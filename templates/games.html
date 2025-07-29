@@ -1,0 +1,58 @@
+{% for game in games %}
+
+<tr class="toplvl" onclick="toggleSelection(this)" style="cursor: pointer;" data-game-id="{{ game.gameId }}">
+  <td>
+               <table>{% for champ, name in game.blue|zip(game.blue_players) %}
+         <tr>
+            <td>
+              <img class="icon is-large" src= "https://ddragon.leagueoflegends.com/cdn/15.14.1/img/champion/{{champ}}.png" alt="Champicon">
+            </td>
+             <td>
+                {{name}}
+            </td>
+          </tr>
+
+        {% endfor %}
+      </table>
+     </td>
+
+       <td>
+               <table>{% for champ in game.ban_blue %}
+         <tr>
+            <td>
+              <img class="icon is-large" src= "https://ddragon.leagueoflegends.com/cdn/15.14.1/img/champion/{{champ}}.png" alt="Champicon">
+            </td>
+          </tr>
+
+        {% endfor %}
+      </table>
+     </td>
+
+ <td>
+               <table>{% for champ in game.ban_red %}
+         <tr>
+            <td>
+              <img class="icon is-large" src= "https://ddragon.leagueoflegends.com/cdn/15.14.1/img/champion/{{champ}}.png" alt="Champicon">
+            </td>
+          </tr>
+
+        {% endfor %}
+      </table>
+      <td>
+               <table>{% for champ, name in game.red|zip(game.red_players) %}
+         <tr>
+              <td>
+                {{name}}
+            </td>
+            <td>
+              <img class="icon is-large" src= "https://ddragon.leagueoflegends.com/cdn/15.14.1/img/champion/{{champ}}.png" alt="Champicon">
+            </td>
+          </tr>
+
+        {% endfor %}
+      </table>
+     </td>
+</tr>
+
+
+{% endfor %}

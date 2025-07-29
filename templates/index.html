@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrimeSearch</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <script src="https://unpkg.com/htmx.org@1.9.4"></script>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+</head>
+<style>
+  tr.toplvl:nth-child(even) {background: #CCC}
+  tr.toplvl:nth-child(odd) {background: #FFF}
+  .loader {
+  border: 16px solid #f3f3f3; /* Light grey */
+  border-top: 16px solid #1c1c1c; /* Blue */
+  border-radius: 50%;
+    margin-left: auto;
+  margin-right: auto;
+  width: 120px;
+  height: 120px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.htmx-indicator {
+                display: none
+            }
+
+.htmx-indicator.htmx-request {
+    display: block;
+}
+
+.htmx-indicator.htmx-request~span {
+    display: none;
+}
+</style>
+
+<script>
+  const selectedIds = new Set();
+
+  function toggleSelection(row) {
+
+    const gameId = row.dataset.gameId;
+    console.log(gameId)
+    if (selectedIds.has(gameId)) {
+      selectedIds.delete(gameId);
+      row.style.backgroundColor = "";
+    } else {
+      selectedIds.add(gameId);
+      row.style.backgroundColor = "#d3f9d8"; // highlight color
+    }
+
+    document.getElementById("selectedGameIds").value = JSON.stringify([...selectedIds]);
+    console.log(selectedIds)
+  }
+</script>
+
+<body>
+
+  <section class="section">
+    <div class="columns">
+      <div class="column is-one-third is-offset-one-third">
+        <input type="text" class="input" placeholder="Search" name="q" >
+      </div>
+    </div>
+    <table class = "hero-buttons buttons">
+      <tbody>
+        <tr>
+          <td>
+            <button class="button" hx-get="/search" hx-trigger="click" hx-target="#results" hx-include="[name='q']" hx-indicator="#loader">Search</button>
+          </td>
+          <td>
+            <button class="button" hx-get="/data" hx-trigger="click" hx-target="#results" hx-include="#loader">Select all</button>
+          </td>
+          <td>
+            <button class="button" hx-get="/search" hx-trigger="click" hx-target="#results" hx-indicator="#loader">Deselect all</button>
+          </td>
+          <td>
+
+  <input type="hidden" name="gameIds" id="selectedGameIds" />
+   <button class="button"  id="submitSelectedGames"  hx-get="/data"
+            hx-trigger="click from:#submitSelectedGames"
+                  hx-include="#selectedGameIds"
+            hx-target="#results" >Go to Data</button>
+
+
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+    <table class="table is-fullwidth is-hoverable">
+      <thead>
+        <tr>
+          <th>Blue</th>
+          <th>Blue Bans</th>
+          <th>Red Bans</th>
+          <th>Red</th>
+        </tr>
+      </thead>
+      <tbody id="results">
+
+      </tbody>
+    </table>
+  </section>
+<div class="loader htmx-indicator" id="loader"></div>
+</body>
+
+</html>
