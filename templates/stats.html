@@ -3,7 +3,7 @@
     <script type="text/javascript">
 
       // Load the Visualization API and the corechart package.
-      google.charts.load('current', {'packages':['corechart']});
+      google.charts.load('current', {'packages':['corechart', 'controls']});
 
       // Set a callback to run when the Google Visualization API is loaded.
       google.charts.setOnLoadCallback(drawChart);
@@ -15,7 +15,9 @@
         var parsed = JSON.parse('{{stats | tojson}}');
 
         // Create the data table.
+
         var data = new google.visualization.DataTable(parsed);
+
 
         // Set chart options
         var options = {'title':'Current Gold',
@@ -25,14 +27,40 @@
         interpolateNulls: true,
             vAxis: {
     format: '#'
-}
+},
         };
 
+
+        // var programmaticFilter = new google.visualization.ControlWrapper({
+        //   'controlType': 'CategoryFilter',
+        //   'containerId': 'filter_div',
+        //
+        //   'options': {
+        //     'filterColumnLabel': 'participantId',
+        //     'ui': {'labelStacking': 'vertical',
+        //             'allowNone': false,
+        //             'allowMultiple': true,
+        //     'caption': 'Select Player'}
+        //   }
+        // });
+
         // Instantiate and draw our chart, passing in some options.
-        var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+        // var chart = new google.visualization.ChartWrapper({
+        //   'chartType': 'LineChart',
+        //   'containerId': 'chart_div',
+        //   'options': options
+        // });
+        //
+        //
+        // //dashboard.bind(chart);
+        //   console.log(data)
+        // chart.draw(data);
+           var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
         chart.draw(data, options);
       }
     </script>
 
-    <!--Div that will hold the pie chart-->
-  <div id="chart_div"></div>
+
+ <!--Div that will hold the dashboard-->
+
+      <div id="chart_div"></div>

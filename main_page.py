@@ -32,6 +32,7 @@ def search():
 def data_aggregator():
     gameIds = json.loads(request.args.get("gameIds"))
     stats = get_game_stats(gameIds)
+
     stats = dataframe_to_google_chart(stats)
     return render_template("stats.html", stats=stats)
 

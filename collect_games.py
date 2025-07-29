@@ -71,6 +71,7 @@ def get_game_stats(game_list):
     headers = {
         "X-Riot-Token": os.getenv("LOL_API_KEY")
     }
+
     frames = []
     for gameId in game_list:
         print("gameId:", gameId)
@@ -78,6 +79,16 @@ def get_game_stats(game_list):
         response = requests.get(url, headers=headers)
         timeline_data = response.json()
         participants_to_id = pd.DataFrame(timeline_data["info"]["participants"])
+        url = f"https://europe.api.riotgames.com/lol/match/v5/matches/{gameId}"
+        response = requests.get(url, headers=headers)
+        game_data = response.json()
+        summoners = game_data["info"]["participants"]
+        puuid_to_name = []
+        for player in summoners:
+            puuid_to_name.append({"name": player["riotIdGameName"], "puuid": player["puuid"]})
+        puuid_to_name = pd.DataFrame(puuid_to_name)
+
+
         for time_stamp, frame in enumerate(timeline_data["info"]["frames"]):
             for participant_id in range(10):
                 frame_data = frame["participantFrames"][str(participant_id+1)]
@@ -85,7 +96,10 @@ def get_game_stats(game_list):
                     frame_data[key] = value
                 frame_data["position"] = (frame_data["position"]["x"], frame_data["position"]["y"])
                 frame_data["frameId"] = time_stamp
-                frame_data["participantId"] = participant_id
+
+                puuid = participants_to_id[participants_to_id["participantId"] == participant_id+1].iloc[0][1]
+                name = puuid_to_name[puuid_to_name["puuid"] == puuid]["name"].iloc[0]
+                frame_data["participantId"] = name
                 remove_keys(frame_data, ["championStats", "damageStats", "position"])
                 frames.append(frame_data)
     frame_df = pd.DataFrame(frames)

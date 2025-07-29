@@ -1,3 +1,4 @@
+import pandas as pd
 import requests
 
 def get_name(puuid, headers):
@@ -35,11 +36,23 @@ def remove_keys(d, keys):
 
 
 def dataframe_to_google_chart(df):
-    df = df[df["participantId"] == 1]
+    # df = df[df["participantId"]
+    #         == 1]
+    names = list(pd.unique(df["participantId"]))
     data = df.to_dict(orient='records')
-    keys = data[0].keys()
-    output = {"cols": [{"id": "", "label": key, "value": "", "type": "number"} for key in keys],
-              "rows": [{"c": [{"v": value, "f": None} for value in d.values()]} for d in data],
-              }
+    keys = list(data[0].keys())
+    outputRaw = {}
+    max_len = df["frameId"].max()
+    for name in names:
+        player_frames = df[df["participantId"] == name].sort_values(by="frameId").copy().reset_index().reindex(range(max_len+1), fill_value=0)
+        outputRaw[name] = player_frames.to_dict(orient='records')
+    output = {}
 
-    return output
+    for key in keys:
+        output[key] = {"cols": [{"id": "", "label": "timestamp", "value": "", "type": "number"}
+                                ] + [{"id": "", "label": name, "value": "", "type": "number"} for name in outputRaw.keys()],
+              "rows": [{"c": [{"v": i, "f": None}] +
+              [{"v": outputRaw[name][i][key], "f": None} for name in names] } for i in range(max_len+1)],
+                       }
+    #print(output['participantId'])
+    return output[keys[2]]
