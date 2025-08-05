@@ -31,14 +31,13 @@ def search():
 @app.route("/data")
 def data_aggregator():
     gameIds = json.loads(request.args.get("gameIds"))
-    stats = get_game_stats(gameIds)
-
+    stats, player_data = get_game_stats(gameIds)
     stats = dataframe_to_google_chart(stats)
-    return render_template("stats.html", stats=stats)
+    return render_template("stats.html", stats=stats, players=player_data.to_dict(orient='records'))
 
 if __name__ == "__main__":
     load_dotenv()
-    print(os.getenv("LOL_API_KEY"))
+
     app.secret_key = os.getenv("SECRET_KEY")
     app.jinja_env.filters['zip'] = zip
     app.run(debug=True)

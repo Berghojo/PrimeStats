@@ -7,6 +7,25 @@ def get_name(puuid, headers):
     assert response.status_code == 200
     return response.json()["gameName"]
 
+
+def increcment_dict(dict, key):
+    if key not in dict:
+        dict[key] = 1
+    else:
+        dict[key]+=1
+    
+
+
+def show_event_types(events):
+    event_types = set()
+
+    for e in events:
+        for e2 in e:
+            event_types.add(e2["type"])
+            if e2["type"] == "ELITE_MONSTER_KILL":
+                print(e2)
+    print(event_types)
+
 def get_puuid(ign, headers):
     try:
         assert "#" in ign
@@ -35,16 +54,19 @@ def remove_keys(d, keys):
         del d[key]
 
 
-def dataframe_to_google_chart(df):
+def dataframe_to_google_chart(df: pd.DataFrame):
     # df = df[df["participantId"]
     #         == 1]
+
+    df = df.fillna(method='ffill')
     names = list(pd.unique(df["participantId"]))
     data = df.to_dict(orient='records')
     keys = list(data[0].keys())
+    
     outputRaw = {}
     max_len = df["frameId"].max()
     for name in names:
-        player_frames = df[df["participantId"] == name].sort_values(by="frameId").copy().reset_index().reindex(range(max_len+1), fill_value=0)
+        player_frames = df[df["participantId"] == name].sort_values(by="frameId").copy().reset_index().reindex(range(max_len+1), method='ffill')
         outputRaw[name] = player_frames.to_dict(orient='records')
     output = {}
 
@@ -54,5 +76,5 @@ def dataframe_to_google_chart(df):
               "rows": [{"c": [{"v": i, "f": None}] +
               [{"v": outputRaw[name][i][key], "f": None} for name in names] } for i in range(max_len+1)],
                        }
-    #print(output['participantId'])
-    return output[keys[2]]
+
+    return output

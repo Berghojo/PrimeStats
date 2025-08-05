@@ -1,66 +1,109 @@
-  <!--Load the AJAX API-->
+<!--Load the AJAX API-->
 
-    <script type="text/javascript">
+<script type="text/javascript">
+  $(document).ready(function () {
 
-      // Load the Visualization API and the corechart package.
-      google.charts.load('current', {'packages':['corechart', 'controls']});
-
-      // Set a callback to run when the Google Visualization API is loaded.
-      google.charts.setOnLoadCallback(drawChart);
-
-      // Callback that creates and populates a data table,
-      // instantiates the pie chart, passes in the data and
-      // draws it.
-      function drawChart() {
-        var parsed = JSON.parse('{{stats | tojson}}');
-
-        // Create the data table.
-
-        var data = new google.visualization.DataTable(parsed);
+    var multipleCancelButton = new Choices('#choices-multiple-remove-button', {
+      removeItemButton: true,
+      maxItemCount: 5,
+      searchResultLimit: 100,
+      renderChoiceLimit: 100
+    });
+  });
 
 
-        // Set chart options
-        var options = {'title':'Current Gold',
-                       'width':1200,
-            'curveType': 'function',
-                       'height':600,
-        interpolateNulls: true,
-            vAxis: {
-    format: '#'
-},
-        };
+  // Load the Visualization API and the corechart package.
+  google.charts.load('current', { 'packages': ['corechart', 'controls'] });
+
+  // Set a callback to run when the Google Visualization API is loaded.
+  google.charts.setOnLoadCallback(drawChart);
+
+  // Callback that creates and populates a data table,
+  // instantiates the pie chart, passes in the data and
+  // draws it.
+  function drawChart(filtered_columns = [], stat_type = "currentGold") {
+    const parsed = JSON.parse('{{stats | tojson}}');
+    let stat_types = Object.keys(parsed)
+    let selected_type = stat_types[stat_types.indexOf(stat_type)]
+    const selected_data = parsed[selected_type]
+    const data = new google.visualization.DataTable(selected_data);
+    var view = new google.visualization.DataView(data);
+    if (filtered_columns.length > 0) {
+      let numeric_column = [0]
+      filtered_columns.forEach((name) => {
+        var column_id = selected_data.cols.map((element) => {
+
+          return element.label == name
+        })
+        numeric_column.push(column_id.indexOf(true))
+
+        view.setColumns(numeric_column)
+      })
+    }
 
 
-        // var programmaticFilter = new google.visualization.ControlWrapper({
-        //   'controlType': 'CategoryFilter',
-        //   'containerId': 'filter_div',
-        //
-        //   'options': {
-        //     'filterColumnLabel': 'participantId',
-        //     'ui': {'labelStacking': 'vertical',
-        //             'allowNone': false,
-        //             'allowMultiple': true,
-        //     'caption': 'Select Player'}
-        //   }
-        // });
 
-        // Instantiate and draw our chart, passing in some options.
-        // var chart = new google.visualization.ChartWrapper({
-        //   'chartType': 'LineChart',
-        //   'containerId': 'chart_div',
-        //   'options': options
-        // });
-        //
-        //
-        // //dashboard.bind(chart);
-        //   console.log(data)
-        // chart.draw(data);
-           var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
-        chart.draw(data, options);
+    // Set chart options
+    var options = {
+      'title': selected_type,
+      'width': 1200,
+      'height': 600,
+      interpolateNulls: true,
+      vAxis: {
+        format: '#'
+      },
+    };
+
+    var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+    chart.draw(view, options);
+  }
+</script>
+<script>
+  function getSelectValues(select) {
+    var result = [];
+    var options = select && select.options;
+
+    var opt;
+
+    for (var i = 0, iLen = options.length; i < iLen; i++) {
+      opt = options[i];
+
+      if (opt.selected) {
+        result.push(opt.value);
       }
-    </script>
+    }
+    return result;
+  }
 
 
- <!--Div that will hold the dashboard-->
+</script>
 
-      <div id="chart_div"></div>
+<div class="row d-flex justify-content-center mt-100 column is-offset-one-third is-one-third">
+  <div class="col-md-6"> <select id="choices-multiple-remove-button" name="summoner-select"
+      placeholder="Select upto 5 tags" multiple>
+      {% for player in players %}
+      <option value="{{player.name}}">{{player.name}} ({{player.Position}})</option>
+      {% endfor %}
+
+
+    </select>
+    <select id="choices-multiple-remove-button" name="stat-select" placeholder="Select Stat">
+      {% for key, value in stats.items() %}
+      <option value="{{key}}">{{key}}</option>
+      {% endfor %}
+
+
+    </select>
+    <button class="button" onclick="var el = document.getElementsByTagName('select')[0]
+  var el2 = document.getElementsByTagName('select')[1]
+  ; drawChart(getSelectValues(el), el2.value);">
+      Apply Changes
+    </button>
+
+  </div>
+</div>
+
+<!--Div that will hold the dashboard-->
+
+<div id="chart_div" class="column is-offset-one-fifth"></div> 
+</div>
