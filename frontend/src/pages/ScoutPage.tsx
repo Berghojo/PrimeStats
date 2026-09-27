@@ -5,6 +5,7 @@ import { useMeta, useRecentScouts, useStartScout } from "../api/hooks";
 import type { ScoutMode, ScoutPlayer, ScoutSummary } from "../api/types";
 import { ErrorBox, Loading } from "../components/ui";
 import { ago, splitRiotId } from "../lib/format";
+import { InfoTip } from "../components/InfoTip";
 
 const MAX_PLAYERS = 5;
 
@@ -73,12 +74,19 @@ export function SearchForm() {
             <legend className="muted small">Welche Spiele laden?</legend>
             <label className="check">
               <input type="radio" name="mode" checked={mode === "any"} onChange={() => setMode("any")} />
-              <span><b>Jeder einzeln</b> – die Spiele jedes Spielers (z.B. Stammspieler und Ersatz); im Ergebnis kannst du
-                danach die Spieler auswählen</span>
+              <span>
+                <b>Jeder einzeln</b>
+                <InfoTip>
+                  Die Spiele jedes Spielers (z.B. Stammspieler und Ersatz); im Ergebnis kannst du danach die Spieler auswählen.
+                </InfoTip>
+              </span>
             </label>
             <label className="check">
               <input type="radio" name="mode" checked={mode === "all"} onChange={() => setMode("all")} />
-              <span><b>Nur gemeinsam</b> – nur Spiele, in denen alle eingegebenen Spieler im selben Team standen</span>
+              <span>
+                <b>Nur gemeinsam</b>
+                <InfoTip>Nur Spiele, in denen alle eingegebenen Spieler im selben Team standen.</InfoTip>
+              </span>
             </label>
           </fieldset>
         )}

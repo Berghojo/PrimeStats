@@ -6,6 +6,7 @@ import { useChangePassword, useLinkCode, useLogout, useMe, useMeta, useTeams, us
 import type { LinkCode } from "../api/types";
 import { ErrorBox, Loading } from "../components/ui";
 import { ago, dt } from "../lib/format";
+import { InfoTip } from "../components/InfoTip";
 
 function useCountdown(until: string | undefined) {
   const [now, setNow] = useState(Date.now());
@@ -123,12 +124,14 @@ export function AccountPage() {
 
       <section className="grid two">
         <div className="card stack">
-          <h2>Riot-Accounts</h2>
-          <div className="sub">
-            Verknüpfte Accounts weisen dich als Spieler aus: Du siehst deine Scrims, kannst Teams bearbeiten, in deren
-            Kader du stehst, und der Uploader lädt Spiele dieser Accounts hoch. Verknüpft wird über den Uploader – so ist
-            sichergestellt, dass du im League Client mit dem Account eingeloggt bist.
-          </div>
+          <h2>
+            Riot-Accounts
+            <InfoTip>
+              Verknüpfte Accounts weisen dich als Spieler aus: Du siehst deine Scrims, kannst Teams bearbeiten, in deren
+              Kader du stehst, und der Uploader lädt Spiele dieser Accounts hoch. Verknüpft wird über den Uploader – so ist
+              sichergestellt, dass du im League Client mit dem Account eingeloggt bist.
+            </InfoTip>
+          </h2>
           {justLinked && <div className="flash ok">Riot-Account verknüpft.</div>}
           {me.riot_accounts.length > 0 ? (
             <div className="table-wrap">

@@ -39,3 +39,12 @@ def test_classify_order(demo_source):
     ]
     assert pos[blue["TOP"]] == "TOP"
     assert classify_kills(match, {"kills": kills}) == ["lane", "gank", "roam", "dive", "skirmish", "duel", "other"]
+
+
+def test_tower_positions_match_frontend():
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[2] / "frontend" / "src" / "lib" / "towers.ts").read_text(encoding="utf-8")
+    blue = src[src.index("const BLUE"):src.index("];", src.index("const BLUE"))]
+    frontend = [(int(x), int(y)) for x, y in re.findall(r"\[(\d+), (\d+)\]", blue)]
+    assert frontend == TOWERS[100]

@@ -5,6 +5,7 @@ import { ReportBody, useUrlFilters } from "../components/team/ReportBody";
 import { SyncControl } from "../components/team/SyncControl";
 import { Empty, ErrorBox, Loading } from "../components/ui";
 import { useGameData } from "../lib/meta";
+import { InfoTip } from "../components/InfoTip";
 
 export function TeamPage() {
   const teamId = Number(useParams().teamId);
@@ -41,11 +42,14 @@ export function TeamPage() {
           )}
         </div>
         {!team.can_see_scrims && (
-          <p className="muted small" style={{ marginBottom: 0 }}>
-            Du siehst nur Turnierspiele. Scrims sind ausschließlich für Spieler im Kader sichtbar –{" "}
-            {team.can_edit ? <>verknüpfe dazu einen Riot-Account aus dem Kader unter <Link to="/account">Konto</Link>.</>
-              : "dazu muss dein verknüpfter Riot-Account im Kader stehen."}
-          </p>
+          <div className="small" style={{ marginTop: ".5rem" }}>
+            <span className="badge">Nur Turnierspiele</span>
+            <InfoTip>
+              Scrims sind ausschließlich für Spieler im Kader sichtbar –{" "}
+              {team.can_edit ? <>verknüpfe dazu einen Riot-Account aus dem Kader unter <Link to="/account">Konto</Link>.</>
+                : "dazu muss dein verknüpfter Riot-Account im Kader stehen."}
+            </InfoTip>
+          </div>
         )}
       </section>
 

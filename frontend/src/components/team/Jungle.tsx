@@ -5,6 +5,7 @@ import { dt, duration } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 import { type Clear, firstFullClear, reconstruct } from "../../lib/jungleRoute";
 import { type Point, interpolate, wallPolygons } from "../../lib/navgrid";
+import { TOWERS } from "../../lib/towers";
 import { InfoTip } from "../InfoTip";
 import { MapPanel, OptionList, RailSection } from "./MapPanel";
 
@@ -83,6 +84,11 @@ export function MapBase() {
         <image href={mapUrl} width={SIZE} height={SIZE} opacity={0.55} onError={() => setFailed(true)} />
       )}
       <path className="walls" d={WALL_PATH} fillRule="evenodd" />
+      <g className="towers" aria-hidden>
+        {TOWERS.map(({ team, pos: [x, y] }, i) => (
+          <rect key={i} x={px(x) - 4} y={py(y) - 4} width={8} height={8} rx={1.5} className={`tower ${team}`} />
+        ))}
+      </g>
     </>
   );
 }
@@ -365,7 +371,7 @@ function PathView({ paths, maxMinutes, shared }: { paths: JunglePath[]; maxMinut
                 <><br />Camps: {hoveredRoute.clears.map((c) => `${c.camp.name} (~${duration(c.t)})`).join(" → ")}</>
               )}
             </>
-          ) : <>Punkte = Position je Minute (Zahl = Minute), Rauten = geräumte Camps. Linie überfahren für Details.</>}
+          ) : null}
         
         </>
       )}
@@ -389,9 +395,12 @@ function PathView({ paths, maxMinutes, shared }: { paths: JunglePath[]; maxMinut
             <div className="hint">schnellster {fmt(clearStats.fastest)}</div>
           </div>
           <div className="kpi">
-            <div className="label">Full Clear gespielt</div>
+            <div className="label">
+              Full Clear gespielt
+              <InfoTip>Anteil der Spiele mit vollem erstem Clear; sonst Half Clear oder früher Gank.</InfoTip>
+            </div>
             <div className="value">{clearStats.share === null ? "–" : `${Math.round(clearStats.share * 100)} %`}</div>
-            <div className="hint">{clearStats.n} Spiele · sonst Half Clear / früher Gank</div>
+            <div className="hint">{clearStats.n} Spiele</div>
           </div>
         </div>
         <table className="data">
@@ -449,7 +458,8 @@ export function JungleCard({ jungle }: { jungle: Jungle }) {
             <b>Heatmap:</b> Orte, an denen der Jungler an Kills beteiligt war bzw. gestorben ist. Frühe Kills auf einer
             Lane sind meist Ganks.
             <br /><br />
-            <b>Pathing:</b> Die Timeline enthält nur eine Position pro Minute (Punkte). Aus dem Anstieg der Jungle-CS
+            <b>Pathing:</b> Punkte = Position je Minute (Zahl = Minute), Rauten = geräumte Camps, Linie überfahren für
+            Details. Die Timeline enthält nur eine Position pro Minute. Aus dem Anstieg der Jungle-CS
             ergibt sich, wie viele Camps dazwischen geräumt wurden (4 CS je Camp); gewählt werden die Camps, die zu der
             Zeit stehen und den kürzesten begehbaren Weg ergeben. Plausibel, aber nicht der exakte Laufweg.
           </InfoTip>

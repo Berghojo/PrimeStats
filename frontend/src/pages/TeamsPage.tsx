@@ -4,6 +4,7 @@ import { useMe, useTeams } from "../api/hooks";
 import type { Team } from "../api/types";
 import { Empty, ErrorBox, Loading } from "../components/ui";
 import { ago } from "../lib/format";
+import { InfoTip } from "../components/InfoTip";
 
 export function TeamCard({ team }: { team: Team }) {
   return (
@@ -34,11 +35,13 @@ export function TeamsPage() {
     <>
       <section className="row between">
         <div>
-          <h1>Teams</h1>
-          <div className="muted">
-            Aggregierte Statistiken aus gemeinsamen Custom Games (Prime League &amp; Scrims). Du siehst öffentliche Teams und
-            Teams, in deren Kader einer deiner verknüpften Riot-Accounts steht.
-          </div>
+          <h1>
+            Teams
+            <InfoTip>
+              Aggregierte Statistiken aus gemeinsamen Custom Games (Prime League &amp; Scrims). Du siehst öffentliche Teams
+              und Teams, in deren Kader einer deiner verknüpften Riot-Accounts steht.
+            </InfoTip>
+          </h1>
         </div>
         <NewTeamButton />
       </section>

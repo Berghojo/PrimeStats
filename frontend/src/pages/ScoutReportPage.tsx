@@ -139,11 +139,11 @@ export function ScoutReportPage() {
           <div className="team-head">
             <div className="team-logo">{data.players[0].game_name.slice(0, 2).toUpperCase()}</div>
             <div>
-              <h1>{scoutTitle(data.players, data.mode)}</h1>
-              <div className="muted small">
-                {multiple ? MODE_TEXT[data.mode] : "Alle Turnierspiele des Spielers"}
-                {" "}· aktualisiert {ago(data.updated_at)}
-              </div>
+              <h1>
+                {scoutTitle(data.players, data.mode)}
+                <InfoTip>{multiple ? MODE_TEXT[data.mode] : "Alle Turnierspiele des Spielers"}.</InfoTip>
+              </h1>
+              <div className="muted small">aktualisiert {ago(data.updated_at)}</div>
             </div>
           </div>
           {running ? progress : (

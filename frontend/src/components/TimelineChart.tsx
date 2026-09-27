@@ -113,7 +113,10 @@ export function InlineTimeline({ ids, focus }: { ids: string[]; focus?: string[]
         {isFetching && <Spinner />}
       </div>
       {ids.length === 0 ? (
-        <p className="muted">Unten in der Spieletabelle Spiele markieren, um ihren Zeitverlauf zu sehen.</p>
+        <p className="muted">
+          Keine Spiele markiert.
+          <InfoTip>Unten in der Spieletabelle Spiele markieren, um ihren Zeitverlauf zu sehen.</InfoTip>
+        </p>
       ) : error ? (
         <ErrorBox error={error} />
       ) : isPending ? (

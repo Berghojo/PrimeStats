@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useLogin, useMe, useRegister } from "../api/hooks";
 import { ErrorBox } from "../components/ui";
+import { InfoTip } from "../components/InfoTip";
 
 export function LoginPage() {
   const [params] = useSearchParams();
@@ -55,16 +56,18 @@ export function LoginPage() {
                 value={repeat} onChange={(e) => setRepeat(e.target.value)} />
             </label>
           )}
-          <button className="btn primary" type="submit" disabled={action.isPending}>
-            {mode === "login" ? "Anmelden" : "Konto erstellen"}
-          </button>
+          <div className="row">
+            <button className="btn primary" type="submit" disabled={action.isPending}>
+              {mode === "login" ? "Anmelden" : "Konto erstellen"}
+            </button>
+            {mode === "register" && (
+              <InfoTip>
+                Nach der Registrierung verknüpfst du deinen Riot-Account über den PrimeStats-Uploader. Erst dann kannst du
+                Scrims hochladen und siehst private Teamdaten.
+              </InfoTip>
+            )}
+          </div>
         </form>
-        {mode === "register" && (
-          <p className="muted small">
-            Nach der Registrierung verknüpfst du deinen Riot-Account über den PrimeStats-Uploader. Erst dann kannst du
-            Scrims hochladen und siehst private Teamdaten.
-          </p>
-        )}
       </div>
     </section>
   );

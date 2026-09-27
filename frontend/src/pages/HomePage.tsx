@@ -1,17 +1,20 @@
 import { useTeams } from "../api/hooks";
 import { RecentSearches, SearchForm } from "./ScoutPage";
 import { NewTeamButton, TeamCard } from "./TeamsPage";
+import { InfoTip } from "../components/InfoTip";
 
 export function HomePage() {
   const teams = useTeams();
   return (
     <>
       <section className="card hero">
-        <h1>Prime League &amp; Custom-Game-Statistiken</h1>
-        <p>
-          Suche einen oder mehrere Spieler per Riot-ID und werte ihre Turnierspiele aus. Im Ergebnis wählst du bis zu fünf
-          Spieler aus, um die Statistik auf deren Spiele einzugrenzen. Scrims wertest du über ein Team aus.
-        </p>
+        <h1>
+          Prime League &amp; Custom-Game-Statistiken
+          <InfoTip>
+            Suche einen oder mehrere Spieler per Riot-ID und werte ihre Turnierspiele aus. Im Ergebnis wählst du bis zu fünf
+            Spieler aus, um die Statistik auf deren Spiele einzugrenzen. Scrims wertest du über ein Team aus.
+          </InfoTip>
+        </h1>
         <SearchForm />
       </section>
       <RecentSearches />
@@ -26,8 +29,11 @@ export function HomePage() {
           </div>
         ) : (
           <p className="muted">
-            Noch keine Teams. Lege ein Team mit den Riot-IDs deiner Spieler an – PrimeStats findet dann alle Custom Games,
-            in denen genug davon gemeinsam gespielt haben.
+            Noch keine Teams.
+            <InfoTip>
+              Lege ein Team mit den Riot-IDs deiner Spieler an – PrimeStats findet dann alle Custom Games, in denen genug
+              davon gemeinsam gespielt haben.
+            </InfoTip>
           </p>
         )}
       </section>

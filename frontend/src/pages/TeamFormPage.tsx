@@ -4,6 +4,7 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useDeleteTeam, useMe, useSaveTeam, useTeam } from "../api/hooks";
 import { ErrorBox, Loading } from "../components/ui";
 import { useGameData } from "../lib/meta";
+import { InfoTip } from "../components/InfoTip";
 
 interface Row { riot_id: string; role: string }
 
@@ -57,8 +58,10 @@ export function TeamFormPage() {
   return (
     <>
       <section>
-        <h1>{teamId ? "Team bearbeiten" : "Neues Team"}</h1>
-        <div className="muted">Spieler werden über ihre Riot-ID (Name#TAG) gefunden. Auswechselspieler einfach mit eintragen.</div>
+        <h1>
+          {teamId ? "Team bearbeiten" : "Neues Team"}
+          <InfoTip>Spieler werden über ihre Riot-ID (Name#TAG) gefunden. Auswechselspieler einfach mit eintragen.</InfoTip>
+        </h1>
       </section>
       {save.error && <ErrorBox error={save.error} />}
       <form className="card stack" onSubmit={submit}>
@@ -69,7 +72,14 @@ export function TeamFormPage() {
           <label className="field">Kürzel
             <input className="input" maxLength={8} value={tag} onChange={(e) => setTag(e.target.value)} />
           </label>
-          <label className="field">Mindestanzahl Teamspieler pro Spiel
+          <label className="field">
+            <span>
+              Mindestanzahl Teamspieler pro Spiel
+              <InfoTip>
+                Ein Custom Game zählt als Teamspiel, wenn mindestens so viele eingetragene Spieler auf derselben Seite
+                gespielt haben. Mit 4 werden auch Spiele mit einer Aushilfe erfasst.
+              </InfoTip>
+            </span>
             <select value={minMembers} onChange={(e) => setMinMembers(Number(e.target.value))}>
               {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} Spieler{n === 4 ? " (empfohlen)" : ""}</option>)}
             </select>
@@ -78,14 +88,13 @@ export function TeamFormPage() {
         <label className="check">
           <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
           <span>
-            <b>Öffentlich</b> – Statistiken aus Turnierspielen für alle sichtbar. Scrims bleiben immer den Spielern im
-            Kader (mit verknüpftem Riot-Account) vorbehalten.
+            <b>Öffentlich</b>
+            <InfoTip>
+              Statistiken aus Turnierspielen für alle sichtbar. Scrims bleiben immer den Spielern im Kader (mit
+              verknüpftem Riot-Account) vorbehalten.
+            </InfoTip>
           </span>
         </label>
-        <p className="muted small" style={{ margin: 0 }}>
-          Ein Custom Game zählt als Teamspiel, wenn mindestens so viele eingetragene Spieler <em>auf derselben Seite</em>{" "}
-          gespielt haben. Mit 4 werden auch Spiele mit einer Aushilfe erfasst.
-        </p>
         <div>
           <h2>Spieler</h2>
           <div className="grid" style={{ gap: ".5rem" }}>

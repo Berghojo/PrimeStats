@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
 import { buildQuery } from "../api/client";
+import { InfoTip } from "./InfoTip";
 
 interface Props {
   selected: Set<string>;
@@ -22,7 +23,7 @@ export function SelectionBar({ selected, onSelect, focus, team, showFiltered, in
       <button type="button" className="btn small" onClick={() => onSelect("none")}>Keine</button>
       <span className="muted"><b>{selected.size}</b> ausgewählt</span>
       {inline ? (
-        <span className="muted small push">Zeitverlauf oben aktualisiert sich mit der Auswahl.</span>
+        <span className="push"><InfoTip>Der Zeitverlauf oben aktualisiert sich mit der Auswahl.</InfoTip></span>
       ) : (
         <button type="button" className="btn primary push" disabled={selected.size === 0} onClick={analyse}>
           Zeitverlauf analysieren →

@@ -5,6 +5,7 @@ import { ChampIcon } from "../components/ChampIcon";
 import { TimelineChart } from "../components/TimelineChart";
 import { Empty, ErrorBox, Loading } from "../components/ui";
 import { dt } from "../lib/format";
+import { InfoTip } from "../components/InfoTip";
 
 export function AnalysisPage() {
   const [params] = useSearchParams();
@@ -20,8 +21,10 @@ export function AnalysisPage() {
   return (
     <>
       <section>
-        <h1>Zeitverlauf</h1>
-        <div className="muted">Minutenwerte, gemittelt über {data.matches.length} Spiel{data.matches.length !== 1 && "e"} pro Spieler.</div>
+        <h1>
+          Zeitverlauf
+          <InfoTip>Minutenwerte, gemittelt über {data.matches.length} Spiel{data.matches.length !== 1 && "e"} pro Spieler.</InfoTip>
+        </h1>
       </section>
       {data.players.length === 0 ? (
         <Empty>Für die ausgewählten Spiele sind keine Timeline-Daten verfügbar.</Empty>
