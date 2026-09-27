@@ -34,7 +34,7 @@ export function SyncControl({ teamId, initial }: { teamId: number; initial: Sync
   return (
     <div className="sync-box">
       <button className="btn primary" type="button" disabled={start.isPending} onClick={() => start.mutate()}>
-        ⟳ Custom Games synchronisieren
+        Custom Games synchronisieren
       </button>
       {start.error && <ErrorBox error={start.error} />}
       {job?.status === "error" && <span className="neg">{job.message} {job.error}</span>}

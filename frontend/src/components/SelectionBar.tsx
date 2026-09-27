@@ -31,7 +31,7 @@ export function SelectionBar({ games, excluded, onChange, focus, team, inline }:
       <InfoTip>Abgewählte Spiele zählen in der Übersicht nicht mit – in Kennzahlen, Tabellen, Karten und Zeitverlauf.</InfoTip>
       {!inline && team !== undefined && (
         <button type="button" className="btn primary push" disabled={included.length === 0} onClick={analyse}>
-          Zeitverlauf analysieren →
+          Zeitverlauf analysieren
         </button>
       )}
     </div>

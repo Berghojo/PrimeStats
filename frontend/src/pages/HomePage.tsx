@@ -9,7 +9,7 @@ export function HomePage() {
     <>
       <section className="card hero">
         <h1>
-          Prime League &amp; Custom-Game-Statistiken
+          Spieler suchen
           <InfoTip>
             Suche einen oder mehrere Spieler per Riot-ID und werte ihre Turnierspiele aus. Im Ergebnis wählst du bis zu fünf
             Spieler aus, um die Statistik auf deren Spiele einzugrenzen. Scrims wertest du über ein Team aus.

@@ -4,7 +4,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMe, useMeta, useStartScout } from "../api/hooks";
 import { ErrorBox } from "./ui";
 import { splitRiotId } from "../lib/format";
-import { type UiStyle, applyStyle, storedStyle } from "../lib/style";
 
 export function PlayerSearch({ big, autoFocus }: { big?: boolean; autoFocus?: boolean }) {
   const navigate = useNavigate();
@@ -47,22 +46,6 @@ export function PlayerSearch({ big, autoFocus }: { big?: boolean; autoFocus?: bo
   );
 }
 
-/** Umschalter zwischen Prime-League-Stil und nüchternem Analyse-Stil */
-function StyleToggle() {
-  const [style, setStyle] = useState<UiStyle>(storedStyle);
-  const next: UiStyle = style === "prime" ? "analytics" : "prime";
-  return (
-    <button type="button" className="btn small style-toggle" title="Darstellung umschalten"
-      aria-label={`Stil: ${style === "prime" ? "Prime League" : "Analyse"} – umschalten`}
-      onClick={() => {
-        applyStyle(next);
-        setStyle(next);
-      }}>
-      {style === "prime" ? "◧ Analyse-Stil" : "◧ Prime-Stil"}
-    </button>
-  );
-}
-
 function UserMenu() {
   const { data: me } = useMe();
   const { pathname } = useLocation();
@@ -96,7 +79,6 @@ export function Layout() {
           {meta?.demo && <span className="badge official" title="Es werden generierte Beispieldaten verwendet">Demo-Modus</span>}
           <div className="topbar-right">
             {pathname !== "/" && <PlayerSearch />}
-            <StyleToggle />
             <UserMenu />
           </div>
         </div>

@@ -7,14 +7,14 @@ import { Bar, Line } from "react-chartjs-2";
 import { num } from "../lib/format";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
-ChartJS.defaults.color = "#8b93a5";
+ChartJS.defaults.color = "#8f9096";
 ChartJS.defaults.font.family = '"Barlow", system-ui, sans-serif';
-ChartJS.defaults.borderColor = "rgba(37, 43, 56, .7)";
-ChartJS.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+ChartJS.defaults.borderColor = "rgba(46, 48, 53, .8)";
 ChartJS.defaults.plugins.legend.labels.boxWidth = 12;
 
-export const PALETTE = ["#00dcc0", "#7c5cff", "#ffb547", "#ff5a6a", "#4c8dff", "#2fd48a", "#f472b6",
-  "#a3e635", "#fb923c", "#38bdf8", "#c084fc", "#facc15", "#94a3b8", "#e879f9"];
+/** gedeckte Serienfarben, auf dunklem Grund gut unterscheidbar */
+export const PALETTE = ["#5b93f0", "#e3b341", "#4cb782", "#e5535f", "#a383e0", "#57b8c9", "#e0875a", "#d67fb0",
+  "#9bb85a", "#b8b6b0", "#7f8fd9", "#c29a6b", "#6fc7a4", "#c9a0dc"];
 
 export interface LineSeries {
   label: string;

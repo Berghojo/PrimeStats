@@ -119,19 +119,19 @@ export function ViewCustomizer({ kind, panels, setPanels, views, loggedIn }: Ret
           Ansicht
           <select value={value} onChange={(e) => choose(e.target.value)} aria-label="Ansicht wählen">
             <option value="all">Alle Panels</option>
-            {views.map((v) => <option key={v.id} value={v.id}>{v.name}{v.is_default ? " ★" : ""}</option>)}
+            {views.map((v) => <option key={v.id} value={v.id}>{v.name}{v.is_default ? " (Standard)" : ""}</option>)}
             {value === "custom" && <option value="custom">Angepasst</option>}
           </select>
         </label>
         <button type="button" className={`btn small${open ? " primary" : ""}`} aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}>⚙ Anpassen</button>
-        <button type="button" className="btn small" onClick={share}>{copied ? "✓ Link kopiert" : "🔗 Link teilen"}</button>
+          onClick={() => setOpen((o) => !o)}>Anpassen</button>
+        <button type="button" className="btn small" onClick={share}>{copied ? "Link kopiert" : "Link teilen"}</button>
         {loggedIn ? (
           <>
             {!current && <button type="button" className="btn small" onClick={() => setNaming((n) => !n)}>Ansicht speichern</button>}
             {current && !current.is_default && (
               <button type="button" className="btn small" onClick={() => save.mutate({ id: current.id, is_default: true })}>
-                ★ Als Standard
+                Als Standard
               </button>
             )}
             {current && (

@@ -22,7 +22,7 @@ export const px = (x: number) => ((x - IMG_MIN) / (IMG_MAX_X - IMG_MIN)) * SIZE;
 export const py = (y: number) => SIZE - ((y - IMG_MIN) / (IMG_MAX_Y - IMG_MIN)) * SIZE;
 
 
-const SIDE_COLOR: Record<Side, string> = { blue: "#4c8dff", red: "#ff4d5e" };
+const SIDE_COLOR: Record<Side, string> = { blue: "#5b93f0", red: "#e5535f" };
 
 /** Camps der blauen Seite; die rote Seite ist punktgespiegelt. */
 const CAMPS: [string, number, number][] = [
@@ -149,8 +149,8 @@ export function Slider({ label, value, min, max, step = 1, format, onChange }: {
     </label>
   );
 }
-export const KILL_RGB: [number, number, number] = [0, 220, 192];
-export const DEATH_RGB: [number, number, number] = [255, 77, 94];
+export const KILL_RGB: [number, number, number] = [76, 183, 130];
+export const DEATH_RGB: [number, number, number] = [229, 83, 95];
 
 function Segmented<T extends string | number>({ value, options, onChange, label }: {
   value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string;

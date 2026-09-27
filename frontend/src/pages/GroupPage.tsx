@@ -5,6 +5,7 @@ import {
   useDeleteGroup, useMe, useGroupCompare, useRecentScouts, useStartScout, useTeams, useUpdateGroup,
 } from "../api/hooks";
 import type { Group, GroupEntry, GroupEntryOut, GroupTeamStats, PlayerReport } from "../api/types";
+import { PALETTE } from "../components/charts";
 import { InfoTip } from "../components/InfoTip";
 import { Tabs, useTab } from "../components/Tabs";
 import { FilterBar } from "../components/team/FilterBar";
@@ -16,11 +17,9 @@ import { parseTeams } from "../lib/teamImport";
 import { ApiError } from "../api/client";
 import { useGameData } from "../lib/meta";
 
-/** Feste Farbe je Team (Reihenfolge in der Gruppe) */
-export const TEAM_COLORS = ["#00e1c4", "#ff5a6e", "#ffb547", "#7c6cff", "#4ea1ff", "#3ddc84", "#ff7ad9", "#c4d65a",
-  "#ff8a4c", "#9aa7ff", "#5ad1e6", "#e0e0e0", "#b983ff", "#f5d76e", "#6ee7b7", "#fb7185"];
 
-const teamColor = (i: number) => TEAM_COLORS[i % TEAM_COLORS.length];
+/** feste Farbe je Team (Reihenfolge in der Gruppe) */
+const teamColor = (i: number) => PALETTE[i % PALETTE.length];
 const entryLink = (e: GroupEntry) => (e.kind === "team" ? `/teams/${e.ref}` : `/scout/${e.ref}`);
 const plain = (e: GroupEntry): GroupEntry => ({ kind: e.kind, ref: e.ref, name: e.name });
 
@@ -50,7 +49,7 @@ function GroupHeader({ group }: { group: Group }) {
         </InfoTip>
       </h1>
       <div className="row">
-        <button className="btn small" type="button" onClick={share}>{copied ? "✓ Link kopiert" : "Link teilen"}</button>
+        <button className="btn small" type="button" onClick={share}>{copied ? "Link kopiert" : "Link teilen"}</button>
         {group.can_edit && (
           <>
             <button className="btn small" type="button" onClick={rename}>Umbenennen</button>

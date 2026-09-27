@@ -31,7 +31,7 @@ export function MatchPage() {
             <span className="small">{match.match_id}</span>
           </div>
         </div>
-        <Link className="btn" to={analysisLink}>Zeitverlauf →</Link>
+        <Link className="btn" to={analysisLink}>Zeitverlauf</Link>
       </section>
       {[match.blue, match.red].map((side) => (
         <section className="card" key={side.team_id}>

@@ -150,7 +150,7 @@ export function ScoutReportPage() {
           <div className="row">
             <AddToGroup kind="scout" refId={data.key} />
             {running ? progress : (
-              <button className="btn" type="button" onClick={refresh} disabled={restart.isPending}>⟳ Aktualisieren</button>
+              <button className="btn" type="button" onClick={refresh} disabled={restart.isPending}>Aktualisieren</button>
             )}
           </div>
         </div>

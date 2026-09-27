@@ -72,7 +72,7 @@ function GameRow({ g, puuid, on, onToggle }: { g: PlayerGame; puuid: string; on:
       <div className="mh-kda">
         <span className="big">{g.kills} / <span className="neg">{g.deaths}</span> / {g.assists}</span>
         <span className="muted small">{num((g.kills + g.assists) / Math.max(g.deaths, 1), 2)} KDA · KP {pct(g.kp)}</span>
-        <Link className="small" to={`/match/${g.match_id}`}>Scoreboard →</Link>
+        <Link className="small" to={`/match/${g.match_id}`}>Scoreboard</Link>
       </div>
       <div className="mh-stats">
         <span>CS <b>{g.cs}</b> ({num(g.cs / minutes)})</span>
@@ -189,7 +189,7 @@ export function PlayerPage() {
             </div>
           ) : (
             <button className="btn" type="button" disabled={start.isPending || !meta?.configured} onClick={() => start.mutate()}>
-              ⟳ Aktualisieren
+              Aktualisieren
             </button>
           )}
         </div>

@@ -30,7 +30,7 @@ export function AddToGroup({ kind, refId }: { kind: GroupEntryKind; refId: strin
         {groups.data?.map((g) => <option key={g.key} value={g.key}>{g.name}</option>)}
         <option value="__new">Neue Gruppe …</option>
       </select>
-      {done && <Link className="small" to={`/groups/${done.key}`}>✓ in „{done.name}“</Link>}
+      {done && <Link className="small" to={`/groups/${done.key}`}>Hinzugefügt zu „{done.name}“</Link>}
     </span>
   );
 }
