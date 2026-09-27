@@ -395,3 +395,5 @@ input[type=range] { accent-color: var(--accent); }
 .slider-head b { color: var(--text); font-variant-numeric: tabular-nums; }
 .slider input { width: 100%; }
 .nav-net line { stroke: rgba(255, 255, 255, .28); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.walls polygon { fill: #1c2a24; stroke: #3d5249; stroke-width: 1.5; stroke-linejoin: round; opacity: .9; }
+.walls.outline polygon { fill: rgba(255, 194, 61, .12); stroke: #ffc23d; stroke-width: 1.5; stroke-dasharray: 4 3; opacity: 1; }

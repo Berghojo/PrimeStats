@@ -1,17 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Jungle, JungleEvent, JunglePath, Side } from "../../api/types";
 import { dt } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
-import { type Point, edges, interpolate } from "../../lib/rift";
+import { type Point, WALLS, edges, interpolate } from "../../lib/rift";
 
 /** Kartengröße in Spielkoordinaten (Summoner's Rift, Ursprung unten links) */
 const MAP_W = 14870;
 const MAP_H = 14980;
 const SIZE = 512;
+/** Bereich, den das offizielle Kartenbild (Data Dragon, map11.png) abdeckt – laut Riot-Doku */
+const IMG_MIN = -120;
+const IMG_MAX_X = 14870;
+const IMG_MAX_Y = 14980;
 
-const px = (x: number) => (x / MAP_W) * SIZE;
-const py = (y: number) => SIZE - (y / MAP_H) * SIZE;
+const px = (x: number) => ((x - IMG_MIN) / (IMG_MAX_X - IMG_MIN)) * SIZE;
+const py = (y: number) => SIZE - ((y - IMG_MIN) / (IMG_MAX_Y - IMG_MIN)) * SIZE;
+
+/** Darstellung der Karte (Wände, Abgleich mit dem echten Kartenbild) – gilt für Heatmap und Pathing. */
+interface MapSettings {
+  walls: boolean;
+  /** Abgleich: echtes Kartenbild voll sichtbar, Wände nur als Umriss */
+  calibrate: boolean;
+  imageOpacity: number;
+  onImage: (state: "ok" | "failed") => void;
+}
+const MapContext = createContext<MapSettings>({ walls: true, calibrate: false, imageOpacity: 0.55, onImage: () => {} });
 
 const SIDE_COLOR: Record<Side, string> = { blue: "#4c8dff", red: "#ff4d5e" };
 
@@ -46,8 +60,9 @@ export function zone(x: number, y: number, side: Side): string {
 const ZONES = ["Toplane", "Midlane", "Botlane", "Fluss", "Eigener Jungle", "Gegnerischer Jungle", "Basis"];
 
 /** Summoner's Rift als schlichte Vektorgrafik – Hintergrund, falls das Kartenbild nicht lädt. */
-function MapBase() {
+function MapBase(_: { walls?: boolean }) {
   const { mapUrl } = useGameData();
+  const { walls, calibrate, imageOpacity, onImage } = useContext(MapContext);
   const [failed, setFailed] = useState(false);
   return (
     <>
@@ -61,7 +76,17 @@ function MapBase() {
       <circle cx={34} cy={478} r={30} fill="#16233d" />
       <circle cx={478} cy={34} r={30} fill="#3a1820" />
       {mapUrl && !failed && (
-        <image href={mapUrl} width={SIZE} height={SIZE} opacity={0.55} onError={() => setFailed(true)} />
+        <image href={mapUrl} width={SIZE} height={SIZE} opacity={imageOpacity}
+          onLoad={() => onImage("ok")}
+          onError={() => {
+            setFailed(true);
+            onImage("failed");
+          }} />
+      )}
+      {(walls || calibrate) && (
+        <g className={calibrate ? "walls outline" : "walls"}>
+          {WALLS.map((w, i) => <polygon key={i} points={w.map(([x, y]) => `${px(x)},${py(y)}`).join(" ")} />)}
+        </g>
       )}
     </>
   );
@@ -139,7 +164,7 @@ function Segmented<T extends string | number>({ value, options, onChange, label 
   );
 }
 
-function HeatView({ events, games }: { events: JungleEvent[]; games: number }) {
+function HeatView({ events, games, walls }: { events: JungleEvent[]; games: number; walls: boolean }) {
   const [type, setType] = useState<HeatType>("involved");
   const lastMinute = Math.max(15, Math.ceil(Math.max(0, ...events.map((e) => e.t)) / 60));
   const [from, setFrom] = useState(0);
@@ -180,7 +205,7 @@ function HeatView({ events, games }: { events: JungleEvent[]; games: number }) {
             format={(v) => `${Math.round(v * 100)} %`} />
         </div>
         <div className="map">
-          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer"><MapBase /></svg>
+          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer"><MapBase walls={walls} /></svg>
           <Heat points={shown} rgb={type === "death" ? DEATH_RGB : KILL_RGB} radius={radius} intensity={intensity} />
         </div>
       </div>
@@ -218,7 +243,7 @@ function HeatView({ events, games }: { events: JungleEvent[]; games: number }) {
 
 const netEdges = edges();
 
-function PathView({ paths, maxMinutes }: { paths: JunglePath[]; maxMinutes: number }) {
+function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinutes: number; walls: boolean }) {
   const { champion } = useGameData();
   const [minutes, setMinutes] = useState(Math.min(6, maxMinutes));
   const [side, setSide] = useState<"all" | Side>("all");
@@ -259,7 +284,7 @@ function PathView({ paths, maxMinutes }: { paths: JunglePath[]; maxMinutes: numb
         </div>
         <div className="map">
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer" onMouseLeave={() => setHover(null)}>
-            <MapBase />
+            <MapBase walls={walls} />
             {showNet && (
               <g className="nav-net">
                 {netEdges.map(([a, b], i) => <line key={i} x1={px(a[0])} y1={py(a[1])} x2={px(b[0])} y2={py(b[1])} />)}
@@ -321,6 +346,11 @@ function PathView({ paths, maxMinutes }: { paths: JunglePath[]; maxMinutes: numb
 /** Jungle-Auswertung: Gank-Heatmap und Pathing des eigenen Junglers. */
 export function JungleCard({ jungle }: { jungle: Jungle }) {
   const [view, setView] = useState<View>("heat");
+  const [walls, setWalls] = useState(true);
+  const [calibrate, setCalibrate] = useState(false);
+  const [imageOpacity, setImageOpacity] = useState(1);
+  const [image, setImage] = useState<"ok" | "failed" | null>(null);
+  const settings: MapSettings = { walls, calibrate, imageOpacity: calibrate ? imageOpacity : 0.55, onImage: setImage };
   const [off, setOff] = useState<Set<string>>(new Set());
   if (!jungle.players.length) return null;
   const active = (puuid: string) => !off.has(puuid);
@@ -354,7 +384,34 @@ export function JungleCard({ jungle }: { jungle: Jungle }) {
           ))}
         </div>
       )}
-      {view === "heat" ? <HeatView events={events} games={games} /> : <PathView paths={paths} maxMinutes={jungle.path_minutes} />}
+      <MapContext.Provider value={settings}>
+        {view === "heat"
+          ? <HeatView events={events} games={games} walls={walls} />
+          : <PathView paths={paths} maxMinutes={jungle.path_minutes} walls={walls} />}
+      </MapContext.Provider>
+      <div className="row small">
+        <label className="check">
+          <input type="checkbox" checked={walls} onChange={(e) => setWalls(e.target.checked)} />
+          <span>Wände einblenden (angenäherte Umrisse)</span>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={calibrate} onChange={(e) => setCalibrate(e.target.checked)} />
+          <span>Kartenabgleich: echtes Kartenbild mit Wand-Umrissen</span>
+        </label>
+      </div>
+      {calibrate && (
+        <div className="stack">
+          <div className="sliders">
+            <Slider label="Kartenbild" value={imageOpacity} min={0} max={1} step={0.05} onChange={setImageOpacity}
+              format={(v) => `${Math.round(v * 100)} %`} />
+          </div>
+          <p className="muted small">
+            {image === "failed"
+              ? "Das Kartenbild von Riot (Data Dragon) konnte nicht geladen werden – ohne Internetzugang ist kein Abgleich möglich."
+              : "Gestrichelte Umrisse = angenommene Wände, gepunktete Linien (\u201eWegenetz\u201c im Pathing) = angenommene Wege. Liegen sie neben den echten Wänden, bitte einen Screenshot schicken."}
+          </p>
+        </div>
+      )}
     </section>
   );
 }
