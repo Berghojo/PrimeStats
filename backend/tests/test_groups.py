@@ -59,11 +59,13 @@ def test_group_crud_and_compare(client, imported):
     assert client.post("/api/groups", json={"name": "x", "entries": [{"kind": "team", "ref": key}]}).status_code == 422
     assert client.post("/api/groups", json={"name": "x", "entries": [{"kind": "scout", "ref": "1"}]}).status_code == 422
 
-    # Andere sehen die Gruppe per Link, dürfen sie aber nicht ändern
+    # Ohne Anmeldung gibt es keine Gruppen; andere Angemeldete sehen sie per Link, dürfen sie aber nicht ändern
     other = other_client(client)
+    assert other.get(f"/api/groups/{group['key']}").status_code == 401
+    assert other.get(f"/api/groups/{group['key']}/compare").status_code == 401
+    register(other, "gast")
     shared = other.get(f"/api/groups/{group['key']}").json()
     assert shared["can_edit"] is False and len(shared["entries"]) == 2
-    register(other, "gast")
     assert other.get("/api/groups").json() == []
     assert other.patch(f"/api/groups/{group['key']}", json={"name": "fremd"}).status_code == 404
     assert other.delete(f"/api/groups/{group['key']}").status_code == 404
@@ -83,7 +85,21 @@ def test_private_team_hidden_in_shared_group(client):
     team_id = _team(client, public=False)
     group = client.post("/api/groups", json={"name": "G", "entries": [{"kind": "team", "ref": str(team_id)}]}).json()
     other = other_client(client)
+    register(other, "gast")
     cmp = other.get(f"/api/groups/{group['key']}/compare").json()
     (entry,) = cmp["teams"]
     assert entry["entry"]["available"] is False and entry["overview"] is None and entry["players"] == []
     assert entry["entry"]["title"] == "Team nicht verfügbar"
+
+
+def test_logged_in_users_may_scout_more(client, monkeypatch):
+    from primestats import scout_api
+    monkeypatch.setattr(scout_api.scout_limit, "limit", 1)
+    monkeypatch.setattr(scout_api.user_scout_limit, "limit", 2)
+    ids = ["BSK Skalde#EUW", "ALP Enzian#EUW", "HFK Kogge#EUW", "RHW Anker#EUW"]
+    assert client.post("/api/scout", json={"riot_ids": [ids[0]]}).status_code == 202
+    assert client.post("/api/scout", json={"riot_ids": [ids[1]]}).status_code == 429
+    register(client, "vielscout")
+    assert client.post("/api/scout", json={"riot_ids": [ids[1]]}).status_code == 202
+    assert client.post("/api/scout", json={"riot_ids": [ids[2]]}).status_code == 202
+    assert client.post("/api/scout", json={"riot_ids": [ids[3]]}).status_code == 429

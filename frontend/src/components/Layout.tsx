@@ -80,6 +80,7 @@ function UserMenu() {
 
 export function Layout() {
   const { data: meta } = useMeta();
+  const { data: me } = useMe();
   const { pathname } = useLocation();
   return (
     <>
@@ -89,7 +90,7 @@ export function Layout() {
           <nav className="nav">
             <NavLink to="/" className={() => (pathname === "/" || pathname.startsWith("/scout") || pathname.startsWith("/player") ? "active" : "")}>Suche</NavLink>
             <NavLink to="/teams">Teams</NavLink>
-            <NavLink to="/groups">Gruppen</NavLink>
+            {me?.user && <NavLink to="/groups">Gruppen</NavLink>}
             <NavLink to="/uploader">Scrims hochladen</NavLink>
           </nav>
           {meta?.demo && <span className="badge official" title="Es werden generierte Beispieldaten verwendet">Demo-Modus</span>}

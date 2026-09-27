@@ -2,7 +2,7 @@ import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
-  useDeleteGroup, useGroupCompare, useRecentScouts, useStartScout, useTeams, useUpdateGroup,
+  useDeleteGroup, useMe, useGroupCompare, useRecentScouts, useStartScout, useTeams, useUpdateGroup,
 } from "../api/hooks";
 import type { Group, GroupEntry, GroupEntryOut, GroupTeamStats, PlayerReport } from "../api/types";
 import { InfoTip } from "../components/InfoTip";
@@ -401,6 +401,21 @@ function PlayerCompare({ teams }: { teams: GroupTeamStats[] }) {
 
 // ------------------------------------------------------------------ Seite
 export function GroupPage() {
+  const { data: me } = useMe();
+  if (!me) return <Loading />;
+  if (!me.user) {
+    return (
+      <Empty>
+        <h2>Gruppen gibt es nur für angemeldete Nutzer</h2>
+        <p>Melde dich an, um diese Gruppe zu öffnen.</p>
+        <Link className="btn primary" to={`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}>Anmelden</Link>
+      </Empty>
+    );
+  }
+  return <GroupView />;
+}
+
+function GroupView() {
   const { key = "" } = useParams();
   const [filters, setFilters, resetFilters] = useUrlFilters();
   // Vergleich immer nur mit Turnierspielen – Spieltyp ist daher kein Filter

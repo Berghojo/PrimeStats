@@ -1,8 +1,9 @@
 """Gruppen: mehrere Teams bzw. Scoutings speichern und ihre Kennzahlen und Spieler vergleichen.
 
 Verglichen werden nur Turnierspiele (Prime League, mit Turniercode) – Scrims und Custom Games ohne Code zählen
-nicht, damit alle Teams auf derselben Grundlage stehen. Eine Gruppe gehört einem Konto; wer den Link kennt, kann sie ansehen. Teams, die der Betrachter nicht sehen
-darf, erscheinen nur als „nicht verfügbar“.
+nicht, damit alle Teams auf derselben Grundlage stehen. Gruppen gibt es nur für angemeldete Nutzer: Eine Gruppe
+gehört einem Konto, andere angemeldete Nutzer können sie über den Link ansehen. Teams, die der Betrachter nicht
+sehen darf, erscheinen nur als „nicht verfügbar“.
 """
 
 from __future__ import annotations
@@ -80,7 +81,7 @@ def create_group(body: GroupIn, service: Service, viewer: CurrentViewer, user: C
 
 
 @router.get("/{key}", response_model=GroupOut)
-def get_group(key: str, service: Service, viewer: CurrentViewer):
+def get_group(key: str, service: Service, viewer: CurrentViewer, _user: CurrentUser):
     return _group_out(service, viewer, _get(service, key))
 
 
@@ -113,7 +114,7 @@ def delete_group(key: str, service: Service, user: CurrentUser):
 
 
 @router.get("/{key}/compare", response_model=GroupCompareOut)
-def compare_group(key: str, service: Service, viewer: CurrentViewer, filters: Annotated[GroupFilters, Query()]):
+def compare_group(key: str, service: Service, viewer: CurrentViewer, _user: CurrentUser, filters: Annotated[GroupFilters, Query()]):
     group = _get(service, key)
     if filters.side not in {"all", "blue", "red"}:
         filters.side = "all"

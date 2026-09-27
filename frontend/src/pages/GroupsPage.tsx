@@ -52,14 +52,15 @@ export function GroupsPage() {
           Gruppen
           <InfoTip>
             Speichere mehrere Teams – angelegte Teams oder gescoutete Gegner – als Gruppe (z.B. deine Prime-League-Gruppe)
-            und vergleiche ihre Kennzahlen und alle Spieler direkt miteinander. Gruppen lassen sich per Link teilen.
+            und vergleiche ihre Kennzahlen und alle Spieler direkt miteinander. Gruppen lassen sich per Link mit anderen
+            angemeldeten Nutzern teilen.
           </InfoTip>
         </h1>
       </section>
       {!me ? <Loading /> : !loggedIn ? (
         <Empty>
-          <h2>Anmelden, um Gruppen zu speichern</h2>
-          <p>Gruppen gehören zu deinem Konto. Geteilte Gruppen-Links kannst du auch ohne Anmeldung ansehen.</p>
+          <h2>Gruppen gibt es nur für angemeldete Nutzer</h2>
+          <p>Gruppen gehören zu deinem Konto; auch geteilte Gruppen-Links lassen sich nur angemeldet öffnen.</p>
           <Link className="btn primary" to="/login?next=/groups">Anmelden</Link>
         </Empty>
       ) : (

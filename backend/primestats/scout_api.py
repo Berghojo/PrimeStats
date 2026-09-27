@@ -8,14 +8,14 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
-from .deps import RateLimit, Service, client_ip
+from .deps import RateLimit, Service, client_ip, get_user
 from .riot import NotFound
 from .schemas import (Filters, HistoryRow, ScoutFilters, RosterPlayer, ScoutIn, ScoutPlayer, ScoutReportOut, ScoutStartOut,
                       ScoutSummary, SyncJobOut)
 from .services import scout_key
-from .store import Member, Team
+from .store import Member, Team, UserAccount
 from .team_stats import LABELS, GameRecord, build_report, filter_records, history_rows, patches
 
 def with_players(records: list[GameRecord], puuids: list[str], match: str) -> list[GameRecord]:
@@ -43,8 +43,9 @@ def scout_team(scout: dict) -> Team:
 
 
 router = APIRouter(prefix="/api/scout")
-#: großzügig genug, um eine ganze Liga-Gruppe (8 Teams) auf einmal zu scouten
-scout_limit = RateLimit(limit=40, window=3600)
+scout_limit = RateLimit(limit=20, window=3600)
+#: angemeldet mehr, damit eine ganze Liga-Gruppe (8 Teams) in eine Gruppe importiert werden kann
+user_scout_limit = RateLimit(limit=40, window=3600)
 
 
 def _job_key(key: str) -> tuple[str, str]:
@@ -52,7 +53,8 @@ def _job_key(key: str) -> tuple[str, str]:
 
 
 @router.post("", response_model=ScoutStartOut, status_code=status.HTTP_202_ACCEPTED)
-def start_scout(body: ScoutIn, request: Request, service: Service):
+def start_scout(body: ScoutIn, request: Request, service: Service,
+                user: Annotated[UserAccount | None, Depends(get_user)]):
     if not service.online:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Scouting braucht einen Riot-API-Key.")
     accounts, errors = [], []
@@ -70,7 +72,10 @@ def start_scout(body: ScoutIn, request: Request, service: Service):
     key = scout_key([a["puuid"] for a in accounts], mode)
     running = service.jobs.get(_job_key(key))
     if not (running and running.status == "running"):
-        scout_limit.check(client_ip(request))
+        if user is None:
+            scout_limit.check(client_ip(request))
+        else:
+            user_scout_limit.check(f"user:{user.id}")
     job = service.jobs.run(_job_key(key), lambda j: service.scout(accounts, j, mode=mode))
     return ScoutStartOut(
         key=key,
