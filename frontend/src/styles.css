@@ -598,7 +598,7 @@ table.data tr.off td { opacity: .45; }
 }
 
 /* ------------------------------------------------------------------ Gruppen */
-.group-add { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; align-items: start;
+.group-add { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 1rem; align-items: start;
   border-top: 1px solid var(--border); padding-top: 1rem; }
 .field-row { display: flex; gap: .5rem; align-items: end; }
 .field-row label.field { flex: 1; min-width: 0; }
@@ -612,3 +612,8 @@ table.data tr.off td { opacity: .45; }
 label.field.inline { display: flex; align-items: center; gap: .5rem; }
 table.data td.best { color: var(--win); font-weight: 700; }
 table.data td .spinner { display: inline-block; width: 12px; height: 12px; vertical-align: middle; }
+@media (max-width: 720px) { .group-add { grid-template-columns: 1fr; } }
+.bulk-import textarea { width: 100%; font: 14px/1.5 var(--font); resize: vertical; }
+.import-preview { margin: 0; padding-left: 1.1rem; display: grid; gap: .15rem; font-size: .9rem; }
+.import-preview li.bad { opacity: .6; }
+.flash.error ul { margin: .3rem 0 0; padding-left: 1.1rem; }

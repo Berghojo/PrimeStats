@@ -11,7 +11,9 @@ import { FilterBar } from "../components/team/FilterBar";
 import { PlayersTable } from "../components/team/PlayersTable";
 import { useUrlFilters } from "../components/team/ReportBody";
 import { Empty, ErrorBox, Loading, Spinner } from "../components/ui";
-import { duration, num, pct, signed, splitRiotId, tone } from "../lib/format";
+import { duration, num, pct, signed, tone } from "../lib/format";
+import { parseTeams } from "../lib/teamImport";
+import { ApiError } from "../api/client";
 import { useGameData } from "../lib/meta";
 
 /** Feste Farbe je Team (Reihenfolge in der Gruppe) */
@@ -67,81 +69,111 @@ function GroupHeader({ group }: { group: Group }) {
   );
 }
 
-function AddTeamForm({ group, onAdd, busy }: { group: Group; onAdd: (e: GroupEntry) => void; busy: boolean }) {
-  const teams = useTeams();
-  const scouts = useRecentScouts();
+/** Mehrere Gegner auf einmal: Text einfügen, jedes Team wird gescoutet und hinzugefügt. */
+function BulkImport({ busy, onAdd }: { busy: boolean; onAdd: (entries: GroupEntry[]) => void }) {
   const start = useStartScout();
-  const [team, setTeam] = useState("");
-  const [scout, setScout] = useState("");
-  const [rows, setRows] = useState<string[]>(["", ""]);
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
-  const has = (kind: string, ref: string) => group.entries.some((e) => e.kind === kind && e.ref === ref);
+  const [text, setText] = useState("");
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [failed, setFailed] = useState<string[]>([]);
+  const parsed = useMemo(() => parseTeams(text), [text]);
+  const valid = parsed.filter((t) => t.riotIds.length > 0);
 
-  const scoutNew = (ev: FormEvent) => {
+  const submit = async (ev: FormEvent) => {
     ev.preventDefault();
-    const filled = rows.map((r) => r.trim()).filter(Boolean);
-    const invalid = filled.filter((r) => !splitRiotId(r));
-    if (!filled.length || invalid.length) {
-      setError(invalid.length ? `Bitte im Format Name#TAG eingeben: ${invalid.join(", ")}` : "Mindestens einen Spieler eingeben.");
-      return;
+    const added: GroupEntry[] = [];
+    const errors: string[] = [];
+    const leftover: string[] = [];
+    setProgress({ done: 0, total: valid.length });
+    for (const [i, team] of valid.entries()) {
+      try {
+        const res = await start.mutateAsync({ riotIds: team.riotIds, mode: "any" });
+        added.push({ kind: "scout", ref: res.key, name: team.name.slice(0, 40) });
+      } catch (err) {
+        const detail = err instanceof ApiError && err.details.length ? ` (${err.details.join("; ")})` : "";
+        errors.push(`${team.name || team.riotIds.join(", ")}: ${err instanceof Error ? err.message : String(err)}${detail}`);
+        leftover.push(`${team.name ? `${team.name}: ` : ""}${team.riotIds.join(", ")}`);
+      }
+      setProgress({ done: i + 1, total: valid.length });
     }
-    setError("");
-    start.mutate({ riotIds: filled, mode: "any" }, {
-      onSuccess: (res) => {
-        onAdd({ kind: "scout", ref: res.key, name: name.trim() });
-        setRows(["", ""]);
-        setName("");
-      },
-    });
+    if (added.length) onAdd(added);
+    setFailed(errors);
+    setText(leftover.join("\n"));  // fehlgeschlagene Teams zum Korrigieren stehen lassen
+    setProgress(null);
   };
 
   return (
+    <form className="stack bulk-import" onSubmit={submit}>
+      <div className="muted small">
+        Neue Teams scouten – mehrere auf einmal
+        <InfoTip>
+          Ein Team pro Zeile als „Teamname: Spieler#TAG, Spieler#TAG, …“ oder als Block (erste Zeile Teamname, dann eine
+          Riot-ID pro Zeile, Blöcke durch Leerzeile getrennt). Bis zu 5 Spieler je Team, Ersatzspieler dürfen dabei sein.
+          Geladen werden die Turnierspiele jedes Spielers.
+        </InfoTip>
+      </div>
+      <textarea className="input" rows={8} value={text} onChange={(e) => setText(e.target.value)} aria-label="Teams einfügen"
+        placeholder={"Nordlicht Esports: NLE Polaris#EUW, NLE Kompass#EUW, NLE Waldgeist#EUW\nBerserker: BSK Skalde#EUW, BSK Drakkar#EUW\n…"} />
+      {parsed.length > 0 && (
+        <ul className="import-preview">
+          {parsed.map((t, i) => (
+            <li key={i} className={t.riotIds.length ? "" : "bad"}>
+              <b>{t.name || `Team ${i + 1}`}</b>
+              <span className="muted small"> · {t.riotIds.length} Spieler</span>
+              {t.invalid.length > 0 && <span className="neg small"> · keine Riot-ID: {t.invalid.join(", ")}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="row">
+        {progress && <span className="muted small"><Spinner /> Scoute Team {Math.min(progress.done + 1, progress.total)} von {progress.total} …</span>}
+        <button className="btn primary push" type="submit" disabled={!valid.length || !!progress || busy}>
+          {valid.length > 1 ? `${valid.length} Teams scouten & hinzufügen` : "Scouten & hinzufügen"}
+        </button>
+      </div>
+      {failed.length > 0 && (
+        <div className="flash error">
+          Nicht hinzugefügt (steht noch im Textfeld):
+          <ul>{failed.map((f) => <li key={f}>{f}</li>)}</ul>
+        </div>
+      )}
+    </form>
+  );
+}
+
+function AddTeamForm({ group, onAdd, busy }: { group: Group; onAdd: (entries: GroupEntry[]) => void; busy: boolean }) {
+  const teams = useTeams();
+  const scouts = useRecentScouts();
+  const [team, setTeam] = useState("");
+  const [scout, setScout] = useState("");
+  const has = (kind: string, ref: string) => group.entries.some((e) => e.kind === kind && e.ref === ref);
+
+  return (
     <div className="group-add">
-      <div className="field-row">
-        <label className="field">Angelegtes Team
-          <select value={team} onChange={(e) => setTeam(e.target.value)}>
-            <option value="">– auswählen –</option>
-            {teams.data?.filter((t) => !has("team", String(t.id))).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </label>
-        <button className="btn" type="button" disabled={!team || busy}
-          onClick={() => { onAdd({ kind: "team", ref: team, name: "" }); setTeam(""); }}>Hinzufügen</button>
-      </div>
-      <div className="field-row">
-        <label className="field">Bisheriges Scouting
-          <select value={scout} onChange={(e) => setScout(e.target.value)}>
-            <option value="">– auswählen –</option>
-            {scouts.data?.filter((s) => !has("scout", s.key)).map((s) => (
-              <option key={s.key} value={s.key}>{s.players.map((p) => p.game_name).join(s.mode === "any" ? " / " : " + ")}</option>
-            ))}
-          </select>
-        </label>
-        <button className="btn" type="button" disabled={!scout || busy}
-          onClick={() => { onAdd({ kind: "scout", ref: scout, name: "" }); setScout(""); }}>Hinzufügen</button>
-      </div>
-      <form className="stack" onSubmit={scoutNew}>
-        <div className="muted small">
-          Neues Team scouten
-          <InfoTip>
-            Riot-IDs der Spieler eines Gegners eingeben (auch Ersatzspieler). Geladen werden die Turnierspiele jedes Spielers;
-            der Name ist frei wählbar, z.B. der Teamname.
-          </InfoTip>
+      <BulkImport busy={busy} onAdd={onAdd} />
+      <div className="stack">
+        <div className="field-row">
+          <label className="field">Angelegtes Team
+            <select value={team} onChange={(e) => setTeam(e.target.value)}>
+              <option value="">– auswählen –</option>
+              {teams.data?.filter((t) => !has("team", String(t.id))).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </label>
+          <button className="btn" type="button" disabled={!team || busy}
+            onClick={() => { onAdd([{ kind: "team", ref: team, name: "" }]); setTeam(""); }}>Hinzufügen</button>
         </div>
-        <input className="input" value={name} maxLength={40} onChange={(e) => setName(e.target.value)}
-          placeholder="Teamname (optional)" aria-label="Teamname" />
-        {rows.map((value, i) => (
-          <input key={i} className="input" value={value} aria-label={`Spieler ${i + 1}`} placeholder="Name#TAG"
-            onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? e.target.value : x)))} />
-        ))}
-        <div className="row">
-          {rows.length < 5 && <button type="button" className="btn small" onClick={() => setRows((r) => [...r, ""])}>+ Spieler</button>}
-          <button className="btn primary push" type="submit" disabled={start.isPending || busy}>
-            {start.isPending ? "Suche …" : "Scouten & hinzufügen"}
-          </button>
+        <div className="field-row">
+          <label className="field">Bisheriges Scouting
+            <select value={scout} onChange={(e) => setScout(e.target.value)}>
+              <option value="">– auswählen –</option>
+              {scouts.data?.filter((s) => !has("scout", s.key)).map((s) => (
+                <option key={s.key} value={s.key}>{s.players.map((p) => p.game_name).join(s.mode === "any" ? " / " : " + ")}</option>
+              ))}
+            </select>
+          </label>
+          <button className="btn" type="button" disabled={!scout || busy}
+            onClick={() => { onAdd([{ kind: "scout", ref: scout, name: "" }]); setScout(""); }}>Hinzufügen</button>
         </div>
-        {(error || start.error) && <ErrorBox error={error || start.error} />}
-      </form>
+      </div>
     </div>
   );
 }
@@ -186,7 +218,7 @@ function EntriesCard({ group, stats }: { group: Group; stats: GroupTeamStats[] }
         ))}
       </div>
       {group.can_edit && adding && (
-        <AddTeamForm group={group} busy={update.isPending} onAdd={(e) => save([...group.entries, e])} />
+        <AddTeamForm group={group} busy={update.isPending} onAdd={(added) => save([...group.entries, ...added])} />
       )}
       {update.error && <ErrorBox error={update.error} />}
     </section>

@@ -43,7 +43,8 @@ def scout_team(scout: dict) -> Team:
 
 
 router = APIRouter(prefix="/api/scout")
-scout_limit = RateLimit(limit=20, window=3600)
+#: großzügig genug, um eine ganze Liga-Gruppe (8 Teams) auf einmal zu scouten
+scout_limit = RateLimit(limit=40, window=3600)
 
 
 def _job_key(key: str) -> tuple[str, str]:
