@@ -37,7 +37,7 @@ export const routes = [
       { path: "teams/:teamId", element: <TeamPage /> },
       { path: "teams/:teamId/edit", element: <TeamFormPage /> },
       { path: "scout", element: <ScoutPage /> },
-      { path: "scout/:puuid", element: <ScoutReportPage /> },
+      { path: "scout/:key", element: <ScoutReportPage /> },
       { path: "uploader", element: <UploaderPage /> },
       { path: "login", element: <LoginPage /> },
       { path: "account", element: <AccountPage /> },

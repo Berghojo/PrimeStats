@@ -8,6 +8,7 @@ import { FilterBar } from "./FilterBar";
 import { GamesTable } from "./GamesTable";
 import { ObjectivesCard, OverviewKpis } from "./Overview";
 import { PlayersTable } from "./PlayersTable";
+import { ChampionTable } from "./ChampionTable";
 import { ChampionPools, DraftCards } from "./Pools";
 
 const DEFAULT_FILTERS: Filters = { label: "all", side: "all", patch: "", last: 0 };
@@ -76,6 +77,7 @@ export function ReportBody({ data, refreshing, teamId, editable = false, hideLab
               </div>
               <PlayersTable players={report.players} />
             </section>
+            <ChampionTable rows={report.champion_table} />
             <ChampionPools players={report.players} />
             <DraftCards picks={report.picks} ourBans={report.our_bans} enemyBans={report.enemy_bans} enemyPicks={report.enemy_picks} />
             {ov.timeline_games > 0 && (

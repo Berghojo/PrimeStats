@@ -447,5 +447,7 @@ def setup_demo_account(service) -> None:
     team_id = store.create_team(name, tag, 4, members, owner_id=user.id, public=True)
     service.jobs.start(store.get_team(team_id), background=False)
     # Beispiel-Scouting eines Gegners
+    from .services import scout_key
     rival = service.account("BSK Skalde#EUW")
-    service.jobs.run(("scout", rival["puuid"]), lambda job: service.scout(rival, job), background=False)
+    service.jobs.run(("scout", scout_key([rival["puuid"]])), lambda job: service.scout([rival], job),
+                     background=False)

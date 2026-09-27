@@ -29,9 +29,9 @@ export function PlayerPage() {
         </div>
         <div className="row">
         <button className="btn" type="button" disabled={scout.isPending}
-          title="Kader aus den Turnierspielen ableiten und Team-Statistiken erstellen"
-          onClick={() => scout.mutate({ riot_id: `${account.game_name}#${account.tag_line}` },
-            { onSuccess: (res) => navigate(`/scout/${res.puuid}`) })}>
+          title="Team-Statistiken aus allen Turnierspielen dieses Spielers"
+          onClick={() => scout.mutate([`${account.game_name}#${account.tag_line}`],
+            { onSuccess: (res) => navigate(`/scout/${res.key}`) })}>
           Team scouten →
         </button>
         <label className="field">

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -120,6 +119,7 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
 
     players: dict[str, _PlayerAcc] = {}
     picks: dict[int, dict] = {}
+    champ_stats: dict[int, dict] = {}   # Champion-Pick-Tabelle (eigene Picks)
     enemy_picks: dict[int, dict] = {}
     our_bans: Counter = Counter()
     enemy_bans: Counter = Counter()
@@ -216,6 +216,22 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
             pk["games"] += 1
             pk["wins"] += p.win
             pk["players"][acc.name] += 1
+            cs = champ_stats.setdefault(p.champion_id, {
+                "picks": 0, "wins": 0, "kills": 0, "deaths": 0, "assists": 0, "cs": 0, "minutes": 0.0,
+                "damage": 0, "positions": Counter(), "players": {}})
+            cs["picks"] += 1
+            cs["wins"] += p.win
+            cs["kills"] += p.kills
+            cs["deaths"] += p.deaths
+            cs["assists"] += p.assists
+            cs["cs"] += p.cs
+            cs["damage"] += p.damage
+            cs["minutes"] += match.minutes
+            cs["positions"][p.position] += 1
+            pl = cs["players"].setdefault(p.puuid, {"name": acc.name, "games": 0, "wins": 0})
+            pl["name"] = acc.name
+            pl["games"] += 1
+            pl["wins"] += p.win
             if tl:
                 s = player_series(tl, match, p.puuid)
                 if s:
@@ -232,6 +248,24 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
     for pk in picks.values():
         pk["winrate"] = pk["wins"] / pk["games"]
         pk["players"] = [name for name, _ in pk["players"].most_common()]
+    champion_table = []
+    for cid in set(champ_stats) | set(our_bans) | set(enemy_bans):
+        cs = champ_stats.get(cid)
+        row = {"champion_id": cid, "picks": 0, "wins": 0, "winrate": None, "kda": None, "kills": None,
+               "deaths": None, "assists": None, "cspm": None, "dpm": None, "position": "", "players": [],
+               "bans_by_us": our_bans[cid], "bans_against": enemy_bans[cid]}
+        if cs:
+            g = cs["picks"]
+            row.update(picks=g, wins=cs["wins"], winrate=cs["wins"] / g,
+                       kda=(cs["kills"] + cs["assists"]) / max(cs["deaths"], 1),
+                       kills=cs["kills"] / g, deaths=cs["deaths"] / g, assists=cs["assists"] / g,
+                       cspm=cs["cs"] / cs["minutes"], dpm=cs["damage"] / cs["minutes"],
+                       position=cs["positions"].most_common(1)[0][0],
+                       players=sorted(cs["players"].values(), key=lambda x: -x["games"]))
+        # Präsenz: Anteil der Spiele, in denen der Champion gepickt oder (von einer Seite) gebannt wurde
+        row["presence"] = (row["picks"] + row["bans_by_us"] + row["bans_against"]) / n if n else None
+        champion_table.append(row)
+    champion_table.sort(key=lambda r: (-r["picks"], -(r["presence"] or 0)))
     for e in enemy_picks.values():
         e["winrate"] = e["wins"] / e["games"]
 
@@ -274,6 +308,7 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
         "overview": overview,
         "players": player_rows,
         "picks": sorted(picks.values(), key=lambda p: (-p["games"], -p["wins"])),
+        "champion_table": champion_table,
         "enemy_picks": sorted(enemy_picks.values(), key=lambda p: (-p["games"], p["wins"])),
         "our_bans": [{"champion_id": c, "count": k} for c, k in our_bans.most_common()],
         "enemy_bans": [{"champion_id": c, "count": k} for c, k in enemy_bans.most_common()],
@@ -335,29 +370,30 @@ def match_side_for_team(match: MatchSummary, puuids: set[str], min_members: int)
     return best if best_count >= min_members else None
 
 
-def infer_roster(matches: list[MatchSummary], puuid: str, *, min_share: float = 0.2,
-                 limit: int = 10) -> list[dict]:
-    """Leitet aus den Spielen eines Spielers seinen Kader ab: alle, die oft genug mit ihm im selben
-    Team standen (mindestens 2 gemeinsame Spiele bzw. ``min_share`` seiner Spiele)."""
+def together_side(match: MatchSummary, puuids: list[str]) -> int | None:
+    """teamId, falls alle Spieler in diesem Match im selben Team standen."""
+    sides = set()
+    for puuid in puuids:
+        team = match.team_of(puuid)
+        if team is None:
+            return None
+        sides.add(team.team_id)
+    return sides.pop() if len(sides) == 1 else None
+
+
+def roster_from_games(games: list[tuple[MatchSummary, int]], searched: list[str]) -> list[dict]:
+    """Alle Spieler, die in diesen Spielen im Team standen – gesuchte Spieler zuerst, dann nach Häufigkeit."""
     counts: Counter = Counter()
     positions: dict[str, Counter] = {}
     names: dict[str, tuple[str, str]] = {}
-    own_games = 0
-    for match in sorted(matches, key=lambda m: m.created):
-        team = match.team_of(puuid)
-        if team is None:
-            continue
-        own_games += 1
-        for p in team.players:
+    for match, side in sorted(games, key=lambda g: g[0].created):
+        for p in match.teams[side].players:
             counts[p.puuid] += 1
             positions.setdefault(p.puuid, Counter())[p.position] += 1
             names[p.puuid] = (p.name, p.tag)  # neuester Name gewinnt
-    if not own_games:
-        return []
-    threshold = max(min(2, own_games), math.ceil(min_share * own_games))
-    chosen = [puuid] + [pid for pid, c in counts.most_common() if pid != puuid and c >= threshold][:limit - 1]
+    order = [p for p in searched if p in counts] + [p for p, _ in counts.most_common() if p not in searched]
     return [{"puuid": pid, "game_name": names[pid][0], "tag_line": names[pid][1], "games": counts[pid],
-             "position": positions[pid].most_common(1)[0][0]} for pid in chosen]
+             "position": positions[pid].most_common(1)[0][0], "searched": pid in searched} for pid in order]
 
 
 def default_label(match: MatchSummary) -> str:
@@ -371,5 +407,5 @@ def patches(records: list[GameRecord]) -> list[str]:
 
 __all__ = [
     "GameRecord", "LABELS", "build_report", "history_rows", "filter_records", "match_side_for_team",
-    "default_label", "infer_roster", "patches",
+    "default_label", "patches", "roster_from_games", "together_side",
 ]

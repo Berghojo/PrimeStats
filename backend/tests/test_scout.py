@@ -1,84 +1,97 @@
 import time
 
 from primestats.matches import parse_match
-from primestats.team_stats import infer_roster
+from primestats.team_stats import roster_from_games, together_side
 
 from .conftest import other_client
 
 
-def _wait(client, puuid):
+def _wait(client, key):
     for _ in range(200):
-        job = client.get(f"/api/scout/{puuid}/status").json()
+        job = client.get(f"/api/scout/{key}/status").json()
         if job and job["status"] != "running":
             return job
         time.sleep(0.05)
     raise AssertionError("Scouting läuft zu lange")
 
 
-def test_infer_roster_from_player_games(demo_source):
-    polaris = demo_source.account("NLE Polaris#EUW")["puuid"]
-    matches = [parse_match(demo_source.matches[mid]) for mid in demo_source.by_puuid[polaris]]
-    roster = infer_roster(matches, polaris)
-    names = [r["game_name"] for r in roster]
-    assert names[0] == "NLE Polaris"
-    assert set(names) >= {"NLE Frostbite", "NLE Waldgeist", "NLE Kompass", "NLE Leuchtturm"}
-    assert all(not n.startswith(("RHW", "BSK", "ALP", "HFK")) for n in names)   # Gegner gehören nicht dazu
-    assert not any(n in {"Kaffeetasse", "Blitzbirne"} for n in names)          # Zufallsbekanntschaften auch nicht
-    assert roster[0]["position"] == "MIDDLE"
+def _tourney_games_together(demo_source, names):
+    """Erwartung aus den Rohdaten: Turnierspiele, in denen alle Spieler im selben Team standen."""
+    puuids = [demo_source.account(f"{n}#EUW")["puuid"] for n in names]
+    result = set()
+    for mid, m in demo_source.matches.items():
+        if not m["info"].get("tournamentCode"):
+            continue
+        teams = {p["puuid"]: p["teamId"] for p in m["info"]["participants"]}
+        if all(p in teams for p in puuids) and len({teams[p] for p in puuids}) == 1:
+            result.add(mid)
+    return result
 
 
-def test_infer_roster_single_game(demo_source):
+def test_together_side_and_roster(demo_source):
     mid = next(iter(demo_source.matches))
     match = parse_match(demo_source.matches[mid])
-    player = match.teams[100].players[0]
-    assert len(infer_roster([match], player.puuid)) == 5
-    assert infer_roster([match], "unbekannt") == []
+    blue = [p.puuid for p in match.teams[100].players]
+    red = [p.puuid for p in match.teams[200].players]
+    assert together_side(match, blue[:3]) == 100
+    assert together_side(match, [blue[0], red[0]]) is None
+    assert together_side(match, [blue[0], "unbekannt"]) is None
+    roster = roster_from_games([(match, 100)], [blue[2]])
+    assert roster[0]["puuid"] == blue[2] and roster[0]["searched"]
+    assert {r["puuid"] for r in roster} == set(blue)
 
 
-def test_scout_opponent_from_single_player(client, demo_source):
-    # anonym, ohne Konto: nur einen Spieler des Gegners eingeben
-    resp = client.post("/api/scout", json={"riot_id": "BSK Skalde#EUW"})
+def test_scout_single_player_uses_all_his_games(client, demo_source):
+    resp = client.post("/api/scout", json={"riot_ids": ["BSK Skalde#EUW"]})
     assert resp.status_code == 202, resp.text
-    puuid = resp.json()["puuid"]
-    job = _wait(client, puuid)
-    assert job["status"] == "done", job
+    key = resp.json()["key"]
+    assert _wait(client, key)["status"] == "done"
 
-    report = client.get(f"/api/scout/{puuid}").json()
-    assert report["player"]["game_name"] == "BSK Skalde"     # alles läuft unter dem gesuchten Spieler
-    assert "team_tag" not in report and "opponents" not in report
-    assert {r["game_name"] for r in report["roster"]} == {f"BSK {n}" for n in
-                                                          ("Runenstein", "Wikinger", "Skalde", "Drakkar", "Hjalmar")}
-    assert report["report"]["overview"]["games"] == len(report["history"]) > 0
-    # nur öffentliche Turnierspiele, keine Scrims
-    assert all(r["tournament"] for r in report["history"])
-    assert report["report"]["enemy_bans"] or report["report"]["our_bans"]
-    assert client.get(f"/api/scout/{puuid}", params={"side": "blue"}).json()["filters"]["side"] == "blue"
-
-    # erscheint in der Liste der letzten Scoutings und ist für alle abrufbar
-    assert client.get("/api/scout").json()[0]["game_name"] == "BSK Skalde"
-    assert other_client(client).get(f"/api/scout/{puuid}").status_code == 200
+    report = client.get(f"/api/scout/{key}").json()
+    assert [p["game_name"] for p in report["players"]] == ["BSK Skalde"]
+    assert {r["match_id"] for r in report["history"]} == _tourney_games_together(demo_source, ["BSK Skalde"])
+    assert all(r["tournament"] for r in report["history"])             # nie Scrims
+    assert report["roster"][0]["game_name"] == "BSK Skalde" and report["roster"][0]["searched"]
+    assert {r["game_name"] for r in report["roster"][1:]} == {"BSK Runenstein", "BSK Wikinger", "BSK Drakkar",
+                                                              "BSK Hjalmar"}
+    assert report["report"]["champion_table"]
+    assert client.get("/api/scout").json()[0]["players"][0]["game_name"] == "BSK Skalde"
+    assert other_client(client).get(f"/api/scout/{key}").status_code == 200   # für alle abrufbar
 
 
-def test_scout_finds_games_without_the_searched_player(client, demo_source):
-    # Polaris wurde in einigen Turnierspielen durch Treibholz ersetzt – das Scouting findet sie trotzdem
-    polaris = demo_source.account("NLE Polaris#EUW")["puuid"]
-    own = {m for m in demo_source.by_puuid[polaris] if demo_source.matches[m]["info"].get("tournamentCode")}
-    team = {m for m, d in demo_source.matches.items() if d["info"].get("tournamentCode")
-            and any(p["riotIdGameName"].startswith("NLE") for p in d["info"]["participants"])}
-    assert team - own, "Demo-Daten sollten Turnierspiele ohne Polaris enthalten"
+def test_scout_multiple_players_requires_same_team(client, demo_source):
+    # Treibholz ersetzt mal Frostbite, mal Polaris – zählen dürfen nur Spiele mit beiden im selben Team
+    names = ["NLE Polaris", "NLE Treibholz"]
+    expected = _tourney_games_together(demo_source, names)
+    only_polaris = _tourney_games_together(demo_source, ["NLE Polaris"])
+    assert expected and expected < only_polaris
 
-    puuid = client.post("/api/scout", json={"riot_id": "NLE Polaris#EUW"}).json()["puuid"]
-    assert _wait(client, puuid)["status"] == "done"
-    found = {r["match_id"] for r in client.get(f"/api/scout/{puuid}").json()["history"]}
-    assert found == team
+    key = client.post("/api/scout", json={"riot_ids": [f"{n}#EUW" for n in names]}).json()["key"]
+    assert _wait(client, key)["status"] == "done"
+    report = client.get(f"/api/scout/{key}").json()
+    assert {r["match_id"] for r in report["history"]} == expected
+    assert [p["game_name"] for p in report["players"]] == names
+    assert [r["searched"] for r in report["roster"][:2]] == [True, True]
+
+    # Reihenfolge der Eingabe spielt für den Schlüssel keine Rolle
+    again = client.post("/api/scout", json={"riot_ids": ["NLE Treibholz#EUW", "NLE Polaris#EUW"]}).json()
+    assert again["key"] == key
+
+
+def test_scout_players_never_together(client):
+    key = client.post("/api/scout", json={"riot_ids": ["NLE Polaris#EUW", "BSK Skalde#EUW"]}).json()["key"]
+    job = _wait(client, key)
+    assert job["status"] == "error" and "im selben Team" in job["error"]
+    assert client.get(f"/api/scout/{key}").status_code == 404
 
 
 def test_scout_errors(client, offline_client):
-    assert client.post("/api/scout", json={"riot_id": "Nobody#EUW"}).status_code == 404
-    # Spieler ohne Turnierspiele: Job endet mit verständlicher Meldung
-    puuid = client.post("/api/scout", json={"riot_id": "Kaffeetasse#EUW"}).json()["puuid"]
-    job = _wait(client, puuid)
+    resp = client.post("/api/scout", json={"riot_ids": ["NLE Polaris#EUW", "Nobody#EUW", "Kaputt"]})
+    assert resp.status_code == 422 and len(resp.json()["detail"]["errors"]) == 2
+    assert client.post("/api/scout", json={"riot_ids": []}).status_code == 422
+    assert client.post("/api/scout", json={"riot_ids": ["a#b"] * 6}).status_code == 422
+    key = client.post("/api/scout", json={"riot_ids": ["Kaffeetasse#EUW"]}).json()["key"]
+    job = _wait(client, key)
     assert job["status"] == "error" and "keine Turnierspiele" in job["error"]
-    assert client.post("/api/scout", json={"riot_id": "Kaputt"}).status_code == 400
     assert client.get("/api/scout/unbekannt").status_code == 404
-    assert offline_client.post("/api/scout", json={"riot_id": "NLE Polaris#EUW"}).status_code == 503
+    assert offline_client.post("/api/scout", json={"riot_ids": ["NLE Polaris#EUW"]}).status_code == 503

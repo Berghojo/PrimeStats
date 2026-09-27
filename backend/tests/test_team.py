@@ -59,3 +59,21 @@ def test_match_side_for_team(service, synced_team):
     match = service.match(tg.match_id)
     assert match_side_for_team(match, synced_team.puuids, 4) == tg.side
     assert match_side_for_team(match, synced_team.puuids, 6) is None
+
+
+def test_champion_table(service, synced_team):
+    records = service.team_records(synced_team)
+    report = build_report(synced_team, records)
+    table = report["champion_table"]
+    n = len(records)
+    assert sum(r["picks"] for r in table) == 5 * n
+    assert sum(r["bans_by_us"] for r in table) == sum(b["count"] for b in report["our_bans"])
+    assert sum(r["bans_against"] for r in table) == sum(b["count"] for b in report["enemy_bans"])
+    for row in table:
+        assert 0 <= row["presence"] <= 1
+        if row["picks"]:
+            assert sum(p["games"] for p in row["players"]) == row["picks"]
+            assert 0 <= row["winrate"] <= 1 and row["position"]
+        else:  # nur gebannt
+            assert row["winrate"] is None and row["players"] == []
+    assert [r["picks"] for r in table] == sorted((r["picks"] for r in table), reverse=True)

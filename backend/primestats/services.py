@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import threading
 import time
@@ -12,7 +13,7 @@ from . import lcu
 from .matches import MatchSummary, parse_match
 from .riot import MatchSource, NotFound, RiotAPIError, split_riot_id
 from .store import Member, Store, Team
-from .team_stats import GameRecord, default_label, infer_roster, match_side_for_team
+from .team_stats import GameRecord, default_label, match_side_for_team, roster_from_games, together_side
 from .timeline import SUMMARY_VERSION, summarize_timeline
 
 log = logging.getLogger(__name__)
@@ -303,53 +304,45 @@ class PrimeStats:
 
 
     # ------------------------------------------------------------ Scouting
-    def scout(self, account: dict, progress: "SyncJob", min_members: int = 4,
-              depth: int = SCOUT_MATCH_COUNT, timelines: int = SCOUT_TIMELINES) -> None:
-        """Turnier-Scouting ab einem einzelnen Spieler.
+    def scout(self, accounts: list[dict], progress: "SyncJob", depth: int = SCOUT_MATCH_COUNT,
+              timelines: int = SCOUT_TIMELINES) -> str:
+        """Turnier-Scouting für einen oder mehrere Spieler.
 
-        1. Turniercode-Spiele des Spielers laden und daraus den Kader ableiten (häufige Mitspieler).
-        2. Turniercode-Spiele aller Kader-Spieler durchsuchen – so werden auch Spiele gefunden, in denen der
-           gesuchte Spieler selbst fehlte.
-        3. Alle Spiele behalten, in denen mindestens ``min_members`` Kader-Spieler zusammen spielten.
-        Nutzt ausschließlich öffentliche Riot-API-Daten (keine hochgeladenen Scrims).
+        Ein Spiel zählt nur, wenn **alle** gesuchten Spieler darin im selben Team standen – bei einem
+        einzelnen Spieler also alle seiner Turnierspiele. Die übrigen Spieler dieses Teams werden als
+        Mitspieler ausgewiesen. Nutzt ausschließlich öffentliche Riot-API-Daten (keine Scrims).
+        Liefert den Schlüssel des gespeicherten Ergebnisses.
         """
         if not self.online:
             raise RiotAPIError(503, "Scouting braucht einen Riot-API-Key (LOL_API_KEY).")
-        puuid = account["puuid"]
-        progress.update(f"Lade Turnierspiele von {account['gameName']} …", 0, 1)
-        own_ids = self.custom_match_ids(puuid, depth)
-        own = []
-        for i, mid in enumerate(own_ids, 1):
-            progress.update(f"Lade Spiel {i}/{len(own_ids)}", i, len(own_ids))
-            own.append(self.match(mid))
-        own = [m for m in own if not m.private]
-        roster = infer_roster(own, puuid)
-        if not roster:
-            raise RiotAPIError(404, f"{account['gameName']}#{account['tagLine']} hat keine Turnierspiele.")
-        roster_puuids = {r["puuid"] for r in roster}
-        needed = min(min_members, len(roster))
+        puuids = [a["puuid"] for a in accounts]
+        names = ", ".join(f"{a['gameName']}#{a['tagLine']}" for a in accounts)
 
-        # Eigene Spiele sind schon geladen; fremde nur abrufen, wenn sie in mehreren Kader-Listen
-        # auftauchen (Toleranz 1, weil ältere Spiele aus einzelnen Listen herausfallen können).
-        occurrences: Counter = Counter()
-        for i, member in enumerate(roster[1:], 1):
-            progress.update(f"Durchsuche Spiele von {member['game_name']} …", i, len(roster) - 1)
-            occurrences.update(set(self.custom_match_ids(member["puuid"], depth)) - set(own_ids))
-        others = {mid for mid, c in occurrences.items() if c >= max(1, needed - 1)}
-        candidates = sorted({m.match_id for m in own} | others, key=_match_sort_key, reverse=True)
+        # nur Match-IDs, die in den Listen aller gesuchten Spieler vorkommen, werden abgerufen
+        common: set[str] | None = None
+        for i, acc in enumerate(accounts, 1):
+            progress.update(f"Lade Turnierspiele von {acc['gameName']} …", i - 1, len(accounts))
+            ids = set(self.custom_match_ids(acc["puuid"], depth))
+            common = ids if common is None else common & ids
+        candidates = sorted(common or set(), key=_match_sort_key, reverse=True)
+
         games: list[tuple[str, int]] = []
         for i, mid in enumerate(candidates, 1):
             progress.update(f"Prüfe Spiel {i}/{len(candidates)}", i, len(candidates))
             match = self.match(mid)
             if match.private or not match.is_custom:
                 continue
-            side = match_side_for_team(match, roster_puuids, needed)
+            side = together_side(match, puuids)
             if side is not None:
                 games.append((mid, side))
+        if not games:
+            if len(accounts) == 1:
+                raise RiotAPIError(404, f"{names} hat keine Turnierspiele.")
+            raise RiotAPIError(404, f"Keine Turnierspiele, in denen {names} im selben Team standen.")
 
-        # Timelines (Goldkurven, Lane-Differenzen) für die neuesten Spiele
         recent = [mid for mid, _ in games][:timelines]
-        missing = [mid for mid in recent if mid not in self.store.summarized_matches(recent, SUMMARY_VERSION)]
+        done = self.store.summarized_matches(recent, SUMMARY_VERSION)
+        missing = [mid for mid in recent if mid not in done]
         for i, mid in enumerate(missing, 1):
             progress.update(f"Lade Timeline {i}/{len(missing)}", i, len(missing))
             try:
@@ -357,19 +350,22 @@ class PrimeStats:
             except RiotAPIError as exc:
                 log.warning("Timeline für %s nicht verfügbar: %s", mid, exc)
 
-        # Kader-Statistik (Spiele je Spieler) auf Basis aller gefundenen Teamspiele aktualisieren
-        counts: Counter = Counter()
-        for mid, side in games:
-            counts.update(p.puuid for p in self.match(mid).teams[side].players if p.puuid in roster_puuids)
-        for r in roster:
-            r["games"] = counts.get(r["puuid"], r["games"])
-        self.store.put_scout(puuid, account["gameName"], account["tagLine"], roster, games, needed)
+        roster = roster_from_games([(self.match(mid), side) for mid, side in games], puuids)
+        players = [{"puuid": a["puuid"], "game_name": a["gameName"], "tag_line": a["tagLine"]} for a in accounts]
+        key = scout_key(puuids)
+        self.store.put_scout(key, players, roster, games)
         progress.new_games = len(games)
-        progress.done_message = f"Fertig – {len(games)} Turnierspiele von {len(roster)} Spielern gefunden."
+        progress.done_message = f"Fertig – {len(games)} Turnierspiele gefunden."
+        return key
 
     def scout_records(self, scout: dict) -> list[GameRecord]:
         return [r for r in self._records([(mid, side, "official", True, "") for mid, side in scout["games"]])
                 if not r.match.private]
+
+
+def scout_key(puuids: list[str]) -> str:
+    """Stabiler Schlüssel für eine Spielerkombination (Reihenfolge egal)."""
+    return hashlib.sha1("|".join(sorted(set(puuids))).encode()).hexdigest()
 
 
 def _match_sort_key(match_id: str) -> int:

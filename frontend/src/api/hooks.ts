@@ -2,8 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api } from "./client";
 import type {
-  Analysis, Filters, Label, LinkCode, Match, Me, Meta, PlayerGames, ScoutReport, ScoutSummary, SyncJob, Team,
-  TeamInput, TeamReport,
+  Analysis, Filters, Label, LinkCode, Match, Me, Meta, PlayerGames, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
+  Team, TeamInput, TeamReport,
 } from "./types";
 
 export const useMeta = () =>
@@ -135,18 +135,18 @@ export function useUnlink() {
 export const useRecentScouts = () =>
   useQuery({ queryKey: ["scouts"], queryFn: () => api<ScoutSummary[]>("/scout") });
 
-export const useScoutReport = (puuid: string, filters: Partial<Filters>) =>
+export const useScoutReport = (key: string, filters: Partial<Filters>) =>
   useQuery({
-    queryKey: ["scout", puuid, "report", filters],
-    queryFn: () => api<ScoutReport>(`/scout/${encodeURIComponent(puuid)}`, { query: { ...filters } }),
+    queryKey: ["scout", key, "report", filters],
+    queryFn: () => api<ScoutReport>(`/scout/${encodeURIComponent(key)}`, { query: { ...filters } }),
     placeholderData: keepPreviousData,
     retry: false,
   });
 
-export const useScoutStatus = (puuid: string, enabled: boolean) =>
+export const useScoutStatus = (key: string, enabled: boolean) =>
   useQuery({
-    queryKey: ["scout", puuid, "status"],
-    queryFn: () => api<SyncJob | null>(`/scout/${encodeURIComponent(puuid)}/status`),
+    queryKey: ["scout", key, "status"],
+    queryFn: () => api<SyncJob | null>(`/scout/${encodeURIComponent(key)}/status`),
     enabled,
     refetchInterval: (query) => (query.state.data?.status === "running" ? 1000 : false),
   });
@@ -154,10 +154,10 @@ export const useScoutStatus = (puuid: string, enabled: boolean) =>
 export function useStartScout() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { riot_id: string; min_members?: number }) =>
-      api<{ puuid: string; game_name: string; tag_line: string; job: SyncJob }>("/scout", {
-        method: "POST", body: JSON.stringify(body),
+    mutationFn: (riotIds: string[]) =>
+      api<{ key: string; players: ScoutPlayer[]; job: SyncJob }>("/scout", {
+        method: "POST", body: JSON.stringify({ riot_ids: riotIds }),
       }),
-    onSuccess: (res) => qc.setQueryData(["scout", res.puuid, "status"], res.job),
+    onSuccess: (res) => qc.setQueryData(["scout", res.key, "status"], res.job),
   });
 }

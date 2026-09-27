@@ -293,6 +293,32 @@ class PickStat(BaseModel):
     players: list[str] = []
 
 
+class ChampionPlayer(BaseModel):
+    name: str
+    games: int
+    wins: int
+
+
+class ChampionRow(BaseModel):
+    """Zeile der Champion-Pick-Tabelle (eigene Picks, Bans beider Seiten)."""
+
+    champion_id: int
+    picks: int
+    wins: int
+    winrate: float | None
+    kda: float | None
+    kills: float | None
+    deaths: float | None
+    assists: float | None
+    cspm: float | None
+    dpm: float | None
+    position: str
+    players: list[ChampionPlayer]
+    bans_by_us: int
+    bans_against: int
+    presence: float | None
+
+
 class BanStat(BaseModel):
     champion_id: int
     count: int
@@ -327,6 +353,7 @@ class Report(BaseModel):
     overview: Overview
     players: list[PlayerReport]
     picks: list[PickStat]
+    champion_table: list[ChampionRow]
     enemy_picks: list[PickStat]
     our_bans: list[BanStat]
     enemy_bans: list[BanStat]
@@ -467,14 +494,26 @@ class ImportOut(BaseModel):
 
 # ------------------------------------------------------------ Scouting
 class ScoutIn(BaseModel):
-    riot_id: str = Field(min_length=3, max_length=30)
-    min_members: int = Field(default=4, ge=2, le=5)
+    riot_ids: list[str] = Field(min_length=1, max_length=5)
+
+    @field_validator("riot_ids")
+    @classmethod
+    def _clean(cls, values: list[str]) -> list[str]:
+        cleaned = list(dict.fromkeys(v.strip() for v in values if v.strip()))
+        if not cleaned:
+            raise ValueError("Mindestens ein Spieler ist Pflicht.")
+        return cleaned
 
 
-class ScoutStartOut(BaseModel):
+class ScoutPlayer(BaseModel):
     puuid: str
     game_name: str
     tag_line: str
+
+
+class ScoutStartOut(BaseModel):
+    key: str
+    players: list[ScoutPlayer]
     job: SyncJobOut
 
 
@@ -484,21 +523,21 @@ class RosterPlayer(BaseModel):
     tag_line: str
     games: int
     position: str
+    searched: bool = False
 
 
 class ScoutSummary(BaseModel):
-    puuid: str
-    game_name: str
-    tag_line: str
-    games: int
+    key: str
+    players: list[ScoutPlayer]
     roster: list[RosterPlayer]
+    games: int
     updated_at: datetime
 
 
 class ScoutReportOut(BaseModel):
-    player: AccountOut
+    key: str
+    players: list[ScoutPlayer]
     roster: list[RosterPlayer]
-    min_members: int
     updated_at: datetime
     filters: Filters
     report: Report

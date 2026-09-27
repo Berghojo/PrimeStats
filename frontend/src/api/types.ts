@@ -222,10 +222,29 @@ export interface Curve { values: (number | null)[]; counts: number[] }
 
 export interface TrendPoint { match_id: string; date: string; win: boolean; gd15: number | null; kills: number; deaths: number }
 
+export interface ChampionRow {
+  champion_id: number;
+  picks: number;
+  wins: number;
+  winrate: number | null;
+  kda: number | null;
+  kills: number | null;
+  deaths: number | null;
+  assists: number | null;
+  cspm: number | null;
+  dpm: number | null;
+  position: string;
+  players: { name: string; games: number; wins: number }[];
+  bans_by_us: number;
+  bans_against: number;
+  presence: number | null;
+}
+
 export interface Report {
   overview: Overview;
   players: PlayerReport[];
   picks: PickStat[];
+  champion_table: ChampionRow[];
   enemy_picks: PickStat[];
   our_bans: BanStat[];
   enemy_bans: BanStat[];
@@ -283,21 +302,22 @@ export interface Me { user: User | null; riot_accounts: RiotLink[] }
 
 export interface LinkCode { code: string; expires_at: string }
 
-export interface RosterPlayer { puuid: string; game_name: string; tag_line: string; games: number; position: string }
+export interface ScoutPlayer { puuid: string; game_name: string; tag_line: string }
+
+export interface RosterPlayer extends ScoutPlayer { games: number; position: string; searched: boolean }
 
 export interface ScoutSummary {
-  puuid: string;
-  game_name: string;
-  tag_line: string;
-  games: number;
+  key: string;
+  players: ScoutPlayer[];
   roster: RosterPlayer[];
+  games: number;
   updated_at: string;
 }
 
 export interface ScoutReport {
-  player: { puuid: string; game_name: string; tag_line: string };
+  key: string;
+  players: ScoutPlayer[];
   roster: RosterPlayer[];
-  min_members: number;
   updated_at: string;
   filters: Filters;
   report: Report;

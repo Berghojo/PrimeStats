@@ -406,27 +406,23 @@ class Store:
             return set(s.scalars(select(TeamGameRow.team_id).where(TeamGameRow.match_id == match_id)))
 
     # --------------------------------------------------------------- Scouting
-    def put_scout(self, puuid: str, game_name: str, tag_line: str, roster: list[dict],
-                  games: list[tuple[str, int]], min_members: int) -> None:
-        values = {"game_name": game_name, "tag_line": tag_line, "roster": roster,
-                  "games": [list(g) for g in games], "min_members": min_members,
+    def put_scout(self, key: str, players: list[dict], roster: list[dict], games: list[tuple[str, int]]) -> None:
+        values = {"players": players, "roster": roster, "games": [list(g) for g in games],
                   "updated_at": datetime.now(timezone.utc)}
-        stmt = insert(Scout).values(puuid=puuid, **values).on_conflict_do_update(
-            index_elements=[Scout.puuid], set_=values)
+        stmt = insert(Scout).values(key=key, **values).on_conflict_do_update(index_elements=[Scout.key], set_=values)
         with self.session() as s:
             s.execute(stmt)
 
-    def get_scout(self, puuid: str) -> dict | None:
+    def get_scout(self, key: str) -> dict | None:
         with self.session() as s:
-            row = s.get(Scout, puuid)
+            row = s.get(Scout, key)
             if row is None:
                 return None
-            return {"puuid": row.puuid, "game_name": row.game_name, "tag_line": row.tag_line,
-                    "roster": row.roster, "games": [tuple(g) for g in row.games], "min_members": row.min_members,
-                    "updated_at": row.updated_at}
+            return {"key": row.key, "players": row.players, "roster": row.roster,
+                    "games": [tuple(g) for g in row.games], "updated_at": row.updated_at}
 
     def recent_scouts(self, limit: int = 10) -> list[dict]:
         with self.session() as s:
             rows = s.scalars(select(Scout).order_by(Scout.updated_at.desc()).limit(limit))
-            return [{"puuid": r.puuid, "game_name": r.game_name, "tag_line": r.tag_line, "roster": r.roster,
-                     "games": len(r.games), "updated_at": r.updated_at} for r in rows]
+            return [{"key": r.key, "players": r.players, "roster": r.roster, "games": len(r.games),
+                     "updated_at": r.updated_at} for r in rows]

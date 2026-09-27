@@ -87,8 +87,9 @@ CSRF = {"X-Requested-With": "PrimeStats"}
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limits():
-    from primestats import accounts_api
-    for limiter in (accounts_api.login_limit, accounts_api.register_limit, accounts_api.link_limit):
+    from primestats import accounts_api, scout_api
+    for limiter in (accounts_api.login_limit, accounts_api.register_limit, accounts_api.link_limit,
+                    scout_api.scout_limit):
         limiter._hits.clear()
 
 

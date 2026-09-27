@@ -281,3 +281,7 @@ code { background: var(--surface-2); padding: .05rem .35rem; border-radius: 4px;
 form.stack > .input, form.stack > label.field .input, form.stack > label.field select { display: block; width: 100%; }
 form.stack > .btn { justify-self: start; align-self: flex-start; }
 table.data input.opponent { padding: .2rem .45rem; width: 150px; font-size: .85rem; }
+.scout-form { display: grid; gap: .5rem; max-width: 560px; margin: auto; }
+.scout-form .row { flex-wrap: nowrap; }
+.scout-form .input { flex: 1; }
+table.data td.wrap { white-space: normal; min-width: 180px; max-width: 320px; font-size: .82rem; }

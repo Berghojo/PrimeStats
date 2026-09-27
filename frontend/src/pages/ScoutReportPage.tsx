@@ -8,13 +8,14 @@ import { ReportBody, useUrlFilters } from "../components/team/ReportBody";
 import { ErrorBox, Loading, Spinner } from "../components/ui";
 import { ago } from "../lib/format";
 import { useGameData } from "../lib/meta";
+import { scoutTitle } from "./ScoutPage";
 
 export function ScoutReportPage() {
-  const { puuid = "" } = useParams();
+  const { key = "" } = useParams();
   const [filters] = useUrlFilters();
   const qc = useQueryClient();
-  const report = useScoutReport(puuid, filters);
-  const status = useScoutStatus(puuid, true);
+  const report = useScoutReport(key, filters);
+  const status = useScoutStatus(key, true);
   const restart = useStartScout();
   const { position } = useGameData();
   const job = status.data;
@@ -23,11 +24,11 @@ export function ScoutReportPage() {
   // Nach Abschluss des Scoutings den Report neu laden
   useEffect(() => {
     if (previous.current === "running" && job?.status === "done") {
-      qc.invalidateQueries({ queryKey: ["scout", puuid, "report"] });
+      qc.invalidateQueries({ queryKey: ["scout", key, "report"] });
       qc.invalidateQueries({ queryKey: ["scouts"] });
     }
     previous.current = job?.status;
-  }, [job?.status, puuid, qc]);
+  }, [job?.status, key, qc]);
 
   const running = job?.status === "running";
   const progress = running && (
@@ -46,30 +47,30 @@ export function ScoutReportPage() {
     return (
       <div className="card stack">
         {running ? progress : job?.status === "error" ? <ErrorBox error={job.error} /> : <ErrorBox error={report.error} />}
-        {notYet && !running && <p className="muted">Für diesen Spieler gibt es noch kein Scouting.</p>}
+        {notYet && !running && <p className="muted">Dieses Scouting gibt es noch nicht.</p>}
       </div>
     );
   }
 
   const data = report.data;
-  const refresh = () =>
-    restart.mutate({ riot_id: `${data.player.game_name}#${data.player.tag_line}`, min_members: data.min_members });
+  const refresh = () => restart.mutate(data.players.map((p) => `${p.game_name}#${p.tag_line}`));
+  const multiple = data.players.length > 1;
 
   return (
     <>
       <section className="card">
         <div className="row between">
           <div className="team-head">
-            <div className="team-logo">{data.player.game_name.slice(0, 2).toUpperCase()}</div>
+            <div className="team-logo">{data.players[0].game_name.slice(0, 2).toUpperCase()}</div>
             <div>
-              <h1>{data.player.game_name}<span className="muted">#{data.player.tag_line}</span>{" "}
-                <span className="badge accent">Scouting</span></h1>
+              <h1>{scoutTitle(data.players)} <span className="badge accent">Scouting</span></h1>
               <div className="muted small">
-                Turnierspiele mit ≥ {data.min_members} Spielern aus diesem Kader · aktualisiert {ago(data.updated_at)}
+                {multiple ? "Turnierspiele, in denen alle gesuchten Spieler im selben Team standen" : "Alle Turnierspiele des Spielers"}
+                {" "}· aktualisiert {ago(data.updated_at)}
               </div>
               <div className="row small" style={{ marginTop: ".4rem" }}>
                 {data.roster.map((r) => (
-                  <span className="badge" key={r.puuid} title={`${r.game_name}#${r.tag_line}`}>
+                  <span className={`badge${r.searched ? " accent" : ""}`} key={r.puuid} title={`${r.game_name}#${r.tag_line}`}>
                     {position(r.position)} · {r.game_name} · {r.games}×
                   </span>
                 ))}

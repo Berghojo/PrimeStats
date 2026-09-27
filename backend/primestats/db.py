@@ -152,15 +152,16 @@ class LinkCode(Base):
 
 # --------------------------------------------------------------- Scouting
 class Scout(Base):
-    """Ergebnis eines Turnier-Scoutings: abgeleiteter Kader und dessen Turnierspiele."""
+    """Ergebnis eines Turnier-Scoutings: Spiele, in denen alle gesuchten Spieler im selben Team standen."""
 
     __tablename__ = "scouts"
 
-    puuid: Mapped[str] = mapped_column(String(100), primary_key=True)  # gesuchter Spieler
-    game_name: Mapped[str] = mapped_column(Text)
-    tag_line: Mapped[str] = mapped_column(Text)
+    #: Hash der sortierten PUUIDs der gesuchten Spieler
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    #: gesuchte Spieler [{puuid, game_name, tag_line}]
+    players: Mapped[list] = mapped_column(JSONB)
+    #: alle Spieler, die in diesen Spielen im Team standen (gesuchte zuerst)
     roster: Mapped[list] = mapped_column(JSONB)
     #: [[match_id, side], ...]
     games: Mapped[list] = mapped_column(JSONB)
-    min_members: Mapped[int] = mapped_column(SmallInteger)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

@@ -18,6 +18,8 @@ Statistik-Tool für **Prime-League- und Custom Games** in League of Legends –
   - Objective-Kontrolle (Drachen, Grubs, Herald, Baron, Atakhan) inkl. Ø Zeitpunkt des ersten eigenen Kills
   - Spielertabelle (sortierbar): KDA, KP, CS/min, Gold/min, Schaden/min, Schadens- & Goldanteil, Vision/min,
     Kontrollwards, GD/CSD/XPD@15 gegen den Lanegegner; Aushilfen werden separat markiert
+  - Champion-Pick-Tabelle (Picks, Siege, WR, KDA, CS/min, Schaden/min, wer spielt ihn, eigene Bans, Bans des
+    Gegners, Präsenz; sortierbar, nach Rolle filterbar) – für Team-/Scrim-Ansicht und Scouting
   - Champion-Pools pro Spieler, eigene Picks & Bans, Bans gegen das Team, gegnerische Picks
   - Spielliste mit Label (*Prime League* / *Scrim* – Spiele mit Turniercode werden automatisch als Prime League
     markiert), Ausschließen einzelner Spiele und direktem Sprung in die Zeitverlaufs-Analyse
@@ -44,19 +46,16 @@ Im Demo-Modus z.B. nach `NLE Polaris#EUW` suchen oder ein Team mit
 
 ## Turnier-Scouting
 
-Unter **Scouting** (oder „Team scouten“ auf einer Spielerseite) reicht ein einziger Spieler des Gegners:
+Unter **Scouting** (oder „Team scouten“ auf einer Spielerseite) gibt man **einen oder mehrere Spieler** ein
+(bis zu 5). Ausgewertet werden alle Turniercode-Spiele (Prime League), in denen **alle eingegebenen Spieler im
+selben Team** standen – bei einem Spieler also alle seine Turnierspiele, bei mehreren nur die Spiele dieses
+Lineups. Die übrigen Spieler dieser Spiele werden als Mitspieler angezeigt.
 
-1. Seine Turniercode-Spiele (Prime League) werden geladen; wer oft genug mit ihm im selben Team stand
-   (mind. 2 Spiele bzw. 20 % seiner Spiele), gilt als Kader.
-2. Die Turnierspiele aller Kader-Spieler werden ebenfalls durchsucht – so tauchen auch Spiele auf, in denen
-   der gesuchte Spieler selbst gefehlt hat.
-3. Alle Spiele mit mindestens *N* (Standard 4) Kader-Spielern im selben Team bilden den Report: Winrate je
-   Seite, Picks & Bans, Bans gegen das Team, Champion-Pools, Objectives, Goldverlauf und Spielliste.
-
-Scouting ist für alle offen (auch ohne Konto), nutzt nur öffentliche Riot-API-Daten – hochgeladene Scrims
-fließen nie ein – und braucht deshalb einen `LOL_API_KEY`. Ergebnisse werden gespeichert und sind über
-„Zuletzt gescoutet“ bzw. ihre URL erneut abrufbar; „Neu scouten“ aktualisiert sie. Ein Scouting läuft
-immer unter dem gesuchten Spieler – es wird kein Teamname oder -kürzel geraten.
+Der Report enthält Winrate je Seite, Objectives, Goldverlauf, Spielerwerte, Champion-Pools, die
+Champion-Pick-Tabelle, Picks & Bans und die Spielliste. Scouting ist für alle offen (auch ohne Konto), nutzt
+nur öffentliche Riot-API-Daten – hochgeladene Scrims fließen nie ein – und braucht deshalb einen `LOL_API_KEY`.
+Ergebnisse werden je Spielerkombination gespeichert und sind über „Zuletzt gescoutet“ bzw. ihre URL erneut
+abrufbar; „Neu scouten“ aktualisiert sie.
 
 ## Konten und Riot-Verknüpfung
 
@@ -212,7 +211,7 @@ backend/
     lcu.py                League-Client-Format → match-v5 (für hochgeladene Scrims)
     accounts_api.py       Konten, Anmeldung, Riot-Verknüpfung, Uploader-Endpunkte
     access.py             Sichtbarkeit und Berechtigungen
-    scout_api.py          Turnier-Scouting (Kader aus einem Spieler ableiten)
+    scout_api.py          Turnier-Scouting (Spiele, in denen alle gesuchten Spieler zusammen spielten)
     auth.py               Passwort-Hashing (scrypt), Tokens, Verknüpfungscodes
     services.py           Spielersuche, Caching, Team-Sync (Hintergrund-Jobs)
     matches.py            match-v5 → Datenobjekte (inkl. Rollenerkennung für Custom Lobbys)
@@ -250,7 +249,7 @@ frontend/
 | DELETE | `/api/me/riot/{puuid}` | Verknüpfung lösen |
 | POST | `/api/uploader/status`, `/api/uploader/link` | Uploader: Verknüpfung prüfen / per Code herstellen |
 | POST | `/api/uploader/known`, `/api/uploader/games` | Uploader: bekannte Match-IDs abfragen / Spiele hochladen |
-| POST | `/api/scout` | Scouting ab einem Spieler starten (`riot_id`, `min_members`) |
-| GET | `/api/scout`, `/api/scout/{puuid}`, `/api/scout/{puuid}/status` | Letzte Scoutings, Report (mit Filtern), Fortschritt |
+| POST | `/api/scout` | Scouting starten (`riot_ids`: 1–5 Spieler, die im selben Team stehen müssen) |
+| GET | `/api/scout`, `/api/scout/{key}`, `/api/scout/{key}/status` | Letzte Scoutings, Report (mit Filtern), Fortschritt |
 
 Die vollständige, interaktive Doku gibt es unter `/docs` (OpenAPI).
