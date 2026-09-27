@@ -1,11 +1,14 @@
 .env
 data/
+.cache/
 flask_session/
 __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
 venv/
+node_modules/
+frontend/dist/
+*.tsbuildinfo
 .idea/*
 !.idea/.gitignore
-bulma.min.css

@@ -1,6 +1,7 @@
 # PrimeStats
 
-Statistik-Tool für **Prime-League- und Custom Games** in League of Legends.
+Statistik-Tool für **Prime-League- und Custom Games** in League of Legends –
+**React-Frontend**, **FastAPI-Backend** und **PostgreSQL**.
 
 - **Spielersuche:** Riot-ID eingeben, Turnier- und Custom Games inklusive Draft (Picks & Bans) ansehen,
   Spiele auswählen und im **Zeitverlauf** analysieren (Gold, XP, CS, Schaden, KDA, Kill-Beteiligung sowie
@@ -12,44 +13,82 @@ Statistik-Tool für **Prime-League- und Custom Games** in League of Legends.
     Ø Teamgold-Differenz @10 und @15
   - Ø Golddifferenz im Spielverlauf (alle Spiele, Siege, Niederlagen) und Formkurve (GD@15 je Spiel)
   - Objective-Kontrolle (Drachen, Grubs, Herald, Baron, Atakhan) inkl. Ø Zeitpunkt des ersten eigenen Kills
-  - Spielertabelle: KDA, KP, CS/min, Gold/min, Schaden/min, Schadens- & Goldanteil, Vision/min, Kontrollwards,
-    GD/CSD/XPD@15 gegen den Lanegegner (sortierbar); Aushilfen werden separat markiert
+  - Spielertabelle (sortierbar): KDA, KP, CS/min, Gold/min, Schaden/min, Schadens- & Goldanteil, Vision/min,
+    Kontrollwards, GD/CSD/XPD@15 gegen den Lanegegner; Aushilfen werden separat markiert
   - Champion-Pools pro Spieler, eigene Picks & Bans, Bans gegen das Team, gegnerische Picks
   - Spielliste mit Label (*Prime League* / *Scrim* – Spiele mit Turniercode werden automatisch als Prime League
     markiert), Ausschließen einzelner Spiele und direktem Sprung in die Zeitverlaufs-Analyse
-  - Filter nach Spieltyp, Seite, Patch, Gegner (aus Namenskürzeln erkannt) und letzten *N* Spielen
+  - Filter nach Spieltyp, Seite, Patch, Gegner (aus Namenskürzeln erkannt) und letzten *N* Spielen –
+    die Filter stehen in der URL und lassen sich teilen
 
-## Schnellstart
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env          # LOL_API_KEY eintragen
-python main_page.py           # http://127.0.0.1:5000
-```
-
-Ohne API-Key lässt sich alles mit generierten Beispieldaten ausprobieren:
+## Schnellstart mit Docker
 
 ```bash
-PRIMESTATS_DEMO=1 python main_page.py
+cp .env.example .env              # LOL_API_KEY eintragen (oder PRIMESTATS_DEMO=1)
+docker compose up --build         # http://localhost:8000
 ```
 
+Compose startet PostgreSQL und einen App-Container, der das gebaute React-Frontend und die API ausliefert.
+Das Datenbankschema wird beim Start automatisch per Alembic migriert.
+
+Ohne API-Key lässt sich alles mit generierten Beispieldaten ausprobieren (`PRIMESTATS_DEMO=1` in `.env`).
 Im Demo-Modus z.B. nach `NLE Polaris#EUW` suchen oder ein Team mit
 `NLE Frostbite#EUW`, `NLE Waldgeist#EUW`, `NLE Polaris#EUW`, `NLE Kompass#EUW`, `NLE Leuchtturm#EUW`
 (und optional `NLE Treibholz#EUW`) anlegen. Alle Namen sind frei erfunden.
 
-## Konfiguration (`.env`)
+## Entwicklung
+
+```bash
+docker compose up -d db                       # nur PostgreSQL
+
+# Backend (Python ≥ 3.11) – http://127.0.0.1:8000, API-Doku unter /docs
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+uvicorn primestats.app:app --reload
+
+# Frontend (Node ≥ 20) – http://localhost:5173, leitet /api an das Backend weiter
+cd frontend
+npm install
+npm run dev
+```
+
+### Tests
+
+```bash
+# Backend: braucht eine PostgreSQL-Testdatenbank (Name muss "test" enthalten, das Schema wird geleert)
+docker compose exec db createdb -U primestats primestats_test
+cd backend && TEST_DATABASE_URL=postgresql://primestats:primestats@localhost:5432/primestats_test pytest
+
+# Frontend
+cd frontend && npm run typecheck && npm test
+```
+
+Die GitHub-Actions-Pipeline (`.github/workflows/ci.yml`) führt beides aus – das Backend gegen einen
+PostgreSQL-Service-Container.
+
+### Datenbank-Migrationen
+
+```bash
+cd backend
+alembic upgrade head                                  # manuell migrieren (AUTO_MIGRATE=0)
+alembic revision --autogenerate -m "Beschreibung"     # neue Migration nach Modelländerung
+```
+
+## Konfiguration (Umgebungsvariablen / `.env`)
 
 | Variable | Standard | Beschreibung |
 |---|---|---|
 | `LOL_API_KEY` | – | Riot-API-Key von <https://developer.riotgames.com> |
 | `RIOT_REGION` | `europe` | Regionales Routing für account-v1 / match-v5 |
-| `SECRET_KEY` | zufällig | Flask-Secret (für Hinweis-Meldungen) |
-| `PRIMESTATS_DATA_DIR` | `data` | Ablage für SQLite-Datenbank (Cache + Teams) |
+| `DATABASE_URL` | `postgresql+psycopg://primestats:primestats@localhost:5432/primestats` | PostgreSQL-Verbindung (`postgres://…` wird ebenfalls akzeptiert) |
+| `AUTO_MIGRATE` | `1` | Schema beim Start per Alembic aktualisieren |
 | `PRIMESTATS_DEMO` | `0` | `1` = Beispieldaten statt Riot-API |
+| `SYNC_MATCH_COUNT` | `100` | Wie viele Custom Games pro Spieler beim Team-Sync durchsucht werden |
 | `DDRAGON_FETCH` | `1` | Aktuelle Championdaten von Data Dragon laden (sonst lokale Kopie) |
 | `DDRAGON_LANGUAGE` | `de_DE` | Sprache der Championnamen |
-| `SYNC_MATCH_COUNT` | `100` | Wie viele Custom Games pro Spieler beim Team-Sync durchsucht werden |
+| `FRONTEND_DIST` | `frontend/dist` | Gebautes Frontend, das das Backend mit ausliefert |
+| `CORS_ORIGINS` | – | Kommagetrennte Origins, falls Frontend und API auf verschiedenen Hosts laufen |
 
 ## Wie der Team-Sync funktioniert
 
@@ -58,33 +97,50 @@ Im Demo-Modus z.B. nach `NLE Polaris#EUW` suchen oder ein Team mit
    Requests. Anschließend wird geprüft, ob die Spieler wirklich im selben Team standen.
 3. Für alle Teamspiele wird die Timeline geladen und zu kompakten Minutenreihen verdichtet.
 
-Alle Antworten der Riot-API werden dauerhaft in SQLite gecacht (Matchdaten ändern sich nicht mehr).
-Ein eingebauter Rate-Limiter hält die Limits eines Development-Keys ein (20/s, 100/2 min) und wiederholt
-Anfragen bei `429`. Der erste Sync eines Teams kann daher ein paar Minuten dauern, danach geht es schnell.
-Der Sync läuft im Hintergrund; die Seite zeigt den Fortschritt an.
+Alle Antworten der Riot-API werden dauerhaft als JSONB in PostgreSQL gespeichert (Matchdaten ändern sich
+nicht mehr). Ein eingebauter Rate-Limiter hält die Limits eines Development-Keys ein (20/s, 100/2 min) und
+wiederholt Anfragen bei `429`. Der erste Sync eines Teams kann daher ein paar Minuten dauern; er läuft im
+Hintergrund, das Frontend zeigt den Fortschritt an.
 
-## Projektstruktur
+## Architektur
 
 ```
-main_page.py              Einstiegspunkt
-primestats/
-  config.py               Einstellungen aus Umgebungsvariablen
-  riot.py                 Riot-API-Client (Rate-Limit, Retries, Cache)
-  store.py                SQLite: API-Cache, Teams, Teamspiele
-  ddragon.py              Championdaten (Data Dragon, Offline-Fallback)
-  matches.py              match-v5 → Datenobjekte (inkl. Rollenerkennung für Custom Lobbys)
-  timeline.py             Timeline → Minutenreihen, Lane-Differenzen, Analyse-Daten
-  team_stats.py           Team-Aggregation und Filter
-  services.py             Spielersuche, Team-Sync (Hintergrund-Jobs)
-  demo.py                 Generierte Beispieldaten im API-Format
-  views.py                Flask-Routen
-  templates/, static/     Oberfläche (htmx + Chart.js, lokal eingebunden)
-tests/                    pytest-Suite (läuft komplett offline mit Demo-Daten)
+backend/
+  primestats/
+    app.py                FastAPI-App (Lifespan, Fehlerbehandlung, Auslieferung des Frontends)
+    api.py                REST-Endpunkte unter /api
+    schemas.py            Pydantic-Modelle der API
+    db.py                 SQLAlchemy-Modelle (JSONB für Matches/Timelines)
+    store.py              Datenzugriff (PostgreSQL-Upserts)
+    migrate.py            Alembic beim Start ausführen
+    riot.py               Riot-API-Client (Rate-Limit, Retries)
+    services.py           Spielersuche, Caching, Team-Sync (Hintergrund-Jobs)
+    matches.py            match-v5 → Datenobjekte (inkl. Rollenerkennung für Custom Lobbys)
+    timeline.py           Timeline → Minutenreihen, Lane-Differenzen, Analyse-Daten
+    team_stats.py         Team-Aggregation und Filter
+    ddragon.py            Championdaten (Data Dragon, Offline-Fallback)
+    demo.py               Generierte Beispieldaten im API-Format
+  migrations/             Alembic-Migrationen
+  tests/                  pytest (gegen PostgreSQL)
+frontend/
+  src/
+    api/                  Fetch-Client, TypeScript-Typen, TanStack-Query-Hooks
+    pages/                Start, Spieler, Analyse, Scoreboard, Teams, Team-Formular, Team-Dashboard
+    components/           UI-Bausteine, Charts (Chart.js), Team-Dashboard-Komponenten
 ```
 
-## Tests
+### API-Überblick
 
-```bash
-pip install -r requirements-dev.txt
-pytest
-```
+| Methode | Pfad | Zweck |
+|---|---|---|
+| GET | `/api/meta` | Demo-Status, Championdaten, Labels |
+| GET | `/api/players/{name}/{tag}/games?count=20` | Custom Games eines Spielers |
+| GET | `/api/matches/{match_id}` | Scoreboard eines Spiels |
+| GET | `/api/analysis?m=…&m=…&focus=…&team=…` | Minutenreihen für die Zeitverlaufs-Analyse |
+| GET/POST | `/api/teams` | Teams auflisten / anlegen |
+| GET/PUT/DELETE | `/api/teams/{id}` | Team lesen / bearbeiten / löschen |
+| GET | `/api/teams/{id}/report?label=&side=&patch=&opponent=&last=` | Aggregierte Team-Statistiken |
+| POST/GET | `/api/teams/{id}/sync` | Synchronisation starten / Status abfragen |
+| PATCH | `/api/teams/{id}/games/{match_id}` | Label ändern, Spiel ein-/ausschließen |
+
+Die vollständige, interaktive Doku gibt es unter `/docs` (OpenAPI).
