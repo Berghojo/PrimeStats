@@ -354,3 +354,17 @@ table.data td.wrap { white-space: normal; min-width: 180px; max-width: 320px; fo
   .btn { white-space: normal; }
   .hero h1 { font-size: 2rem; }
 }
+
+/* ---------- Suche: Spielerauswahl im Ergebnis ---------- */
+.player-select { display: grid; gap: .6rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.chip.searched { border-style: dashed; }
+.chip.on.searched { border-style: solid; }
+.chip[disabled] { opacity: .4; cursor: not-allowed; }
+.segmented { display: inline-flex; justify-self: start; border: 1px solid var(--border); background: var(--bg); padding: 3px; gap: 3px; }
+.segmented button {
+  background: none; border: 0; color: var(--muted); padding: .4rem .8rem; cursor: pointer;
+  font: 700 .95rem/1.2 var(--display); text-transform: uppercase; letter-spacing: .05em;
+}
+.segmented button.on { background: var(--accent); color: var(--accent-ink); }
+.segmented button.on .muted { color: inherit; opacity: .7; }
+@media (max-width: 600px) { .segmented { display: grid; justify-self: stretch; } }

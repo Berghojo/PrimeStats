@@ -1,4 +1,4 @@
-import { createBrowserRouter, Link } from "react-router-dom";
+import { createBrowserRouter, Link, Navigate } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
 import { Empty } from "./components/ui";
@@ -7,8 +7,7 @@ import { AnalysisPage } from "./pages/AnalysisPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { MatchPage } from "./pages/MatchPage";
-import { PlayerPage } from "./pages/PlayerPage";
-import { ScoutPage } from "./pages/ScoutPage";
+import { PlayerRedirect } from "./pages/ScoutPage";
 import { ScoutReportPage } from "./pages/ScoutReportPage";
 import { TeamFormPage } from "./pages/TeamFormPage";
 import { TeamPage } from "./pages/TeamPage";
@@ -29,14 +28,14 @@ export const routes = [
     element: <Layout />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: "player/:name/:tag", element: <PlayerPage /> },
+      { path: "player/:name/:tag", element: <PlayerRedirect /> },
       { path: "analysis", element: <AnalysisPage /> },
       { path: "match/:matchId", element: <MatchPage /> },
       { path: "teams", element: <TeamsPage /> },
       { path: "teams/new", element: <TeamFormPage /> },
       { path: "teams/:teamId", element: <TeamPage /> },
       { path: "teams/:teamId/edit", element: <TeamFormPage /> },
-      { path: "scout", element: <ScoutPage /> },
+      { path: "scout", element: <Navigate to="/" replace /> },
       { path: "scout/:key", element: <ScoutReportPage /> },
       { path: "uploader", element: <UploaderPage /> },
       { path: "login", element: <LoginPage /> },

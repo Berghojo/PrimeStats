@@ -22,15 +22,22 @@ export function useUrlFilters(): [Filters, (next: Partial<Filters>) => void, () 
     patch: params.get("patch") ?? "",
     last: Number(params.get("last") ?? 0),
   };
+  const keys = Object.keys(DEFAULT_FILTERS) as (keyof Filters)[];
   const set = (next: Partial<Filters>) => {
     const merged = { ...filters, ...next };
-    const out = new URLSearchParams();
-    (Object.keys(merged) as (keyof Filters)[]).forEach((k) => {
+    const out = new URLSearchParams(params);  // andere Parameter (z.B. Spielerauswahl) bleiben erhalten
+    keys.forEach((k) => {
+      out.delete(k);
       if (merged[k] !== DEFAULT_FILTERS[k]) out.set(k, String(merged[k]));
     });
     setParams(out, { replace: true });
   };
-  return [filters, set, () => setParams({}, { replace: true })];
+  const reset = () => {
+    const out = new URLSearchParams(params);
+    keys.forEach((k) => out.delete(k));
+    setParams(out, { replace: true });
+  };
+  return [filters, set, reset];
 }
 
 interface Props {

@@ -159,3 +159,31 @@ def test_scout_finds_games_missing_from_the_players_own_list(store, demo_source)
     assert found == expected                        # auch die 3 in der eigenen Liste fehlenden Spiele
     games = store.get_scout(key)["games"]
     assert [g[0] for g in games] == sorted((g[0] for g in games), reverse=True)
+
+
+def test_report_narrows_to_selected_players(client, demo_source):
+    # Suche nach Polaris und Ersatzspieler Treibholz einzeln (Vereinigung), danach im Report auswählen
+    names = ["NLE Polaris", "NLE Treibholz"]
+    resp = client.post("/api/scout", json={"riot_ids": [f"{n}#EUW" for n in names], "mode": "any"}).json()
+    assert _wait(client, resp["key"])["status"] == "done"
+    url = f"/api/scout/{resp['key']}"
+    polaris, treibholz = (demo_source.account(f"{n}#EUW")["puuid"] for n in names)
+
+    def games(**params):
+        report = client.get(url, params=params).json()
+        return report, {r["match_id"] for r in report["history"]}
+
+    report, everything = games()
+    assert report["focus"] == [] and report["match"] == "any"
+    _, only_polaris = games(focus=[polaris])
+    assert only_polaris == _tourney_games_any(demo_source, ["NLE Polaris"]) & everything
+    _, both = games(focus=[polaris, treibholz], match="all")
+    assert both == _tourney_games_together(demo_source, names)
+    report, either = games(focus=[polaris, treibholz], match="any")
+    assert either == everything and report["match"] == "any"
+    assert report["report"]["overview"]["games"] == len(either)
+
+    # unbekannte Spieler werden ignoriert, mehr als fünf abgelehnt
+    report, _ = games(focus=["unbekannt"])
+    assert report["focus"] == []
+    assert client.get(url, params={"focus": [polaris] * 6}).status_code == 422

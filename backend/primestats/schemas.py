@@ -393,6 +393,15 @@ class Filters(BaseModel):
     last: int = 0
 
 
+class ScoutFilters(Filters):
+    """Report-Filter beim Scouting: zusätzlich bis zu fünf ausgewählte Spieler."""
+
+    #: ausgewählte Spieler (PUUIDs)
+    focus: list[str] = Field(default_factory=list, max_length=5)
+    #: "all" = alle ausgewählten zusammen, "any" = mindestens einer; leer = Modus der Suche
+    match: Literal["all", "any"] | None = None
+
+
 class TeamReportOut(BaseModel):
     team: TeamOut
     filters: Filters
@@ -563,6 +572,9 @@ class ScoutReportOut(BaseModel):
     roster: list[RosterPlayer]
     updated_at: datetime
     filters: Filters
+    #: im Report ausgewählte Spieler (PUUIDs) und wie sie verknüpft werden
+    focus: list[str] = []
+    match: str = "all"
     report: Report
     history: list[HistoryRow]
     patches: list[str]

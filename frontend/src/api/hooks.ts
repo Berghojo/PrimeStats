@@ -2,20 +2,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api } from "./client";
 import type {
-  Analysis, Filters, Label, LinkCode, Match, Me, Meta, PlayerGames, ScoutMode, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
+  Analysis, Filters, Label, LinkCode, Match, Me, Meta, ScoutMode, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
   Team, TeamInput, TeamReport,
 } from "./types";
 
 export const useMeta = () =>
   useQuery({ queryKey: ["meta"], queryFn: () => api<Meta>("/meta"), staleTime: Infinity });
-
-export const usePlayerGames = (name: string, tag: string, count: number) =>
-  useQuery({
-    queryKey: ["player", name.toLowerCase(), tag.toLowerCase(), count],
-    queryFn: () =>
-      api<PlayerGames>(`/players/${encodeURIComponent(name)}/${encodeURIComponent(tag)}/games`, { query: { count } }),
-    placeholderData: keepPreviousData,
-  });
 
 export const useMatch = (matchId: string) =>
   useQuery({ queryKey: ["match", matchId], queryFn: () => api<Match>(`/matches/${encodeURIComponent(matchId)}`) });
@@ -136,10 +128,10 @@ export function useUnlink() {
 export const useRecentScouts = () =>
   useQuery({ queryKey: ["scouts"], queryFn: () => api<ScoutSummary[]>("/scout") });
 
-export const useScoutReport = (key: string, filters: Partial<Filters>) =>
+export const useScoutReport = (key: string, filters: Partial<Filters>, focus: string[] = [], match?: ScoutMode) =>
   useQuery({
-    queryKey: ["scout", key, "report", filters],
-    queryFn: () => api<ScoutReport>(`/scout/${encodeURIComponent(key)}`, { query: { ...filters } }),
+    queryKey: ["scout", key, "report", filters, focus, match],
+    queryFn: () => api<ScoutReport>(`/scout/${encodeURIComponent(key)}`, { query: { ...filters, focus, match } }),
     placeholderData: keepPreviousData,
     retry: false,
   });

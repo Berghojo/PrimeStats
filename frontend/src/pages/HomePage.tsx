@@ -1,5 +1,5 @@
 import { useTeams } from "../api/hooks";
-import { PlayerSearch } from "../components/Layout";
+import { RecentSearches, SearchForm } from "./ScoutPage";
 import { NewTeamButton, TeamCard } from "./TeamsPage";
 
 export function HomePage() {
@@ -9,11 +9,12 @@ export function HomePage() {
       <section className="card hero">
         <h1>Prime League &amp; Custom-Game-Statistiken</h1>
         <p>
-          Suche einen Spieler per Riot-ID, um seine Turnier- und Custom Games zu sehen und im Zeitverlauf zu analysieren –
-          oder lege ein Team an und werte alle gemeinsamen Custom Games (Prime-League-Spiele und Scrims) aus.
+          Suche einen oder mehrere Spieler per Riot-ID und werte ihre Turnierspiele aus. Im Ergebnis wählst du bis zu fünf
+          Spieler aus, um die Statistik auf deren Spiele einzugrenzen. Scrims wertest du über ein Team aus.
         </p>
-        <PlayerSearch big autoFocus />
+        <SearchForm />
       </section>
+      <RecentSearches />
       <section className="card">
         <div className="row between">
           <h2>Teams</h2>

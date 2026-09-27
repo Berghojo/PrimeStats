@@ -79,11 +79,6 @@ export interface Match {
   red: TeamSide;
 }
 
-export interface PlayerGames {
-  account: { puuid: string; game_name: string; tag_line: string };
-  games: Match[];
-}
-
 export interface Analysis {
   stats: { key: string; label: string }[];
   players: { puuid: string; name: string; games: number; position: string; focus: boolean }[];
@@ -328,6 +323,9 @@ export interface ScoutReport {
   roster: RosterPlayer[];
   updated_at: string;
   filters: Filters;
+  /** im Report ausgewählte Spieler und wie sie verknüpft werden */
+  focus: string[];
+  match: ScoutMode;
   report: Report;
   history: HistoryRow[];
   patches: string[];

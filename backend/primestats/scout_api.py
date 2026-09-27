@@ -1,6 +1,7 @@
-"""Turnier-Scouting nach einem oder mehreren Spielern (öffentlich).
+"""Suche/Turnier-Scouting nach einem oder mehreren Spielern (öffentlich).
 
-Ein Spiel zählt nur, wenn alle gesuchten Spieler darin im selben Team standen.
+Die Suche sammelt die Turnierspiele der gesuchten Spieler (alle zusammen oder mindestens einer). Im Report
+lassen sich danach bis zu fünf Spieler auswählen, um die Statistik auf deren Spiele einzugrenzen.
 """
 
 from __future__ import annotations
@@ -11,11 +12,23 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from .deps import RateLimit, Service, client_ip
 from .riot import NotFound
-from .schemas import (Filters, HistoryRow, RosterPlayer, ScoutIn, ScoutPlayer, ScoutReportOut, ScoutStartOut,
+from .schemas import (Filters, HistoryRow, ScoutFilters, RosterPlayer, ScoutIn, ScoutPlayer, ScoutReportOut, ScoutStartOut,
                       ScoutSummary, SyncJobOut)
 from .services import scout_key
 from .store import Member, Team
-from .team_stats import LABELS, build_report, filter_records, history_rows, patches
+from .team_stats import LABELS, GameRecord, build_report, filter_records, history_rows, patches
+
+def with_players(records: list[GameRecord], puuids: list[str], match: str) -> list[GameRecord]:
+    """Spiele, in denen alle (``match="all"``) bzw. mindestens einer (``"any"``) der Spieler im Team stand."""
+    if not puuids:
+        return records
+    wanted = set(puuids)
+    out = []
+    for r in records:
+        on_team = {p.puuid for p in r.us.players}
+        if (wanted <= on_team) if match == "all" else (wanted & on_team):
+            out.append(r)
+    return out
 
 router = APIRouter(prefix="/api/scout")
 scout_limit = RateLimit(limit=20, window=3600)
@@ -65,10 +78,11 @@ def scout_status(key: str, service: Service):
 
 
 @router.get("/{key}", response_model=ScoutReportOut)
-def scout_report(key: str, service: Service, filters: Annotated[Filters, Query()]):
+def scout_report(key: str, service: Service, params: Annotated[ScoutFilters, Query()]):
     scout = service.store.get_scout(key)
     if scout is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Dieses Scouting gibt es (noch) nicht.")
+    filters = Filters(**params.model_dump(include={"label", "side", "patch", "last"}))
     if filters.label not in {"all", *LABELS}:
         filters.label = "all"
     roster = scout["roster"]
@@ -76,7 +90,10 @@ def scout_report(key: str, service: Service, filters: Annotated[Filters, Query()
     team = Team(id=0, name=names, tag="", min_members=len(scout["players"]), created_at=scout["updated_at"],
                 last_synced=scout["updated_at"],
                 members=[Member(r["puuid"], r["game_name"], r["tag_line"], r["position"]) for r in roster])
-    records = service.scout_records(scout)
+    match = params.match or scout["mode"]
+    in_roster = {r["puuid"] for r in roster}
+    focus = list(dict.fromkeys(p for p in params.focus if p in in_roster))
+    records = with_players(service.scout_records(scout), focus, match)
     selected = filter_records(records, **filters.model_dump())
     selected_ids = {r.match.match_id for r in selected}
     job = service.jobs.get(_job_key(key))
@@ -87,6 +104,8 @@ def scout_report(key: str, service: Service, filters: Annotated[Filters, Query()
         roster=[RosterPlayer(**r) for r in roster],
         updated_at=scout["updated_at"],
         filters=filters,
+        focus=focus,
+        match=match,
         report=build_report(team, selected),
         history=[HistoryRow(**row, selected=row["match_id"] in selected_ids) for row in history_rows(records)],
         patches=patches(records),

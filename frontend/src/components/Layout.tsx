@@ -1,12 +1,14 @@
 import { type FormEvent, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import { useMe, useMeta } from "../api/hooks";
+import { useMe, useMeta, useStartScout } from "../api/hooks";
+import { ErrorBox } from "./ui";
 import { splitRiotId } from "../lib/format";
 
 export function PlayerSearch({ big, autoFocus }: { big?: boolean; autoFocus?: boolean }) {
   const navigate = useNavigate();
   const { data: meta } = useMeta();
+  const start = useStartScout();
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
   const submit = (ev: FormEvent) => {
@@ -17,7 +19,12 @@ export function PlayerSearch({ big, autoFocus }: { big?: boolean; autoFocus?: bo
       return;
     }
     setError("");
-    navigate(`/player/${encodeURIComponent(parts[0])}/${encodeURIComponent(parts[1])}`);
+    start.mutate({ riotIds: [`${parts[0]}#${parts[1]}`] }, {
+      onSuccess: (res) => {
+        setValue("");
+        navigate(`/scout/${res.key}`);
+      },
+    });
   };
   return (
     <form className="search" onSubmit={submit} role="search">
@@ -27,11 +34,14 @@ export function PlayerSearch({ big, autoFocus }: { big?: boolean; autoFocus?: bo
         onChange={(e) => setValue(e.target.value)}
         placeholder={big && meta?.demo ? "Name#TAG – z.B. NLE Polaris#EUW" : "Name#TAG"}
         aria-label="Riot-ID suchen"
-        aria-invalid={!!error}
-        title={error || undefined}
+        aria-invalid={!!error || !!start.error}
+        title={error || start.error?.message || undefined}
         autoFocus={autoFocus}
       />
-      <button className={`btn${big ? " primary" : ""}`} type="submit">{big ? "Spieler suchen" : "Suchen"}</button>
+      <button className={`btn${big ? " primary" : ""}`} type="submit" disabled={start.isPending}>
+        {big ? "Spieler suchen" : "Suchen"}
+      </button>
+      {big && start.error && <ErrorBox error={start.error} />}
     </form>
   );
 }
@@ -60,8 +70,7 @@ export function Layout() {
         <div className="inner">
           <NavLink className="brand" to="/"><span className="logo">PS</span> PrimeStats</NavLink>
           <nav className="nav">
-            <NavLink to="/" className={() => (pathname === "/" || pathname.startsWith("/player") ? "active" : "")}>Spielersuche</NavLink>
-            <NavLink to="/scout">Scouting</NavLink>
+            <NavLink to="/" className={() => (pathname === "/" || pathname.startsWith("/scout") || pathname.startsWith("/player") ? "active" : "")}>Suche</NavLink>
             <NavLink to="/teams">Teams</NavLink>
             <NavLink to="/uploader">Scrims hochladen</NavLink>
           </nav>
