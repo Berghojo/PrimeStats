@@ -26,6 +26,8 @@ PARSE_CACHE_SIZE = 4096
 #: Wie viele Einträge der Turnier-Liste je Spieler beim Scouting durchsucht werden
 #: (die Liste type=tourney enthält auch Nicht-Custom-Spiele wie Clash, daher großzügig)
 SCOUT_MATCH_COUNT = 100
+#: Wie viele der häufigsten Mitspieler beim Scouting zusätzlich durchsucht werden
+SCOUT_MATES = 6
 #: Für wie viele der neuesten Scouting-Spiele Timelines geladen werden
 SCOUT_TIMELINES = 30
 
@@ -322,27 +324,39 @@ class PrimeStats:
         puuids = [a["puuid"] for a in accounts]
         names = ", ".join(f"{a['gameName']}#{a['tagLine']}" for a in accounts)
 
-        # "all": nur Match-IDs aus den Listen aller Spieler abrufen; "any": alle
-        selected: set[str] | None = None
+        pick_side = together_side if mode == "all" else any_side
+        games: list[tuple[str, int]] = []
+        checked: set[str] = set()
+
+        def check(ids: set[str], label: str) -> None:
+            todo = sorted(ids - checked, key=_match_sort_key, reverse=True)
+            for i, mid in enumerate(todo, 1):
+                progress.update(f"{label}: prüfe Spiel {i}/{len(todo)}", i, len(todo))
+                checked.add(mid)
+                match = self.match(mid)
+                if match.private or not match.is_custom:
+                    continue
+                side = pick_side(match, puuids)
+                if side is not None:
+                    games.append((mid, side))
+
+        # 1) Turnierlisten der gesuchten Spieler
+        own: set[str] = set()
         for i, acc in enumerate(accounts, 1):
             progress.update(f"Lade Turnierspiele von {acc['gameName']} …", i - 1, len(accounts))
-            ids = set(self.custom_match_ids(acc["puuid"], depth))
-            if selected is None:
-                selected = ids
-            else:
-                selected = selected & ids if mode == "all" else selected | ids
-        candidates = sorted(selected or set(), key=_match_sort_key, reverse=True)
-        pick_side = together_side if mode == "all" else any_side
+            own |= set(self.custom_match_ids(acc["puuid"], depth))
+        check(own, "Eigene Spiele")
 
-        games: list[tuple[str, int]] = []
-        for i, mid in enumerate(candidates, 1):
-            progress.update(f"Prüfe Spiel {i}/{len(candidates)}", i, len(candidates))
-            match = self.match(mid)
-            if match.private or not match.is_custom:
-                continue
-            side = pick_side(match, puuids)
-            if side is not None:
-                games.append((mid, side))
+        # 2) Die Riot-Liste eines Spielers ist nicht vollständig (live beobachtet: Spiele fehlen in der
+        #    eigenen Liste, stehen aber in denen der Mitspieler). Deshalb auch die Listen der häufigsten
+        #    Mitspieler durchsuchen – gezählt werden weiterhin nur Spiele mit den gesuchten Spielern.
+        if games:
+            roster = roster_from_games([(self.match(mid), side) for mid, side in games], puuids)
+            mates = [r for r in roster if not r["searched"] and r["games"] >= 2][:SCOUT_MATES]
+            for i, mate in enumerate(mates, 1):
+                progress.update(f"Lade Turnierspiele von {mate['game_name']} …", i, len(mates))
+                check(set(self.custom_match_ids(mate["puuid"], depth)), mate["game_name"])
+        games.sort(key=lambda g: _match_sort_key(g[0]), reverse=True)
         if not games:
             if len(accounts) == 1 or mode == "any":
                 raise RiotAPIError(404, f"{names}: keine Turnierspiele gefunden.")

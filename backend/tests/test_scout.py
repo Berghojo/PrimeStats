@@ -135,3 +135,27 @@ def test_scout_errors(client, offline_client):
     assert job["status"] == "error" and "keine Turnierspiele" in job["error"]
     assert client.get("/api/scout/unbekannt").status_code == 404
     assert offline_client.post("/api/scout", json={"riot_ids": ["NLE Polaris#EUW"]}).status_code == 503
+
+
+def test_scout_finds_games_missing_from_the_players_own_list(store, demo_source):
+    """Riot-Listen einzelner Spieler sind unvollständig: Spiele aus den Listen der Mitspieler ergänzen."""
+    from primestats.services import PrimeStats, SyncJob
+
+    polaris = demo_source.account("NLE Polaris#EUW")
+    expected = _tourney_games_together(demo_source, ["NLE Polaris"])
+    hidden = sorted(expected)[:3]
+
+    class GappyList:
+        def __getattr__(self, name):
+            return getattr(demo_source, name)
+
+        def match_ids(self, puuid, count=20, **kw):
+            ids = demo_source.match_ids(puuid, count, **kw)
+            return [m for m in ids if not (puuid == polaris["puuid"] and m in hidden)]
+
+    svc = PrimeStats(store, GappyList())
+    key = svc.scout([polaris], SyncJob("t"))
+    found = {mid for mid, _ in store.get_scout(key)["games"]}
+    assert found == expected                        # auch die 3 in der eigenen Liste fehlenden Spiele
+    games = store.get_scout(key)["games"]
+    assert [g[0] for g in games] == sorted((g[0] for g in games), reverse=True)
