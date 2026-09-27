@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import type { PlayerReport } from "../../api/types";
-import { num, pct, signed, tone } from "../../lib/format";
+import { num, pct, playerUrl, signed, tone } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 
 type Col = {
@@ -21,7 +22,12 @@ export function PlayersTable({ players }: { players: PlayerReport[] }) {
 
   const cols: Col[] = [
     { key: "name", label: "Spieler", left: true, sort: (p) => p.name.toLowerCase(),
-      render: (p) => <><b>{p.name}</b>{!p.member && <> <span className="badge">Aushilfe</span></>}</> },
+      render: (p) => (
+        <>
+          {p.tag ? <Link to={playerUrl(p.name, p.tag)} title="Spieler-Einzelansicht"><b>{p.name}</b></Link> : <b>{p.name}</b>}
+          {!p.member && <> <span className="badge">Aushilfe</span></>}
+        </>
+      ) },
     { key: "pos", label: "Rolle", sort: (p) => position(p.position), render: (p) => position(p.position) },
     { key: "games", label: "Spiele", sort: (p) => p.games, render: (p) => p.games },
     { key: "wr", label: "WR", sort: (p) => p.winrate, render: (p) => pct(p.winrate) },

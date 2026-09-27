@@ -257,6 +257,7 @@ class ChampionStat(BaseModel):
 class PlayerReport(BaseModel):
     puuid: str
     name: str
+    tag: str = ""
     member: bool
     position: str
     games: int
@@ -688,3 +689,99 @@ class ViewOut(BaseModel):
     name: str
     panels: list[str]
     is_default: bool
+
+
+# ------------------------------------------------------- Spieler-Einzelansicht
+class PlayerFilters(BaseModel):
+    """Filter der Spieleransicht; ``queue`` leer = alle."""
+
+    queue: list[Literal["solo", "flex", "tourney", "scrim"]] = Field(default_factory=list, max_length=4)
+    patch: str = ""
+    last: int = 0
+    champion: int = 0
+    role: str = ""
+
+
+class PlayerOverview(BaseModel):
+    games: int
+    wins: int
+    winrate: float | None
+    kills: float | None
+    deaths: float | None
+    assists: float | None
+    kda: float | None
+    cspm: float | None
+    gpm: float | None
+    dpm: float | None
+    vspm: float | None
+    kp: float | None
+    first_blood: float | None
+    gd10: float | None
+    gd15: float | None
+    csd15: float | None
+    xpd15: float | None
+    timeline_games: int
+
+
+class PlayerBucket(BaseModel):
+    key: str
+    games: int
+    wins: int
+    winrate: float
+    kills: int
+    deaths: int
+    assists: int
+    kda: float
+
+
+class PlayerChampion(BaseModel):
+    champion_id: int
+    games: int
+    wins: int
+    winrate: float
+    kills: int
+    deaths: int
+    assists: int
+    kda: float
+    cspm: float
+    dpm: float
+    positions: list[str]
+
+
+class PlayerGame(BaseModel):
+    match_id: str
+    date: datetime
+    queue: str
+    champion_id: int
+    position: str
+    win: bool
+    kills: int
+    deaths: int
+    assists: int
+    cs: int
+    duration: int
+    gd15: float | None
+
+
+class PlayerStatsReport(BaseModel):
+    overview: PlayerOverview
+    champions: list[PlayerChampion]
+    roles: list[PlayerBucket]
+    queues: list[PlayerBucket]
+    history: list[PlayerGame]
+    deaths: list[DeathEvent]
+    kills: list[KillEvent]
+
+
+class PlayerReportOut(BaseModel):
+    account: ScoutPlayer
+    filters: PlayerFilters
+    report: PlayerStatsReport
+    #: Anzahl Spiele je Queue ohne Filter (für die Filterleiste)
+    queue_counts: dict[str, int]
+    patches: list[str]
+    #: Champions und Rollen des Spielers (für Filter)
+    champions: list[int]
+    roles: list[str]
+    last_fetch: datetime | None
+    job: SyncJobOut | None

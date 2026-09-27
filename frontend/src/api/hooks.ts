@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api } from "./client";
 import type {
-  Analysis, Filters, Label, LinkCode, Match, Me, Meta, SavedView, ScoutMode, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
+  Analysis, Filters, Label, LinkCode, Match, Me, Meta, PlayerFilters, PlayerReportData, SavedView, ScoutMode, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
   Team, TeamInput, TeamReport,
 } from "./types";
 
@@ -177,5 +177,32 @@ export function useDeleteView() {
   return useMutation({
     mutationFn: (id: number) => api<void>(`/me/views/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["views"] }),
+  });
+}
+
+// ------------------------------------------------------- Spieler-Einzelansicht
+const playerPath = (name: string, tag: string) => `/players/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+
+export const usePlayerReport = (name: string, tag: string, filters: Partial<PlayerFilters>) =>
+  useQuery({
+    queryKey: ["player", name, tag, "report", filters],
+    queryFn: () => api<PlayerReportData>(`${playerPath(name, tag)}/report`, { query: { ...filters } }),
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+
+export const usePlayerSync = (name: string, tag: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ["player", name, tag, "sync"],
+    queryFn: () => api<SyncJob | null>(`${playerPath(name, tag)}/sync`),
+    enabled,
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 1000 : false),
+  });
+
+export function useStartPlayerSync(name: string, tag: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<SyncJob>(`${playerPath(name, tag)}/sync`, { method: "POST" }),
+    onSuccess: (job) => qc.setQueryData(["player", name, tag, "sync"], job),
   });
 }

@@ -54,3 +54,6 @@ export function splitRiotId(value: string): [string, string] | null {
   const tag = value.slice(idx + 1).trim();
   return name && tag ? [name, tag] : null;
 }
+
+/** Link zur Spieler-Einzelansicht */
+export const playerUrl = (name: string, tag: string) => `/player/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;

@@ -179,6 +179,18 @@ class SavedView(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class PlayerMatch(Base):
+    """Welche Spiele eines Spielers aus welcher Queue geladen wurden (Spieler-Einzelansicht)."""
+
+    __tablename__ = "player_matches"
+
+    puuid: Mapped[str] = mapped_column(String(100), primary_key=True)
+    match_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    #: "solo", "flex" oder "tourney"
+    queue: Mapped[str] = mapped_column(String(10))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # --------------------------------------------------------------- Scouting
 class Scout(Base):
     """Ergebnis eines Turnier-Scoutings: Spiele, in denen alle gesuchten Spieler im selben Team standen."""

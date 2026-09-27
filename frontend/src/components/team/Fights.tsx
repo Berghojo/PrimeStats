@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import type { DeathEvent, DeathKind, KillEvent, PlayerReport } from "../../api/types";
+import { playerUrl } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 import { InfoTip } from "../InfoTip";
 import { DEATH_RGB, Heat, KILL_RGB, MapBase, SIZE, Slider } from "./Jungle";
@@ -123,7 +125,7 @@ export function FightCard({ mode, deaths = [], kills = [], players }: {
 
   const rail = (
     <>
-      <RailSection title="Spieler">
+      {members.length > 1 && <RailSection title="Spieler">
         <OptionList label="Spieler" selected={who ?? "all"}
           onToggle={(v) => setWho(v === "all" || v === who ? null : v)}
           options={[
@@ -134,7 +136,7 @@ export function FightCard({ mode, deaths = [], kills = [], players }: {
               count: perPlayer(p.puuid),
             })),
           ]} />
-      </RailSection>
+      </RailSection>}
       <RailSection title="Kategorie">
         <OptionList multi label="Kategorie" selected={new Set(KINDS.map((k) => k.key).filter((k) => !hidden.has(k)))}
           onToggle={toggleKind}
@@ -175,7 +177,8 @@ export function FightCard({ mode, deaths = [], kills = [], players }: {
               <tr key={p.puuid} className={who === p.puuid ? "selected" : ""} style={{ cursor: "pointer" }}
                 onClick={() => setWho(who === p.puuid ? null : p.puuid)}>
                 <td className="left">
-                  {p.name} <span className="muted small">{position(p.position)}</span>
+                  {p.tag ? <Link to={playerUrl(p.name, p.tag)} onClick={(e) => e.stopPropagation()}>{p.name}</Link> : p.name}{" "}
+                  <span className="muted small">{position(p.position)}</span>
                   <div className="cell-sub">{text.top}: {top.map(([pos, n]) => `${position(pos)} ${n}×`).join(", ") || "–"}</div>
                 </td>
                 <td>{total} <span className="muted small">Ø {(total / Math.max(1, p.games)).toFixed(1)}</span></td>

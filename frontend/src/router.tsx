@@ -7,7 +7,7 @@ import { AnalysisPage } from "./pages/AnalysisPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { MatchPage } from "./pages/MatchPage";
-import { PlayerRedirect } from "./pages/ScoutPage";
+import { PlayerPage } from "./pages/PlayerPage";
 import { ScoutReportPage } from "./pages/ScoutReportPage";
 import { TeamFormPage } from "./pages/TeamFormPage";
 import { TeamPage } from "./pages/TeamPage";
@@ -28,7 +28,7 @@ export const routes = [
     element: <Layout />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: "player/:name/:tag", element: <PlayerRedirect /> },
+      { path: "player/:name/:tag", element: <PlayerPage /> },
       { path: "analysis", element: <AnalysisPage /> },
       { path: "match/:matchId", element: <MatchPage /> },
       { path: "teams", element: <TeamsPage /> },

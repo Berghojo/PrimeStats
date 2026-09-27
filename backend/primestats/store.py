@@ -13,14 +13,14 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Iterator
 
-from sqlalchemy import create_engine, delete, select, update
+from sqlalchemy import create_engine, delete, func, select, update
 from sqlalchemy.dialects.postgresql import array, insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from .auth import token_hash
 from .lcu import CLIENT_PUUID_SQL
-from .db import (Account, LinkCode, Match, PuuidAlias, RawImport, SavedView, RiotLink, Scout, TeamGameRow, TeamMemberRow, TeamRow,
+from .db import (Account, LinkCode, Match, PlayerMatch, PuuidAlias, RawImport, SavedView, RiotLink, Scout, TeamGameRow, TeamMemberRow, TeamRow,
                  Timeline, TimelineSummary, User, UserSession)
 
 
@@ -223,6 +223,26 @@ class Store:
         if match_ids:
             with self.session() as s:
                 s.execute(delete(TimelineSummary).where(TimelineSummary.match_id.in_(match_ids)))
+
+    # ------------------------------------------------------- Spieleransicht
+    def add_player_matches(self, puuid: str, match_ids: list[str], queue: str) -> int:
+        if not match_ids:
+            return 0
+        stmt = insert(PlayerMatch).values([{"puuid": puuid, "match_id": m, "queue": queue} for m in match_ids])
+        stmt = stmt.on_conflict_do_nothing().returning(PlayerMatch.match_id)
+        with self.session() as s:
+            return len(s.execute(stmt).all())
+
+    def player_matches(self, puuid: str) -> list[tuple[str, str]]:
+        """(match_id, queue) aller geladenen Spiele eines Spielers, neueste zuerst."""
+        with self.session() as s:
+            rows = s.execute(select(PlayerMatch.match_id, PlayerMatch.queue).where(PlayerMatch.puuid == puuid)
+                             .order_by(PlayerMatch.match_id.desc()))
+            return [(m, q) for m, q in rows]
+
+    def player_last_fetch(self, puuid: str) -> datetime | None:
+        with self.session() as s:
+            return s.scalar(select(func.max(PlayerMatch.fetched_at)).where(PlayerMatch.puuid == puuid))
 
     # ---------------------------------------------------------------- aliases
     def get_aliases(self, client_puuids: list[str]) -> dict[str, str]:

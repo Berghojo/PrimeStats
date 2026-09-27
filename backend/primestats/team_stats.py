@@ -48,6 +48,7 @@ def _avg(values: list) -> float | None:
 class _PlayerAcc:
     puuid: str
     name: str = ""
+    tag: str = ""
     member: bool = False
     games: int = 0
     wins: int = 0
@@ -83,6 +84,7 @@ class _PlayerAcc:
         return {
             "puuid": self.puuid,
             "name": self.name,
+            "tag": self.tag,
             "member": self.member,
             "position": self.positions.most_common(1)[0][0] if self.positions else "",
             "games": g,
@@ -272,6 +274,7 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
             if acc is None:
                 acc = players[p.puuid] = _PlayerAcc(p.puuid, member=p.puuid in roster)
             acc.name = p.name
+            acc.tag = p.tag
             acc.games += 1
             acc.wins += p.win
             acc.kills += p.kills

@@ -1,9 +1,9 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { type FormEvent, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 import { useMeta, useRecentScouts, useStartScout } from "../api/hooks";
 import type { ScoutMode, ScoutPlayer, ScoutSummary } from "../api/types";
-import { ErrorBox, Loading } from "../components/ui";
+import { ErrorBox } from "../components/ui";
 import { ago, splitRiotId } from "../lib/format";
 import { InfoTip } from "../components/InfoTip";
 
@@ -116,18 +116,4 @@ export function RecentSearches() {
       <div className="grid three">{recent.data.map((s) => <ScoutCard key={s.key} scout={s} />)}</div>
     </section>
   );
-}
-
-/** Alte Spieler-Links (/player/Name/TAG) starten die Suche nach diesem Spieler. */
-export function PlayerRedirect() {
-  const { name = "", tag = "" } = useParams();
-  const start = useStartScout();
-  const navigate = useNavigate();
-  const started = useRef(false);
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    start.mutate({ riotIds: [`${name}#${tag}`] }, { onSuccess: (res) => navigate(`/scout/${res.key}`, { replace: true }) });
-  }, [name, tag, start, navigate]);
-  return start.error ? <ErrorBox error={start.error} /> : <Loading message={`Suche ${name}#${tag} …`} />;
 }

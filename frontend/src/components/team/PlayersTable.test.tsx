@@ -6,7 +6,7 @@ import { renderWithProviders } from "../../test/utils";
 import { PlayersTable } from "./PlayersTable";
 
 const player = (name: string, kda: number, member = true): PlayerReport => ({
-  puuid: name, name, member, position: "MIDDLE", games: 10, wins: 5, winrate: 0.5, kills: 3, deaths: 2, assists: 4,
+  puuid: name, name, tag: "EUW", member, position: "MIDDLE", games: 10, wins: 5, winrate: 0.5, kills: 3, deaths: 2, assists: 4,
   kda, cspm: 8, gpm: 400, dpm: 600, dtpm: 500, vspm: 1, wards: 8, wards_killed: 2, control_wards: 2, kp: 0.5,
   damage_share: 0.25, gold_share: 0.2, first_blood: 0.1, gd10: null, gd15: 120, csd15: -3, xpd15: null, champions: [],
 });

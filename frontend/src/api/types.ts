@@ -171,6 +171,7 @@ export interface ChampionStat {
 export interface PlayerReport {
   puuid: string;
   name: string;
+  tag: string;
   member: boolean;
   position: string;
   games: number;
@@ -404,3 +405,53 @@ export interface ScoutReport {
 
 /** Gespeicherte Ansicht: sichtbare Panels in dieser Reihenfolge */
 export interface SavedView { id: number; name: string; panels: string[]; is_default: boolean }
+
+// ------------------------------------------------------- Spieler-Einzelansicht
+export type QueueKey = "solo" | "flex" | "tourney" | "scrim";
+
+export interface PlayerFilters {
+  queue: QueueKey[];
+  patch: string;
+  last: number;
+  champion: number;
+  role: string;
+}
+
+export interface PlayerBucket { key: string; games: number; wins: number; winrate: number; kills: number; deaths: number; assists: number; kda: number }
+
+export interface PlayerChampion {
+  champion_id: number; games: number; wins: number; winrate: number; kills: number; deaths: number; assists: number;
+  kda: number; cspm: number; dpm: number; positions: string[];
+}
+
+export interface PlayerGame {
+  match_id: string; date: string; queue: QueueKey; champion_id: number; position: string; win: boolean;
+  kills: number; deaths: number; assists: number; cs: number; duration: number; gd15: number | null;
+}
+
+export interface PlayerStatsReport {
+  overview: {
+    games: number; wins: number; winrate: number | null; kills: number | null; deaths: number | null; assists: number | null;
+    kda: number | null; cspm: number | null; gpm: number | null; dpm: number | null; vspm: number | null; kp: number | null;
+    first_blood: number | null; gd10: number | null; gd15: number | null; csd15: number | null; xpd15: number | null;
+    timeline_games: number;
+  };
+  champions: PlayerChampion[];
+  roles: PlayerBucket[];
+  queues: PlayerBucket[];
+  history: PlayerGame[];
+  deaths: DeathEvent[];
+  kills: KillEvent[];
+}
+
+export interface PlayerReportData {
+  account: ScoutPlayer;
+  filters: PlayerFilters;
+  report: PlayerStatsReport;
+  queue_counts: Partial<Record<QueueKey, number>>;
+  patches: string[];
+  champions: number[];
+  roles: string[];
+  last_fetch: string | null;
+  job: SyncJob | null;
+}

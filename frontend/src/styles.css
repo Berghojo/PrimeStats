@@ -141,7 +141,7 @@ input, select, textarea, button { font: inherit; color: inherit; }
 .search .input { flex: 1; }
 .topbar .search { max-width: 320px; }
 .topbar .search .input { padding: .4rem .65rem; }
-label.field { display: grid; gap: .3rem; font: 700 .9rem/1.2 var(--display); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+label.field, div.field { display: grid; gap: .3rem; font: 700 .9rem/1.2 var(--display); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 label.field .input, label.field select { font: 15px/1.5 var(--font); text-transform: none; letter-spacing: 0; color: var(--text); }
 .btn {
   display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
@@ -546,3 +546,5 @@ table.data.fights td:first-child { min-width: 150px; }
 .tower { stroke: #07090d; stroke-width: 1.5; }
 .tower.blue { fill: #4c8dff; }
 .tower.red { fill: #ff4d5e; }
+.segmented.multi button.off { opacity: .55; }
+.segmented.multi button[disabled] { opacity: .35; cursor: not-allowed; }

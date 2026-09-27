@@ -28,6 +28,9 @@ PARSE_CACHE_SIZE = 4096
 SCOUT_MATCH_COUNT = 100
 #: Wie viele der häufigsten Mitspieler beim Scouting zusätzlich durchsucht werden
 SCOUT_MATES = 6
+#: So viele Spiele je Queue lädt die Spieler-Einzelansicht; Timelines nur für die neuesten
+PLAYER_MATCH_COUNT = 20
+PLAYER_TIMELINES = 10
 #: Für wie viele der neuesten Scouting-Spiele Timelines geladen werden
 SCOUT_TIMELINES = 30
 
@@ -459,6 +462,56 @@ class PrimeStats:
         progress.new_games = len(games)
         progress.done_message = f"Fertig – {len(games)} Turnierspiele gefunden."
         return key
+
+    # --------------------------------------------------- Spieler-Einzelansicht
+    def sync_player(self, account: dict, progress: "SyncJob", count: int = PLAYER_MATCH_COUNT) -> None:
+        """Lädt die neuesten Solo-/Flex-/Turnierspiele eines Spielers (inkl. Timelines der neuesten)."""
+        from .player_stats import QUEUES
+        puuid = account["puuid"]
+        found: dict[str, list[str]] = {}
+        for n, (key, query) in enumerate(QUEUES.items()):
+            progress.update(f"Suche {key}-Spiele …", n, len(QUEUES))
+            found[key] = self.source.match_ids(puuid, count, **query)
+            self.store.add_player_matches(puuid, found[key], key)
+        todo = [(mid, key) for key, ids in found.items() for mid in ids]
+        with_tl = {mid for ids in found.values() for mid in ids[:PLAYER_TIMELINES]}
+        for i, (mid, key) in enumerate(todo, 1):
+            progress.update(f"Lade Spiel {i}/{len(todo)} …", i, len(todo))
+            try:
+                match = self.match(mid)
+                if mid in with_tl:
+                    self.timeline_summary(match, fetch=True)
+            except RiotAPIError as exc:
+                log.warning("Spiel %s nicht ladbar: %s", mid, exc)
+
+    def player_records(self, puuid: str, can_view=lambda match: True) -> list[GameRecord]:
+        """Alle geladenen Spiele eines Spielers (Label = Queue) plus sichtbare hochgeladene Scrims."""
+        rows = dict(self.store.player_matches(puuid))
+        for mid in self.store.matches_with_players({puuid}):
+            rows.setdefault(mid, "scrim")
+        ids = list(rows)
+        raw = self.store.get_matches([mid for mid in ids if not self._is_parsed(mid)])
+        summaries = self.store.get_timeline_summaries(ids, SUMMARY_VERSION)
+        stale = self.store.timeline_ids([mid for mid in ids if mid not in summaries])
+        records = []
+        for mid in ids:
+            if mid not in raw and not self._is_parsed(mid):
+                continue  # noch nicht geladen
+            match = self._parse_from(mid, raw.get(mid))
+            player = match.player(puuid)
+            if player is None:
+                continue
+            label = rows[mid]
+            if label == "scrim":
+                if match.tournament_code:
+                    label = "tourney"
+                elif not can_view(match):
+                    continue
+            summary = summaries.get(mid)
+            if summary is None and mid in stale:
+                summary = self.timeline_summary(match, fetch=False)
+            records.append(GameRecord(match, player.team_id, label, True, summary))
+        return records
 
     def scout_records(self, scout: dict) -> list[GameRecord]:
         return [r for r in self._records([(mid, side, "official", True, "") for mid, side in scout["games"]])

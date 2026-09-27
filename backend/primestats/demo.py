@@ -24,6 +24,8 @@ OPPONENTS = [
     ("ALP", ["ALP Gipfel", "ALP Murmel", "ALP Enzian", "ALP Steinbock", "ALP Firn"], 0.35),
     ("HFK", ["HFK Kaimauer", "HFK Lotse", "HFK Möwe", "HFK Kogge", "HFK Tide"], 0.52),
 ]
+#: Queues für Demo-Ranglistenspiele (Solo/Duo, Flex)
+SOLO_QUEUE, FLEX_QUEUE = 420, 440
 RANDOMS = ["Kaffeetasse", "Blitzbirne", "Nachteule", "Wolkenbruch", "Zimtstern", "Laubfrosch",
            "Sturmtief", "Pixelhexe", "Kieselstein", "Glühwurm", "Schneeflocke", "Papierflieger"]
 
@@ -143,7 +145,12 @@ class DemoSource:
         self.matches: dict[str, dict] = {}
         self.timelines: dict[str, dict] = {}
         self.by_puuid: dict[str, list[str]] = {}
+        # Solo-/Flex-Spiele getrennt, damit Team- und Scrim-Auswertungen unverändert bleiben
+        self.ranked: dict[str, dict] = {}
+        self.ranked_timelines: dict[str, dict] = {}
+        self.ranked_by_puuid: dict[str, list[str]] = {}
         self._generate()
+        self._generate_ranked()
 
     # --------------------------------------------------------------- API
     def account(self, riot_id: str) -> dict:
@@ -155,19 +162,24 @@ class DemoSource:
 
     def match_ids(self, puuid: str, count: int = 20, *, queue: int | None = None,
                   type: str | None = None, start: int = 0) -> list[str]:
+        if queue:  # Ranglistenspiele (Solo/Duo, Flex)
+            ids = [i for i in self.ranked_by_puuid.get(puuid, []) if self.ranked[i]["info"]["queueId"] == queue]
+            return ids[start:start + count]
         # Wie die echte Riot-API: Custom Games gibt es nur mit Turniercode
         ids = [i for i in self.by_puuid.get(puuid, []) if self.matches[i]["info"].get("tournamentCode")]
         return ids[start:start + count]
 
     def match(self, match_id: str) -> dict:
-        if match_id not in self.matches:
+        found = self.matches.get(match_id) or self.ranked.get(match_id)
+        if not found:
             raise NotFound(404, "Match nicht gefunden.")
-        return self.matches[match_id]
+        return found
 
     def timeline(self, match_id: str) -> dict:
-        if match_id not in self.timelines:
+        found = self.timelines.get(match_id) or self.ranked_timelines.get(match_id)
+        if not found:
             raise NotFound(404, "Timeline nicht gefunden.")
-        return self.timelines[match_id]
+        return found
 
     # ---------------------------------------------------------- generator
     def _player(self, name: str) -> dict:
@@ -203,6 +215,38 @@ class DemoSource:
         for ids in self.by_puuid.values():
             ids.sort(reverse=True)
 
+    def _generate_ranked(self) -> None:
+        """Solo/Duo- und Flex-Spiele für Kader- und Gegnerspieler (eigener Zufallsgenerator)."""
+        main_rng, self.rng = self.rng, random.Random(f"ranked:{self.rng.random()}")
+        before_matches, before_timelines = set(self.matches), set(self.timelines)
+        before = {k: list(v) for k, v in self.by_puuid.items()}
+        players = list(DEMO_TEAM[2])
+        players += [(name, pos) for name, pos in zip(OPPONENTS[1][1], POSITIONS)]
+        fillers = [f"Solo {animal}" for animal in ("Dachs", "Fuchs", "Luchs", "Otter", "Marder", "Wiesel",
+                                                    "Igel", "Biber", "Hase", "Reh", "Eber", "Uhu")]
+        start = self.now - timedelta(days=42)
+        for n, (name, pos) in enumerate(players):
+            for g in range(22):
+                queue = SOLO_QUEUE if g % 3 else FLEX_QUEUE
+                when = start + timedelta(hours=self.rng.randint(0, 42 * 24 - 2), seconds=n * 97 + g * 13)
+                while f"EUW1_{7_000_000_000 + int(when.timestamp()) - 1_700_000_000}" in self.matches:
+                    when += timedelta(seconds=1)
+                us = self.rng.sample(fillers, 4)
+                us.insert(POSITIONS.index(pos), name)
+                them = self.rng.sample([f for f in fillers + RANDOMS if f not in us], 5)
+                self._game(when, us, them, self.rng.uniform(0.35, 0.65), "", us_blue=self.rng.random() < 0.5,
+                           queue=queue)
+        for mid in set(self.matches) - before_matches:
+            self.ranked[mid] = self.matches.pop(mid)
+        for mid in set(self.timelines) - before_timelines:
+            self.ranked_timelines[mid] = self.timelines.pop(mid)
+        for puuid, ids in self.by_puuid.items():
+            new = [i for i in ids if i in self.ranked]
+            if new:
+                self.ranked_by_puuid[puuid] = sorted(new, reverse=True)
+        self.by_puuid = {k: v for k, v in before.items()}
+        self.rng = main_rng
+
     def _lineup(self, roster, sub_chance: float) -> list[str]:
         names = [name for name, _ in roster[:5]]
         if self.rng.random() < sub_chance:
@@ -210,7 +254,7 @@ class DemoSource:
         return names
 
     def _game(self, when: datetime, us: list[str], them: list[str], their_strength: float,
-              code: str, us_blue: bool) -> None:
+              code: str, us_blue: bool, queue: int = 0) -> None:
         rng = self.rng
         # Match-IDs steigen wie bei Riot mit der Zeit an
         match_id = f"EUW1_{7_000_000_000 + int(when.timestamp()) - 1_700_000_000}"
@@ -426,7 +470,8 @@ class DemoSource:
         info = {
             "gameCreation": created_ms, "gameStartTimestamp": created_ms + 90_000,
             "gameEndTimestamp": created_ms + 90_000 + duration * 1000, "gameDuration": duration,
-            "gameMode": "CLASSIC", "gameType": "CUSTOM_GAME", "queueId": 0, "mapId": 11,
+            "gameMode": "CLASSIC", "gameType": "MATCHED_GAME" if queue else "CUSTOM_GAME", "queueId": queue,
+            "mapId": 11,
             "gameVersion": "15.18.700.1234" if when > self.now - timedelta(days=21) else "15.17.690.1111",
             "platformId": "EUW1", "participants": participants, "teams": teams,
         }
