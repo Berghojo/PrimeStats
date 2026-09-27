@@ -66,13 +66,21 @@ def main() -> int:
     key = os.environ["LOL_API_KEY"]
     store = Store.from_url(os.environ.get("DATABASE_URL", "postgresql+psycopg://postgres:postgres@localhost/primestats"))
     upgrade(store.engine)
-    svc = PrimeStats(store, RiotClient(key), sync_match_count=50)
+    svc = PrimeStats(store, RiotClient(key))
     dd = DataDragon(fetch=True)
     started = time.time()
 
     say(f"# PrimeStats Live-Check: {riot_id}")
     acc = svc.account(riot_id)
     say(f"Account gefunden: `{acc['gameName']}#{acc['tagLine']}`")
+    say()
+
+    # 0) Was steckt in der Turnier-Liste der Riot-API?
+    from collections import Counter
+    ids = svc.custom_match_ids(acc["puuid"], 100)
+    kinds = Counter((svc.match(m).game_type, svc.match(m).queue_id) for m in ids)
+    say(f"Turnier-Liste (type=tourney): {len(ids)} Einträge – " +
+        ", ".join(f"{gt} / Queue {q}: {n}" for (gt, q), n in kinds.most_common()))
     say()
 
     # 1) Spielersuche

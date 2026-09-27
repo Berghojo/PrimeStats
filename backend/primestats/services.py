@@ -23,8 +23,9 @@ log = logging.getLogger(__name__)
 #: Normale Custom-Lobbys (Scrims) kommen ausschließlich über den LCU-Uploader herein.
 CUSTOM_QUERIES = ({"type": "tourney"},)
 PARSE_CACHE_SIZE = 4096
-#: Wie viele Turnierspiele je Spieler beim Scouting durchsucht werden
-SCOUT_MATCH_COUNT = 50
+#: Wie viele Einträge der Turnier-Liste je Spieler beim Scouting durchsucht werden
+#: (die Liste type=tourney enthält auch Nicht-Custom-Spiele wie Clash, daher großzügig)
+SCOUT_MATCH_COUNT = 100
 #: Für wie viele der neuesten Scouting-Spiele Timelines geladen werden
 SCOUT_TIMELINES = 30
 
