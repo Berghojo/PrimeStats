@@ -35,10 +35,46 @@ Compose startet PostgreSQL und einen App-Container, der das gebaute React-Fronte
 Das Datenbankschema wird beim Start automatisch per Alembic migriert.
 
 Ohne API-Key lässt sich alles mit generierten Beispieldaten ausprobieren (`PRIMESTATS_DEMO=1` in `.env`;
-die Demo-Scrims werden beim Start so importiert, als kämen sie vom Uploader).
+die Demo-Scrims werden beim Start so importiert, als kämen sie vom Uploader). Im Demo-Modus gibt es das
+Konto `demo` / `demo1234` (verknüpft mit `NLE Polaris#EUW`) und das öffentliche Team „Nordlicht Esports“.
 Im Demo-Modus z.B. nach `NLE Polaris#EUW` suchen oder ein Team mit
 `NLE Frostbite#EUW`, `NLE Waldgeist#EUW`, `NLE Polaris#EUW`, `NLE Kompass#EUW`, `NLE Leuchtturm#EUW`
 (und optional `NLE Treibholz#EUW`) anlegen. Alle Namen sind frei erfunden.
+
+## Konten und Riot-Verknüpfung
+
+Auf der Website legt man ein **Konto** an (Benutzername + Passwort). Ein Riot-Account wird **über den
+Uploader** mit dem Konto verknüpft – nur wer im League Client mit dem Account eingeloggt ist, kann ihn
+verknüpfen:
+
+1. Konto → „Riot-Account verknüpfen“ erzeugt einen Einmal-Code (z.B. `K7QX-M2PA`, 15 Minuten gültig).
+2. Uploader starten: Er erkennt den im Client eingeloggten Riot-Account, fragt nach dem Code und meldet
+   sich damit beim Server. Die Website zeigt die Verknüpfung sofort an.
+3. Ab dann lädt der Uploader für diesen Riot-Account ohne Rückfrage hoch. Er bekommt dafür beim
+   Verknüpfen einen Geräteschlüssel, den er sich in `primestats-uploader.ini` merkt – es gibt keinen
+   Token zum Abtippen. Mehrere Riot-Accounts (z.B. Smurfs) lassen sich an ein Konto hängen; wird ein
+   Account mit einem neuen Code verknüpft, zieht er zum neuen Konto um.
+
+Was Konten und Verknüpfungen steuern:
+
+| | Anonym | Angemeldet | Riot-Account im Kader |
+|---|---|---|---|
+| Turniercode-Spiele (Riot-API) suchen/ansehen | ✓ | ✓ | ✓ |
+| Hochgeladene Scrims ansehen | – | nur eigene (mitgespielt) | + Scrims des Teams |
+| Öffentliche Teams ansehen | ✓ | ✓ | ✓ |
+| Private Teams ansehen | – | nur selbst erstellte | ✓ |
+| Team anlegen | – | ✓ | ✓ |
+| Team bearbeiten, synchronisieren, Spiele labeln | – | Ersteller | ✓ |
+| Team löschen | – | Ersteller | – |
+| Scrims hochladen | – | – | eigene Spiele (Uploader) |
+
+Passwörter werden mit scrypt gehasht, Sessions laufen über ein `HttpOnly`-Cookie (`SameSite=Lax`, bei HTTPS
+`Secure`); ändernde Anfragen brauchen zusätzlich den Header `X-Requested-With: PrimeStats` (CSRF-Schutz).
+Login, Registrierung und Code-Eingabe sind rate-limitiert.
+
+> Der Nachweis „im Client eingeloggt“ stammt vom Uploader auf dem Rechner des Spielers. Er schützt gut gegen
+> versehentliche oder fremde Verknüpfungen, ist aber keine kryptografische Bestätigung durch Riot – das ginge
+> nur über Riot Sign-On (RSO), wofür ein von Riot freigegebener Production-Key nötig ist.
 
 ## Uploader: Scrims aus dem League Client
 
@@ -46,14 +82,17 @@ Die Riot-API gibt Custom Games aus Datenschutzgründen nur heraus, wenn sie per 
 wurden (Prime-League-Spiele). Normale Custom-Lobbys kennt nur der League Client selbst – über seine lokale
 Schnittstelle (LCU-API). Der Uploader liest sie dort aus:
 
-1. Server-Admin setzt `UPLOAD_TOKEN` (beliebiges langes Geheimnis) und gibt es an das Team weiter.
-2. Ein Spieler lädt `PrimeStats-Uploader.exe` herunter (GitHub → Releases bzw. Actions-Artefakt
-   „PrimeStats-Uploader“), startet den League Client und dann den Uploader.
-3. Beim ersten Start fragt das Tool nach Server-Adresse und Token (gespeichert in
-   `primestats-uploader.ini` neben der EXE).
-4. Das Tool liest die Match-History (standardmäßig die letzten 200 Spiele), fragt den Server, welche
-   Custom Games schon bekannt sind, und lädt nur neue Spiele samt Timeline hoch. Der Server ordnet sie
-   automatisch allen passenden Teams zu (Label „Scrim“).
+1. `PrimeStats-Uploader.exe` herunterladen (GitHub → Releases bzw. Actions-Artefakt „PrimeStats-Uploader“),
+   League Client starten und einloggen, Uploader starten.
+2. Beim ersten Start mit einem Riot-Account: Code von der Website eingeben (siehe oben).
+3. Das Tool liest die Match-History (standardmäßig die letzten 200 Spiele), fragt den Server, welche
+   Custom Games schon bekannt sind, und lädt nur neue Spiele samt Timeline hoch. Der Server nimmt nur
+   Spiele an, in denen einer der verknüpften Riot-Accounts mitgespielt hat, und ordnet sie automatisch
+   allen passenden Teams zu (Label „Scrim“).
+
+Die Server-Adresse ist fest in die EXE eingebaut: Die GitHub-Action `uploader.yml` setzt dafür die
+Repository-Variable `PRIMESTATS_SERVER_URL` ein (Settings → Secrets and variables → Actions → Variables).
+Bei einem Tag `uploader-v*` hängt sie die EXE an ein Release.
 
 Ein Teammitglied reicht, wenn es bei (fast) allen Scrims dabei ist – jedes Spiel enthält alle 10 Spieler.
 Doppelte Uploads werden erkannt; fehlende Timelines werden bei einem späteren Upload ergänzt. Die Rohdaten
@@ -61,14 +100,10 @@ aus dem Client werden zusätzlich gespeichert (`raw_imports`), damit sie bei Ver
 neu verarbeitet werden können.
 
 Ohne `LOL_API_KEY` läuft PrimeStats im **Upload-Modus**: Spielersuche, Teams und Statistiken basieren dann
-ausschließlich auf hochgeladenen Spielen (Spieler sind über die Uploads bekannt).
+ausschließlich auf hochgeladenen Spielen (Spieler sind über Uploads und Verknüpfungen bekannt).
 
 > Die LCU-API ist nicht offiziell dokumentiert. Die Endpunkte (`/lol-match-history/v1/…`) entsprechen dem
 > Stand der Community-Dokumentation; nach Client-Patches kann eine Anpassung nötig sein.
-
-Den Uploader selbst bauen: `pip install pyinstaller requests && pyinstaller --onefile --name PrimeStats-Uploader
-uploader/primestats_uploader.py` (unter Windows). Die GitHub-Action `uploader.yml` baut die EXE automatisch
-und hängt sie bei einem Tag `uploader-v*` an ein Release.
 
 ## Entwicklung
 
@@ -117,7 +152,8 @@ alembic revision --autogenerate -m "Beschreibung"     # neue Migration nach Mode
 | `RIOT_REGION` | `europe` | Regionales Routing für account-v1 / match-v5 |
 | `DATABASE_URL` | `postgresql+psycopg://primestats:primestats@localhost:5432/primestats` | PostgreSQL-Verbindung (`postgres://…` wird ebenfalls akzeptiert) |
 | `AUTO_MIGRATE` | `1` | Schema beim Start per Alembic aktualisieren |
-| `UPLOAD_TOKEN` | – | Token für den Uploader; leer = Uploads deaktiviert |
+| `SESSION_DAYS` | `30` | Wie lange eine Anmeldung gültig bleibt |
+| `COOKIE_SECURE` | `auto` | Session-Cookie nur per HTTPS (`auto` = je nach Anfrage, `1`/`0` erzwingen) |
 | `UPLOADER_URL` | GitHub-Releases | Download-Link für den Uploader, der im Frontend angezeigt wird |
 | `PRIMESTATS_DEMO` | `0` | `1` = Beispieldaten statt Riot-API |
 | `SYNC_MATCH_COUNT` | `100` | Wie viele Custom Games pro Spieler beim Team-Sync durchsucht werden |
@@ -152,6 +188,9 @@ backend/
     migrate.py            Alembic beim Start ausführen
     riot.py               Riot-API-Client (Rate-Limit, Retries)
     lcu.py                League-Client-Format → match-v5 (für hochgeladene Scrims)
+    accounts_api.py       Konten, Anmeldung, Riot-Verknüpfung, Uploader-Endpunkte
+    access.py             Sichtbarkeit und Berechtigungen
+    auth.py               Passwort-Hashing (scrypt), Tokens, Verknüpfungscodes
     services.py           Spielersuche, Caching, Team-Sync (Hintergrund-Jobs)
     matches.py            match-v5 → Datenobjekte (inkl. Rollenerkennung für Custom Lobbys)
     timeline.py           Timeline → Minutenreihen, Lane-Differenzen, Analyse-Daten
@@ -165,7 +204,7 @@ uploader/
 frontend/
   src/
     api/                  Fetch-Client, TypeScript-Typen, TanStack-Query-Hooks
-    pages/                Start, Spieler, Analyse, Scoreboard, Teams, Team-Formular, Team-Dashboard, Uploader
+    pages/                Start, Spieler, Analyse, Scoreboard, Teams, Team-Formular, Team-Dashboard, Uploader, Login, Konto
     components/           UI-Bausteine, Charts (Chart.js), Team-Dashboard-Komponenten
 ```
 
@@ -182,7 +221,11 @@ frontend/
 | GET | `/api/teams/{id}/report?label=&side=&patch=&opponent=&last=` | Aggregierte Team-Statistiken |
 | POST/GET | `/api/teams/{id}/sync` | Synchronisation starten / Status abfragen |
 | PATCH | `/api/teams/{id}/games/{match_id}` | Label ändern, Spiel ein-/ausschließen |
-| POST | `/api/import/known` | Uploader: welche Match-IDs sind schon bekannt? (Bearer-Token) |
-| POST | `/api/import/lcu` | Uploader: Spiele im LCU-Format hochladen (Bearer-Token) |
+| POST | `/api/auth/register`, `/api/auth/login`, `/api/auth/logout` | Konto anlegen, an-/abmelden (Cookie) |
+| GET | `/api/auth/me` | Angemeldetes Konto + verknüpfte Riot-Accounts |
+| POST | `/api/me/link-code` | Einmal-Code für die Verknüpfung erzeugen |
+| DELETE | `/api/me/riot/{puuid}` | Verknüpfung lösen |
+| POST | `/api/uploader/status`, `/api/uploader/link` | Uploader: Verknüpfung prüfen / per Code herstellen |
+| POST | `/api/uploader/known`, `/api/uploader/games` | Uploader: bekannte Match-IDs abfragen / Spiele hochladen |
 
 Die vollständige, interaktive Doku gibt es unter `/docs` (OpenAPI).

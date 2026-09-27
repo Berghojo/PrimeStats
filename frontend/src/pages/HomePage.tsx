@@ -1,11 +1,8 @@
-import { Link } from "react-router-dom";
-
-import { useMeta, useTeams } from "../api/hooks";
+import { useTeams } from "../api/hooks";
 import { PlayerSearch } from "../components/Layout";
-import { TeamCard } from "./TeamsPage";
+import { NewTeamButton, TeamCard } from "./TeamsPage";
 
 export function HomePage() {
-  const { data: meta } = useMeta();
   const teams = useTeams();
   return (
     <>
@@ -20,7 +17,7 @@ export function HomePage() {
       <section className="card">
         <div className="row between">
           <h2>Teams</h2>
-          {meta?.configured && <Link className="btn primary" to="/teams/new">+ Team anlegen</Link>}
+          <NewTeamButton />
         </div>
         {teams.data && teams.data.length > 0 ? (
           <div className="grid three" style={{ marginTop: ".75rem" }}>

@@ -6,7 +6,9 @@ Dieses Tool liest sie über die Client-API (LCU) aus und lädt alles hoch, was d
 PrimeStats-Server noch nicht kennt.
 
 Benutzung: League Client starten und einloggen, dann ``PrimeStats-Uploader.exe`` starten.
-Beim ersten Start werden Server-Adresse und Upload-Token abgefragt und gespeichert.
+Beim ersten Start mit einem Riot-Account fragt das Tool nach einem Verknüpfungscode, den man auf der
+PrimeStats-Website (Konto → „Riot-Account verknüpfen“) erzeugt. Damit wird der im Client eingeloggte
+Riot-Account dem PrimeStats-Konto zugeordnet; danach lädt das Tool ohne weitere Eingaben hoch.
 """
 
 from __future__ import annotations
@@ -27,7 +29,9 @@ from pathlib import Path
 import requests
 import urllib3
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
+#: Feste Server-Adresse – wird beim Bauen der EXE über PRIMESTATS_SERVER_URL eingesetzt
+DEFAULT_SERVER = "__PRIMESTATS_SERVER_URL__"
 CONFIG_NAME = "primestats-uploader.ini"
 HISTORY_PAGE = 20
 UPLOAD_BATCH = 5
@@ -63,26 +67,42 @@ def config_path() -> Path:
     return base / "PrimeStats" / CONFIG_NAME
 
 
+def _parser() -> configparser.ConfigParser:
+    parser = configparser.ConfigParser()
+    parser.optionxform = str  # PUUIDs sind case-sensitiv
+    return parser
+
+
+def default_server() -> str:
+    if DEFAULT_SERVER.startswith("__"):
+        return os.getenv("PRIMESTATS_SERVER_URL", "")
+    return DEFAULT_SERVER
+
+
 @dataclass
 class Config:
     server: str = ""
-    token: str = ""
     league_path: str = ""
     max_games: int = 200
+    #: Geräteschlüssel je verknüpftem Riot-Account (puuid -> Schlüssel)
+    keys: dict | None = None
 
     @classmethod
     def load(cls, path: Path) -> "Config":
-        parser = configparser.ConfigParser()
+        parser = _parser()
         if path.exists():
             parser.read(path, encoding="utf-8")
         s = parser["primestats"] if parser.has_section("primestats") else {}
-        return cls(server=s.get("server", ""), token=s.get("token", ""),
-                   league_path=s.get("league_path", ""), max_games=int(s.get("max_games", 200)))
+        keys = dict(parser["accounts"]) if parser.has_section("accounts") else {}
+        return cls(server=s.get("server", "") or default_server(), league_path=s.get("league_path", ""),
+                   max_games=int(s.get("max_games", 200)), keys=keys)
 
     def save(self, path: Path) -> None:
-        parser = configparser.ConfigParser()
-        parser["primestats"] = {"server": self.server, "token": self.token, "league_path": self.league_path,
-                                "max_games": str(self.max_games)}
+        parser = _parser()
+        parser["primestats"] = {"league_path": self.league_path, "max_games": str(self.max_games)}
+        if self.server and self.server != default_server():
+            parser["primestats"]["server"] = self.server
+        parser["accounts"] = dict(self.keys or {})
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8") as fh:
             parser.write(fh)
@@ -207,29 +227,36 @@ def match_id(game: dict) -> str:
 
 # ------------------------------------------------------------------ Server
 class Server:
-    def __init__(self, base: str, token: str, uploader: str = "", session=None):
+    def __init__(self, base: str, session=None):
         self.base = base.rstrip("/")
         self.session = session or requests.Session()
-        self.headers = {"Authorization": f"Bearer {token}", "X-Uploader": uploader,
-                        "User-Agent": f"PrimeStats-Uploader/{VERSION}"}
+        self.headers = {"User-Agent": f"PrimeStats-Uploader/{VERSION}"}
+
+    def authenticate(self, puuid: str, key: str) -> None:
+        """Uploads laufen unter dem im Client eingeloggten, verknüpften Riot-Account."""
+        self.headers.update({"X-Riot-Puuid": puuid, "X-Link-Key": key})
 
     def _post(self, path: str, body: dict) -> dict:
         try:
             resp = self.session.post(self.base + path, json=body, headers=self.headers, timeout=120)
         except requests.RequestException as exc:
             raise UploaderError(f"Server {self.base} nicht erreichbar: {exc}") from exc
-        if resp.status_code in (401, 403):
-            detail = _detail(resp)
-            raise UploaderError(f"Zugriff verweigert ({resp.status_code}): {detail}")
         if resp.status_code != 200:
-            raise UploaderError(f"Server-Fehler {resp.status_code}: {_detail(resp)}")
+            raise UploaderError(f"{_detail(resp)} (HTTP {resp.status_code})")
         return resp.json()
 
+    def status(self, puuid: str, key: str | None) -> dict:
+        return self._post("/api/uploader/status", {"puuid": puuid, "key": key})
+
+    def link(self, code: str, puuid: str, game_name: str, tag_line: str) -> dict:
+        return self._post("/api/uploader/link", {"code": code.strip(), "puuid": puuid, "game_name": game_name,
+                                                 "tag_line": tag_line})
+
     def known(self, ids: list[str]) -> set[str]:
-        return set(self._post("/api/import/known", {"match_ids": ids})["known"])
+        return set(self._post("/api/uploader/known", {"match_ids": ids})["known"])
 
     def upload(self, items: list[dict]) -> dict:
-        return self._post("/api/import/lcu", {"games": items})
+        return self._post("/api/uploader/games", {"games": items})
 
 
 def _detail(resp) -> str:
@@ -303,23 +330,42 @@ def run(client: LeagueClient, server: Server | None, max_games: int, out: Path |
     return summary
 
 
-def ask_config(cfg: Config, path: Path) -> Config:
-    print("Erster Start – bitte die Verbindung zu PrimeStats einrichten.")
-    while not cfg.server:
-        cfg.server = input("Server-Adresse (z.B. https://primestats.example.de): ").strip().rstrip("/")
-    while not cfg.token:
-        cfg.token = input("Upload-Token (vom Server-Admin): ").strip()
-    cfg.save(path)
-    print(f"Gespeichert in {path}\n")
-    return cfg
+def ensure_linked(server: Server, cfg: Config, path: Path, me: dict, code: str | None = None,
+                  ask=input, log=print) -> str:
+    """Stellt sicher, dass der eingeloggte Riot-Account verknüpft ist; liefert den Kontonamen."""
+    puuid = me["puuid"]
+    riot_id = f"{me.get('gameName', '')}#{me.get('tagLine', '')}"
+    keys = cfg.keys if cfg.keys is not None else {}
+    status = server.status(puuid, keys.get(puuid))
+    if status["linked"]:
+        server.authenticate(puuid, keys[puuid])
+        return status["username"]
+
+    log(f"Der Riot-Account {riot_id} ist noch nicht mit PrimeStats verknüpft.")
+    log(f"  1. Öffne {server.base}/account und melde dich an (oder registriere dich).")
+    log("  2. Klicke auf „Riot-Account verknüpfen“ und gib den angezeigten Code hier ein.")
+    for attempt in range(3):
+        entered = code if (code and attempt == 0) else ask("Code: ")
+        try:
+            result = server.link(entered, puuid, me.get("gameName", ""), me.get("tagLine", ""))
+        except UploaderError as exc:
+            log(f"  {exc}")
+            continue
+        keys[puuid] = result["key"]
+        cfg.keys = keys
+        cfg.save(path)
+        server.authenticate(puuid, result["key"])
+        log(f"Verknüpft: {riot_id} gehört jetzt zum PrimeStats-Konto {result['username']}.\n")
+        return result["username"]
+    raise UploaderError("Verknüpfung fehlgeschlagen.")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Lädt Custom Games aus dem League Client zu PrimeStats hoch.")
-    parser.add_argument("--server", help="Adresse des PrimeStats-Servers")
-    parser.add_argument("--token", help="Upload-Token")
+    parser.add_argument("--code", help="Verknüpfungscode von der Website (nur beim ersten Mal nötig)")
+    parser.add_argument("--server", help=argparse.SUPPRESS)  # nur für Entwicklung/Tests
     parser.add_argument("--max-games", type=int, help="Wie weit die Match-History durchsucht wird")
-    parser.add_argument("--out", type=Path, help="Spiele zusätzlich/stattdessen als JSON-Datei speichern")
+    parser.add_argument("--out", type=Path, help="Spiele zusätzlich als JSON-Datei speichern")
     parser.add_argument("--offline", action="store_true", help="Nichts hochladen (nur mit --out sinnvoll)")
     parser.add_argument("--no-pause", action="store_true", help="Am Ende nicht auf Enter warten")
     parser.add_argument("--version", action="version", version=f"PrimeStats-Uploader {VERSION}")
@@ -330,23 +376,20 @@ def main(argv: list[str] | None = None) -> int:
     cfg = Config.load(path)
     if args.server:
         cfg.server = args.server.rstrip("/")
-    if args.token:
-        cfg.token = args.token
     if args.max_games:
         cfg.max_games = args.max_games
 
     code = 0
     try:
-        if not args.offline and (not cfg.server or not cfg.token):
-            cfg = ask_config(cfg, path)
+        if not args.offline and not cfg.server:
+            raise UploaderError("Keine Server-Adresse eingebaut – bitte mit --server starten.")
         client = LeagueClient(find_credentials(cfg.league_path))
-        uploader_name = ""
-        try:
-            me = client.current_summoner()
-            uploader_name = f"{me.get('gameName', '')}#{me.get('tagLine', '')}"
-        except UploaderError:
-            pass
-        server = None if args.offline else Server(cfg.server, cfg.token, uploader_name)
+        me = client.current_summoner()
+        server = None
+        if not args.offline:
+            server = Server(cfg.server)
+            account = ensure_linked(server, cfg, path, me, args.code)
+            print(f"Lade hoch für PrimeStats-Konto {account}.")
         started = time.time()
         s = run(client, server, cfg.max_games, args.out)
         print()

@@ -7,7 +7,7 @@ import pytest
 
 from primestats.demo import to_lcu
 
-from .conftest import UPLOAD_TOKEN
+from .conftest import other_client, register
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "uploader"))
 import primestats_uploader as up  # noqa: E402
@@ -66,52 +66,73 @@ def _client_for(demo_source, riot_id="NLE Polaris#EUW", **kw):
     return up.LeagueClient(up.Credentials(1234, "pw"), session=session), session
 
 
-@pytest.fixture
-def server_client(offline_client):
-    return offline_client
-
-
-def test_uploads_only_new_custom_games(server_client, demo_source):
-    lcu, session = _client_for(demo_source)
-    server = up.Server("http://testserver", UPLOAD_TOKEN, "NLE Polaris#EUW", session=server_client)
+def _linked_tool(web, lcu, tmp_path, username="polaris"):
+    """Konto auf der Website anlegen, Code erzeugen und im Tool eingeben (wie ein echter Nutzer)."""
+    register(web, username)
+    code = web.post("/api/me/link-code").json()["code"]
+    server = up.Server("http://testserver", session=other_client(web))
+    cfg, path = up.Config(server="http://testserver", keys={}), tmp_path / "tool.ini"
     logs = []
-    s = up.run(lcu, server, max_games=200, log=logs.append)
+    assert up.ensure_linked(server, cfg, path, lcu.current_summoner(), ask=lambda _: code,
+                            log=logs.append) == username
+    return server, cfg, path, logs
 
+
+def test_first_start_links_account_then_uploads_only_new_games(offline_client, demo_source, tmp_path):
+    lcu, session = _client_for(demo_source)
+    server, cfg, path, logs = _linked_tool(offline_client, lcu, tmp_path)
+    assert any("noch nicht" in line for line in logs) and "Verknüpft" in logs[-1]
+    # Geräteschlüssel wurde gespeichert (PUUID-Groß-/Kleinschreibung bleibt erhalten)
+    assert up.Config.load(path).keys == {session.account["puuid"]: cfg.keys[session.account["puuid"]]}
+
+    s = up.run(lcu, server, max_games=200, log=lambda *_: None)
     all_ids = demo_source.by_puuid[session.account["puuid"]]
-    assert s.customs == len(all_ids)            # auch Turnierspiele sind Custom Games
-    assert s.uploaded == len(all_ids) and s.errors == 0 and s.known == 0
-    assert session.account["gameName"] in logs[0]
+    assert s.customs == len(all_ids) and s.uploaded == len(all_ids) and s.errors == 0
 
-    # zweiter Lauf: alles bekannt, keine Details/Timelines werden mehr gelesen
+    # zweiter Start: keine Code-Abfrage mehr, nichts Neues
+    server2 = up.Server("http://testserver", session=other_client(offline_client))
+    asked = []
+    up.ensure_linked(server2, up.Config.load(path), path, lcu.current_summoner(), ask=asked.append,
+                     log=lambda *_: None)
+    assert asked == []
     session.calls.clear()
-    s2 = up.run(lcu, server, max_games=200, log=lambda *_: None)
+    s2 = up.run(lcu, server2, max_games=200, log=lambda *_: None)
     assert s2.uploaded == 0 and s2.known == len(all_ids)
     assert not any("/games/" in c or "timelines" in c for c in session.calls)
 
-    # Spiele sind auf dem Server inkl. Timeline angekommen
-    service = server_client.app.state.service
-    mid = all_ids[0]
-    assert service.store.get_timeline(mid) is not None
-    assert service.match(mid).participants[0].name
+    service = offline_client.app.state.service
+    assert service.store.get_timeline(all_ids[0]) is not None
 
 
-def test_upload_assigns_to_existing_team(server_client, demo_source):
-    # Erst ein Spieler lädt hoch, damit die Riot-IDs bekannt sind; dann Team anlegen; dann ein zweiter Upload
+def test_wrong_code_is_retried(offline_client, demo_source, tmp_path):
+    lcu, _ = _client_for(demo_source)
+    register(offline_client, "polaris")
+    good = offline_client.post("/api/me/link-code").json()["code"]
+    answers = iter(["FALSCH-12", good])
+    server = up.Server("http://testserver", session=other_client(offline_client))
+    logs = []
+    user = up.ensure_linked(server, up.Config(keys={}), tmp_path / "t.ini", lcu.current_summoner(),
+                            ask=lambda _: next(answers), log=logs.append)
+    assert user == "polaris" and any("ungültig" in line for line in logs)
+
+
+def test_unlinked_key_is_rejected(offline_client, demo_source, tmp_path):
+    lcu, session = _client_for(demo_source)
+    server, cfg, path, _ = _linked_tool(offline_client, lcu, tmp_path)
+    offline_client.delete(f"/api/me/riot/{session.account['puuid']}")
+    with pytest.raises(up.UploaderError, match="nicht"):
+        up.run(lcu, server, max_games=20, log=lambda *_: None)
+
+
+def test_upload_assigns_to_existing_team(offline_client, demo_source, tmp_path):
     lcu, _ = _client_for(demo_source, "NLE Kompass#EUW")
-    server = up.Server("http://testserver", UPLOAD_TOKEN, session=server_client)
+    server, *_ = _linked_tool(offline_client, lcu, tmp_path, "kompass")
     up.run(lcu, server, max_games=10, log=lambda *_: None)
     team = {"name": "NLE", "min_members": 4, "members": [{"riot_id": f"NLE {n}#EUW"} for n in
                                                          ("Frostbite", "Waldgeist", "Polaris", "Kompass", "Leuchtturm")]}
-    assert server_client.post("/api/teams", json=team).status_code == 201
+    assert offline_client.post("/api/teams", json=team).status_code == 201
     s = up.run(lcu, server, max_games=200, log=lambda *_: None)
     assert s.uploaded > 0 and s.assigned.get("NLE", 0) > 0
-
-
-def test_wrong_token_is_reported(server_client, demo_source):
-    lcu, _ = _client_for(demo_source)
-    server = up.Server("http://testserver", "falsch", session=server_client)
-    with pytest.raises(up.UploaderError, match="401"):
-        up.run(lcu, server, max_games=20, log=lambda *_: None)
 
 
 def test_export_to_file_without_timelines(tmp_path, demo_source):
@@ -138,6 +159,11 @@ def test_credentials_parsing(tmp_path):
 
 def test_config_roundtrip(tmp_path):
     path = tmp_path / "cfg.ini"
-    up.Config(server="https://x.de", token="t", max_games=50).save(path)
+    up.Config(server="https://x.de", max_games=50, keys={"AbC-xyz": "k"}).save(path)
     cfg = up.Config.load(path)
-    assert (cfg.server, cfg.token, cfg.max_games) == ("https://x.de", "t", 50)
+    assert (cfg.server, cfg.max_games, cfg.keys) == ("https://x.de", 50, {"AbC-xyz": "k"})
+
+
+def test_baked_server_url(monkeypatch):
+    monkeypatch.setattr(up, "DEFAULT_SERVER", "https://primestats.example.de")
+    assert up.Config.load(Path("/nicht/vorhanden.ini")).server == "https://primestats.example.de"

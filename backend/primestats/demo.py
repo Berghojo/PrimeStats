@@ -427,3 +427,22 @@ def import_demo_scrims(service, source: "DemoSource") -> None:
              if not m["info"].get("tournamentCode")]
     for i in range(0, len(items), 25):
         service.import_lcu(items[i:i + 25], uploader="demo")
+
+
+DEMO_USER = ("demo", "demo1234")
+
+
+def setup_demo_account(service) -> None:
+    """Demo: Konto ``demo``/``demo1234``, verknüpft mit NLE Polaris, plus öffentliches Beispielteam."""
+    from .auth import hash_password, new_token
+
+    store = service.store
+    if store.user_credentials(DEMO_USER[0]):
+        return
+    user = store.create_user(DEMO_USER[0], hash_password(DEMO_USER[1]))
+    polaris = service.account("NLE Polaris#EUW")
+    store.link_riot(user.id, polaris["puuid"], polaris["gameName"], polaris["tagLine"], new_token())
+    name, tag, entries = demo_team_entries()
+    members, _ = service.resolve_members(entries)
+    team_id = store.create_team(name, tag, 4, members, owner_id=user.id, public=True)
+    service.jobs.start(store.get_team(team_id), background=False)

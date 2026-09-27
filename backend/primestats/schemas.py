@@ -24,7 +24,6 @@ class MetaOut(BaseModel):
     demo: bool
     #: Riot-API verfügbar (sonst nur hochgeladene Spiele)
     configured: bool
-    uploads_enabled: bool
     uploader_url: str
     ddragon_version: str
     champions: dict[int, ChampionOut]
@@ -152,6 +151,7 @@ class TeamIn(BaseModel):
     name: str = Field(min_length=1, max_length=60)
     tag: str = Field(default="", max_length=8)
     min_members: int = Field(default=4, ge=1, le=5)
+    public: bool = False
     members: list[MemberIn] = Field(min_length=1, max_length=12)
 
     @field_validator("name", "tag")
@@ -176,6 +176,17 @@ class TeamOut(_Attrs):
     created_at: datetime
     last_synced: datetime | None
     members: list[MemberOut]
+    public: bool
+    #: Berechtigungen des aktuellen Betrachters
+    can_edit: bool = False
+    can_delete: bool = False
+
+    @classmethod
+    def of(cls, team, viewer) -> "TeamOut":
+        out = cls.model_validate(team)
+        out.can_edit = viewer.can_edit_team(team)
+        out.can_delete = viewer.can_delete_team(team)
+        return out
 
 
 class TeamGameUpdate(BaseModel):
@@ -351,7 +362,75 @@ class TeamReportOut(BaseModel):
     job: SyncJobOut | None
 
 
-# ------------------------------------------------------------ LCU-Import
+# ------------------------------------------------------------ Konten
+_USERNAME = r"^[A-Za-z0-9_.\-]{3,32}$"
+
+
+class RegisterIn(BaseModel):
+    username: str = Field(pattern=_USERNAME, description="3–32 Zeichen: Buchstaben, Ziffern, _ . -")
+    password: str = Field(min_length=8, max_length=200)
+
+
+class LoginIn(BaseModel):
+    username: str = Field(max_length=32)
+    password: str = Field(max_length=200)
+
+
+class PasswordIn(BaseModel):
+    old_password: str = Field(max_length=200)
+    new_password: str = Field(min_length=8, max_length=200)
+
+
+class UserOut(_Attrs):
+    id: int
+    username: str
+    created_at: datetime
+
+
+class RiotLinkOut(_Attrs):
+    puuid: str
+    game_name: str
+    tag_line: str
+    riot_id: str
+    linked_at: datetime
+    last_upload_at: datetime | None
+
+
+class MeOut(BaseModel):
+    user: UserOut | None
+    riot_accounts: list[RiotLinkOut] = []
+
+
+class LinkCodeOut(BaseModel):
+    code: str
+    expires_at: datetime
+
+
+# ------------------------------------------------------------ Uploader
+class UploaderStatusIn(BaseModel):
+    puuid: str = Field(min_length=10, max_length=100)
+    key: str | None = Field(default=None, max_length=100)
+
+
+class UploaderStatusOut(BaseModel):
+    #: Riot-Account ist mit einem Konto verknüpft und der Geräteschlüssel passt
+    linked: bool
+    username: str | None = None
+
+
+class UploaderLinkIn(BaseModel):
+    code: str = Field(min_length=8, max_length=12)
+    puuid: str = Field(min_length=10, max_length=100)
+    game_name: str = Field(min_length=1, max_length=32)
+    tag_line: str = Field(min_length=1, max_length=8)
+
+
+class UploaderLinkOut(BaseModel):
+    username: str
+    #: Geräteschlüssel – das Tool speichert ihn lokal und schickt ihn bei jedem Upload mit
+    key: str
+
+
 class KnownIn(BaseModel):
     match_ids: list[str] = Field(max_length=2000)
 

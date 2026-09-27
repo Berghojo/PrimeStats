@@ -94,6 +94,8 @@ class MatchSummary:
     queue_id: int
     tournament_code: str
     teams: dict[int, TeamLine]
+    #: "riot" (Riot-API) oder "lcu" (per Uploader aus dem League Client)
+    source: str = "riot"
 
     @property
     def minutes(self) -> float:
@@ -102,6 +104,11 @@ class MatchSummary:
     @property
     def is_custom(self) -> bool:
         return self.game_type == "CUSTOM_GAME" or self.queue_id == 0
+
+    @property
+    def private(self) -> bool:
+        """Hochgeladene Custom Games ohne Turniercode (Scrims) sind nicht öffentlich."""
+        return self.source == "lcu" and not self.tournament_code
 
     @property
     def participants(self) -> list[PlayerLine]:
@@ -224,4 +231,5 @@ def parse_match(data: dict) -> MatchSummary:
         queue_id=int(info.get("queueId", -1)),
         tournament_code=info.get("tournamentCode") or "",
         teams=teams,
+        source=data["metadata"].get("source", "riot"),
     )

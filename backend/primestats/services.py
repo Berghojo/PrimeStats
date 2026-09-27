@@ -119,7 +119,8 @@ class PrimeStats:
         return sorted(ids, key=_match_sort_key, reverse=True)
 
     # -------------------------------------------------------------- player
-    def player_games(self, riot_id: str, count: int = 20) -> tuple[dict, list[MatchSummary]]:
+    def player_games(self, riot_id: str, count: int = 20,
+                     visible=lambda match: True) -> tuple[dict, list[MatchSummary]]:
         account = self.account(riot_id)
         ids = set(self.custom_match_ids(account["puuid"], count))
         ids |= set(self.store.matches_with_players({account["puuid"]}))  # hochgeladene Scrims
@@ -127,7 +128,7 @@ class PrimeStats:
         games = []
         for mid in ids:
             match = self.match(mid)
-            if match.is_custom:
+            if match.is_custom and visible(match):
                 games.append(match)
         games.sort(key=lambda m: m.created, reverse=True)
         return account, games
@@ -232,11 +233,13 @@ class PrimeStats:
     def known_matches(self, match_ids: list[str]) -> set[str]:
         return self.store.existing_matches(match_ids)
 
-    def import_lcu(self, items: list[dict], uploader: str = "") -> ImportResult:
+    def import_lcu(self, items: list[dict], uploader: str = "",
+                   allowed_puuids: set[str] | None = None) -> ImportResult:
         """Importiert Spiele aus dem League Client (Format der LCU-API).
 
         Bereits vorhandene Matches (z.B. über die Riot-API geladene Turnierspiele) werden nicht
-        überschrieben; fehlende Timelines werden aber ergänzt.
+        überschrieben; fehlende Timelines werden aber ergänzt. Mit ``allowed_puuids`` werden nur
+        Spiele angenommen, in denen einer dieser Riot-Accounts mitgespielt hat.
         """
         result = ImportResult()
         existing = self.store.existing_matches([lcu.match_id(i["game"]) for i in items if "gameId" in i.get("game", {})])
@@ -252,6 +255,9 @@ class PrimeStats:
                 continue
             if converted["info"]["gameType"] != "CUSTOM_GAME" and converted["info"]["queueId"] != 0:
                 result.skipped.append(mid)
+                continue
+            if allowed_puuids is not None and not allowed_puuids & set(converted["metadata"]["participants"]):
+                result.errors.append(f"{mid}: Keiner deiner verknüpften Riot-Accounts hat mitgespielt.")
                 continue
             self.store.put_raw_import(mid, "lcu", game, raw_timeline, uploader)
             if mid in existing:

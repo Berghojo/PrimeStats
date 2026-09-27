@@ -9,7 +9,6 @@ export interface Meta {
   demo: boolean;
   /** Riot-API verfügbar – sonst nur hochgeladene Spiele */
   configured: boolean;
-  uploads_enabled: boolean;
   uploader_url: string;
   ddragon_version: string;
   champions: Record<string, Champion>;
@@ -109,12 +108,16 @@ export interface Team {
   created_at: string;
   last_synced: string | null;
   members: Member[];
+  public: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
 }
 
 export interface TeamInput {
   name: string;
   tag: string;
   min_members: number;
+  public: boolean;
   members: { riot_id: string; role: string }[];
 }
 
@@ -264,3 +267,18 @@ export interface TeamReport {
   opponents: string[];
   job: SyncJob | null;
 }
+
+export interface User { id: number; username: string; created_at: string }
+
+export interface RiotLink {
+  puuid: string;
+  game_name: string;
+  tag_line: string;
+  riot_id: string;
+  linked_at: string;
+  last_upload_at: string | null;
+}
+
+export interface Me { user: User | null; riot_accounts: RiotLink[] }
+
+export interface LinkCode { code: string; expires_at: string }

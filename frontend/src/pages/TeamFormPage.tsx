@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 
-import { useDeleteTeam, useSaveTeam, useTeam } from "../api/hooks";
+import { useDeleteTeam, useMe, useSaveTeam, useTeam } from "../api/hooks";
 import { ErrorBox, Loading } from "../components/ui";
 import { useGameData } from "../lib/meta";
 
@@ -18,10 +18,12 @@ export function TeamFormPage() {
   const remove = useDeleteTeam();
   const navigate = useNavigate();
   const { position } = useGameData();
+  const { data: me, isPending: mePending } = useMe();
 
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [minMembers, setMinMembers] = useState(4);
+  const [isPublic, setIsPublic] = useState(false);
   const [rows, setRows] = useState<Row[]>(emptyRows);
 
   useEffect(() => {
@@ -30,11 +32,16 @@ export function TeamFormPage() {
     setName(team.name);
     setTag(team.tag);
     setMinMembers(team.min_members);
+    setIsPublic(team.public);
     setRows([...team.members.map((m) => ({ riot_id: m.riot_id, role: m.role })), { riot_id: "", role: "" }]);
   }, [existing.data]);
 
-  if (teamId !== undefined && existing.isPending) return <Loading />;
+  if (mePending || (teamId !== undefined && existing.isPending)) return <Loading />;
+  if (!me?.user) return <Navigate to={`/login?next=${encodeURIComponent(teamId ? `/teams/${teamId}/edit` : "/teams/new")}`} replace />;
   if (existing.error) return <ErrorBox error={existing.error} />;
+  if (existing.data && !existing.data.can_edit) {
+    return <ErrorBox error="Nur der Ersteller und Kader-Mitglieder mit verknüpftem Riot-Account dürfen dieses Team bearbeiten." />;
+  }
 
   const update = (i: number, patch: Partial<Row>) => setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
 
@@ -42,7 +49,7 @@ export function TeamFormPage() {
     ev.preventDefault();
     const members = rows.filter((r) => r.riot_id.trim()).map((r) => ({ riot_id: r.riot_id.trim(), role: r.role }));
     save.mutate(
-      { name, tag, min_members: minMembers, members },
+      { name, tag, min_members: minMembers, public: isPublic, members },
       { onSuccess: (team) => navigate(`/teams/${team.id}`) },
     );
   };
@@ -68,6 +75,13 @@ export function TeamFormPage() {
             </select>
           </label>
         </div>
+        <label className="check">
+          <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+          <span>
+            <b>Öffentlich</b> – Statistiken inkl. Scrims für alle sichtbar. Sonst sehen das Team nur du und Kader-Mitglieder
+            mit verknüpftem Riot-Account.
+          </span>
+        </label>
         <p className="muted small" style={{ margin: 0 }}>
           Ein Custom Game zählt als Teamspiel, wenn mindestens so viele eingetragene Spieler <em>auf derselben Seite</em>{" "}
           gespielt haben. Mit 4 werden auch Spiele mit einer Aushilfe erfasst.
@@ -98,7 +112,7 @@ export function TeamFormPage() {
           <Link className="btn" to={teamId ? `/teams/${teamId}` : "/teams"}>Abbrechen</Link>
         </div>
       </form>
-      {teamId !== undefined && (
+      {existing.data?.can_delete && teamId !== undefined && (
         <button className="btn danger" type="button" disabled={remove.isPending}
           onClick={() => {
             if (confirm("Team wirklich löschen?")) remove.mutate(teamId, { onSuccess: () => navigate("/teams") });

@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import { useMeta } from "../api/hooks";
+import { useMe, useMeta } from "../api/hooks";
 import { splitRiotId } from "../lib/format";
 
 export function PlayerSearch({ big, autoFocus }: { big?: boolean; autoFocus?: boolean }) {
@@ -36,6 +36,21 @@ export function PlayerSearch({ big, autoFocus }: { big?: boolean; autoFocus?: bo
   );
 }
 
+function UserMenu() {
+  const { data: me } = useMe();
+  const { pathname } = useLocation();
+  if (!me) return null;
+  if (!me.user) {
+    return <NavLink className="btn small" to={`/login?next=${encodeURIComponent(pathname)}`}>Anmelden</NavLink>;
+  }
+  return (
+    <NavLink className="user-link" to="/account" title="Konto">
+      <span className="avatar">{me.user.username.slice(0, 1).toUpperCase()}</span>
+      <span>{me.user.username}</span>
+    </NavLink>
+  );
+}
+
 export function Layout() {
   const { data: meta } = useMeta();
   const { pathname } = useLocation();
@@ -50,7 +65,10 @@ export function Layout() {
             <NavLink to="/uploader">Scrims hochladen</NavLink>
           </nav>
           {meta?.demo && <span className="badge official" title="Es werden generierte Beispieldaten verwendet">Demo-Modus</span>}
-          {pathname !== "/" && <PlayerSearch />}
+          <div className="topbar-right">
+            {pathname !== "/" && <PlayerSearch />}
+            <UserMenu />
+          </div>
         </div>
       </header>
       <main className="container stack">

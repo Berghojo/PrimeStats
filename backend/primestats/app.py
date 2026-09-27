@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .accounts_api import router as accounts_router
 from .api import router
 from .config import Settings
 from .ddragon import DataDragon
@@ -43,8 +44,9 @@ def create_app(settings: Settings | None = None, *, source: MatchSource | None =
                 src = OfflineSource()
         app.state.service = PrimeStats(app.state.store, src, settings.sync_match_count)
         if settings.demo and source is None:
-            from .demo import import_demo_scrims
+            from .demo import import_demo_scrims, setup_demo_account
             import_demo_scrims(app.state.service, src)
+            setup_demo_account(app.state.service)
         yield
         if store is None:
             app.state.store.engine.dispose()
@@ -70,7 +72,18 @@ def create_app(settings: Settings | None = None, *, source: MatchSource | None =
     def health():
         return {"status": "ok"}
 
+    @app.middleware("http")
+    async def csrf_guard(request: Request, call_next):
+        # Cookie-authentifizierte Änderungen nur mit eigenem Header (von fremden Seiten nicht setzbar).
+        # Das Uploader-Tool authentifiziert sich nicht per Cookie und ist ausgenommen.
+        if (request.method not in {"GET", "HEAD", "OPTIONS"} and request.url.path.startswith("/api/")
+                and not request.url.path.startswith("/api/uploader/")
+                and request.headers.get("X-Requested-With") != "PrimeStats"):
+            return JSONResponse({"detail": "Header X-Requested-With: PrimeStats fehlt."}, status_code=403)
+        return await call_next(request)
+
     app.include_router(router)
+    app.include_router(accounts_router)
     if settings.frontend_dist and (settings.frontend_dist / "index.html").exists():
         _mount_frontend(app, settings.frontend_dist)
     return app

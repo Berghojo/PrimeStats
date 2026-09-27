@@ -2,8 +2,10 @@ import { createBrowserRouter, Link } from "react-router-dom";
 
 import { Layout } from "./components/Layout";
 import { Empty } from "./components/ui";
+import { AccountPage } from "./pages/AccountPage";
 import { AnalysisPage } from "./pages/AnalysisPage";
 import { HomePage } from "./pages/HomePage";
+import { LoginPage } from "./pages/LoginPage";
 import { MatchPage } from "./pages/MatchPage";
 import { PlayerPage } from "./pages/PlayerPage";
 import { TeamFormPage } from "./pages/TeamFormPage";
@@ -33,6 +35,8 @@ export const routes = [
       { path: "teams/:teamId", element: <TeamPage /> },
       { path: "teams/:teamId/edit", element: <TeamFormPage /> },
       { path: "uploader", element: <UploaderPage /> },
+      { path: "login", element: <LoginPage /> },
+      { path: "account", element: <AccountPage /> },
       { path: "*", element: <NotFound /> },
     ],
   },

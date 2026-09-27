@@ -1,23 +1,30 @@
 # PrimeStats-Uploader
 
 Lädt Custom Games (Scrims) aus dem lokalen League Client zu PrimeStats hoch – nur Spiele, die der Server
-noch nicht kennt. Hintergrund und Server-Einrichtung: siehe [README im Hauptverzeichnis](../README.md#uploader-scrims-aus-dem-league-client).
+noch nicht kennt. Hintergrund: siehe [README im Hauptverzeichnis](../README.md#uploader-scrims-aus-dem-league-client).
+
+Beim ersten Start mit einem Riot-Account fragt das Tool nach einem Verknüpfungscode. Den erzeugt man auf der
+PrimeStats-Website unter **Konto → „Riot-Account verknüpfen“**. Danach lädt das Tool bei jedem Start ohne
+Rückfrage hoch.
 
 ```text
-PrimeStats-Uploader.exe                    # normaler Start (fragt beim ersten Mal nach Server + Token)
+PrimeStats-Uploader.exe                    # normaler Start
+PrimeStats-Uploader.exe --code K7QX-M2PA   # Code direkt übergeben
 PrimeStats-Uploader.exe --max-games 400    # tiefer in der History suchen
 PrimeStats-Uploader.exe --out scrims.json  # zusätzlich als Datei speichern
 PrimeStats-Uploader.exe --offline --out scrims.json   # nur exportieren, nichts hochladen
 ```
 
-Konfiguration (`primestats-uploader.ini` neben der EXE):
+`primestats-uploader.ini` neben der EXE (wird automatisch angelegt):
 
 ```ini
 [primestats]
-server = https://primestats.example.de
-token = <UPLOAD_TOKEN des Servers>
 league_path =          ; nur nötig, wenn der Client nicht automatisch gefunden wird
 max_games = 200
+
+[accounts]
+; <PUUID> = <Geräteschlüssel>  – wird beim Verknüpfen gespeichert, nicht weitergeben
 ```
 
-Ohne EXE (Python ≥ 3.10): `pip install -r requirements.txt && python primestats_uploader.py`
+Die Server-Adresse ist in die EXE eingebaut (beim Bauen aus `PRIMESTATS_SERVER_URL`). Ohne EXE
+(Python ≥ 3.10): `pip install -r requirements.txt && PRIMESTATS_SERVER_URL=https://… python primestats_uploader.py`

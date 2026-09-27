@@ -39,7 +39,14 @@ export async function api<T>(path: string, init: RequestInit & { query?: Query }
   const { query, ...rest } = init;
   const resp = await fetch(`/api${path}${buildQuery(query)}`, {
     ...rest,
-    headers: { "Content-Type": "application/json", Accept: "application/json", ...rest.headers },
+    credentials: "same-origin",
+    // Der Server verlangt diesen Header für ändernde Anfragen (Schutz gegen CSRF)
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Requested-With": "PrimeStats",
+      ...rest.headers,
+    },
   });
   if (!resp.ok) {
     let body: { detail?: unknown } = {};

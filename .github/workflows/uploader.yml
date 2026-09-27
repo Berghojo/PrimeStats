@@ -20,6 +20,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pyinstaller -r uploader/requirements.txt
+      - name: Server-Adresse einbauen (Repository-Variable PRIMESTATS_SERVER_URL)
+        if: vars.PRIMESTATS_SERVER_URL != ''
+        shell: pwsh
+        run: |
+          (Get-Content uploader/primestats_uploader.py) -replace '__PRIMESTATS_SERVER_URL__', '${{ vars.PRIMESTATS_SERVER_URL }}' |
+            Set-Content -Encoding utf8 uploader/primestats_uploader.py
       - run: pyinstaller --onefile --name PrimeStats-Uploader --distpath dist uploader/primestats_uploader.py
       - run: dist/PrimeStats-Uploader.exe --version
       - uses: actions/upload-artifact@v4

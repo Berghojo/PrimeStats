@@ -9,8 +9,8 @@ import { ChampIcon } from "../ChampIcon";
 import { SelectionBar, toggle } from "../SelectionBar";
 import { ResultBadge, SideBadge } from "../ui";
 
-export function GamesTable({ teamId, history }: { teamId: number; history: HistoryRow[] }) {
-  const { meta } = useGameData();
+export function GamesTable({ teamId, history, editable }: { teamId: number; history: HistoryRow[]; editable: boolean }) {
+  const { meta, label } = useGameData();
   const updateGame = useUpdateTeamGame(teamId);
   const initial = () => new Set(history.filter((r) => r.selected).slice(0, 10).map((r) => r.match_id));
   const [selected, setSelected] = useState<Set<string>>(initial);
@@ -50,18 +50,22 @@ export function GamesTable({ teamId, history }: { teamId: number; history: Histo
                 <td className={tone(g.gd15)}>{signed(g.gd15)}</td>
                 <td>{duration(g.duration)}</td>
                 <td className="left nowrap">
-                  <select value={g.label} aria-label="Spieltyp"
-                    onChange={(e) => updateGame.mutate({ matchId: g.match_id, label: e.target.value as Label })}>
-                    {Object.entries(meta?.labels ?? {}).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
-                  </select>{" "}
+                  {editable ? (
+                    <select value={g.label} aria-label="Spieltyp"
+                      onChange={(e) => updateGame.mutate({ matchId: g.match_id, label: e.target.value as Label })}>
+                      {Object.entries(meta?.labels ?? {}).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
+                    </select>
+                  ) : label(g.label)}{" "}
                   {g.tournament && <span className="badge official" title="Spiel mit Turniercode">TC</span>}
                 </td>
                 <td>
-                  <button type="button" className="btn small"
-                    title={g.included ? "Aus der Statistik ausschließen" : "Wieder in die Statistik aufnehmen"}
-                    onClick={() => updateGame.mutate({ matchId: g.match_id, included: !g.included })}>
-                    {g.included ? "✕" : "＋"}
-                  </button>
+                  {editable && (
+                    <button type="button" className="btn small"
+                      title={g.included ? "Aus der Statistik ausschließen" : "Wieder in die Statistik aufnehmen"}
+                      onClick={() => updateGame.mutate({ matchId: g.match_id, included: !g.included })}>
+                      {g.included ? "✕" : "＋"}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

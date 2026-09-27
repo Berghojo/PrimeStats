@@ -13,7 +13,8 @@ from primestats.store import Store, make_engine
 NOW = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
 TEST_DATABASE_URL = normalize_database_url(
     os.getenv("TEST_DATABASE_URL", "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/primestats_test"))
-TABLES = "team_games, team_members, teams, timeline_summaries, timelines, matches, accounts"
+TABLES = ("team_games, team_members, teams, timeline_summaries, timelines, matches, accounts, raw_imports, "
+          "link_codes, riot_links, user_sessions, users")
 
 
 @pytest.fixture(scope="session")
@@ -81,12 +82,14 @@ def synced_team(imported, service, demo_team):
     return demo_team
 
 
-@pytest.fixture
-def client(store, demo_source, tmp_path):
-    yield from _client(store, demo_source, tmp_path)
+CSRF = {"X-Requested-With": "PrimeStats"}
 
 
-UPLOAD_TOKEN = "test-token"
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    from primestats import accounts_api
+    for limiter in (accounts_api.login_limit, accounts_api.register_limit, accounts_api.link_limit):
+        limiter._hits.clear()
 
 
 def _client(store, source, tmp_path, **overrides):
@@ -95,16 +98,42 @@ def _client(store, source, tmp_path, **overrides):
     from primestats.app import create_app
     from primestats.demo import import_demo_scrims
     options = dict(demo=True, ddragon_fetch=False, cache_dir=tmp_path, auto_migrate=False,
-                   database_url=TEST_DATABASE_URL, upload_token=UPLOAD_TOKEN)
+                   database_url=TEST_DATABASE_URL)
     options.update(overrides)
     app = create_app(Settings(**options), source=source, store=store)
-    with TestClient(app) as client:
+    with TestClient(app, headers=CSRF) as client:
         if isinstance(source, DemoSource):
             import_demo_scrims(client.app.state.service, source)
         yield client
 
 
 @pytest.fixture
+def client(store, demo_source, tmp_path):
+    yield from _client(store, demo_source, tmp_path)
+
+
+@pytest.fixture
 def offline_client(store, tmp_path):
     from primestats.services import OfflineSource
     yield from _client(store, OfflineSource(), tmp_path, demo=False)
+
+
+def other_client(client):
+    """Zweiter Browser (eigene Cookies) für dieselbe App."""
+    from fastapi.testclient import TestClient
+    return TestClient(client.app, headers=CSRF)
+
+
+def register(client, username="spieler1", password="geheim123"):
+    resp = client.post("/api/auth/register", json={"username": username, "password": password})
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+def link_riot(client, account: dict) -> str:
+    """Verknüpft einen Riot-Account wie das Uploader-Tool; liefert den Geräteschlüssel."""
+    code = client.post("/api/me/link-code").json()["code"]
+    resp = client.post("/api/uploader/link", json={"code": code, "puuid": account["puuid"],
+                                                   "game_name": account["gameName"], "tag_line": account["tagLine"]})
+    assert resp.status_code == 200, resp.text
+    return resp.json()["key"]

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import { useTeams } from "../api/hooks";
+import { useMe, useTeams } from "../api/hooks";
 import type { Team } from "../api/types";
 import { Empty, ErrorBox, Loading } from "../components/ui";
 import { ago } from "../lib/format";
@@ -11,7 +11,7 @@ export function TeamCard({ team }: { team: Team }) {
       <div className="team-head">
         <div className="team-logo">{(team.tag || team.name).slice(0, 4)}</div>
         <div>
-          <h3>{team.name}</h3>
+          <h3>{team.name} {!team.public && <span className="badge" title="Nur für Ersteller und Kader sichtbar">privat</span>}</h3>
           <div className="muted small">
             {team.members.length} Spieler · {team.last_synced ? `synchronisiert ${ago(team.last_synced)}` : "noch nicht synchronisiert"}
           </div>
@@ -22,6 +22,12 @@ export function TeamCard({ team }: { team: Team }) {
   );
 }
 
+export function NewTeamButton() {
+  const { data: me } = useMe();
+  const to = me?.user ? "/teams/new" : "/login?next=/teams/new";
+  return <Link className="btn primary" to={to}>+ Team anlegen</Link>;
+}
+
 export function TeamsPage() {
   const { data, error, isPending } = useTeams();
   return (
@@ -29,9 +35,12 @@ export function TeamsPage() {
       <section className="row between">
         <div>
           <h1>Teams</h1>
-          <div className="muted">Aggregierte Statistiken aus gemeinsamen Custom Games (Prime League &amp; Scrims).</div>
+          <div className="muted">
+            Aggregierte Statistiken aus gemeinsamen Custom Games (Prime League &amp; Scrims). Du siehst öffentliche Teams und
+            Teams, in deren Kader einer deiner verknüpften Riot-Accounts steht.
+          </div>
         </div>
-        <Link className="btn primary" to="/teams/new">+ Team anlegen</Link>
+        <NewTeamButton />
       </section>
       {isPending ? <Loading /> : error ? <ErrorBox error={error} /> : data.length === 0 ? (
         <Empty>Noch keine Teams angelegt.</Empty>

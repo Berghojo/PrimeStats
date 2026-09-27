@@ -53,7 +53,7 @@ export function TeamPage() {
           <div className="team-head">
             <div className="team-logo">{(team.tag || team.name).slice(0, 4)}</div>
             <div>
-              <h1>{team.name}</h1>
+              <h1>{team.name} <span className="badge">{team.public ? "öffentlich" : "privat"}</span></h1>
               <div className="row small">
                 {team.members.map((m) => (
                   <span className="badge" key={m.puuid} title={m.riot_id}>
@@ -63,10 +63,12 @@ export function TeamPage() {
               </div>
             </div>
           </div>
-          <div className="row">
-            <SyncControl teamId={teamId} initial={data.job} />
-            <Link className="btn" to={`/teams/${teamId}/edit`}>Bearbeiten</Link>
-          </div>
+          {team.can_edit && (
+            <div className="row">
+              <SyncControl teamId={teamId} initial={data.job} />
+              <Link className="btn" to={`/teams/${teamId}/edit`}>Bearbeiten</Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -124,7 +126,7 @@ export function TeamPage() {
                 )}
               </>
             )}
-            <GamesTable teamId={teamId} history={history} />
+            <GamesTable teamId={teamId} history={history} editable={team.can_edit} />
           </div>
         </>
       )}

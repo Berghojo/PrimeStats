@@ -1,7 +1,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./client";
-import type { Analysis, Filters, Label, Match, Meta, PlayerGames, SyncJob, Team, TeamInput, TeamReport } from "./types";
+import type {
+  Analysis, Filters, Label, LinkCode, Match, Me, Meta, PlayerGames, SyncJob, Team, TeamInput, TeamReport,
+} from "./types";
 
 export const useMeta = () =>
   useQuery({ queryKey: ["meta"], queryFn: () => api<Meta>("/meta"), staleTime: Infinity });
@@ -75,5 +77,55 @@ export function useUpdateTeamGame(teamId: number) {
     mutationFn: ({ matchId, ...body }: { matchId: string; label?: Label; included?: boolean }) =>
       api<void>(`/teams/${teamId}/games/${encodeURIComponent(matchId)}`, { method: "PATCH", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["team", teamId, "report"] }),
+  });
+}
+
+// ---------------------------------------------------------------- Konten
+export const useMe = (poll = false) =>
+  useQuery({ queryKey: ["me"], queryFn: () => api<Me>("/auth/me"), refetchInterval: poll ? 3000 : false });
+
+/** Nach An-/Abmeldung ändern sich Sichtbarkeiten überall – alles neu laden. */
+function useResetAll() {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries();
+}
+
+export function useLogin() {
+  const reset = useResetAll();
+  return useMutation({
+    mutationFn: (body: { username: string; password: string }) =>
+      api<Me>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: reset,
+  });
+}
+
+export function useRegister() {
+  const reset = useResetAll();
+  return useMutation({
+    mutationFn: (body: { username: string; password: string }) =>
+      api<Me>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: reset,
+  });
+}
+
+export function useLogout() {
+  const reset = useResetAll();
+  return useMutation({ mutationFn: () => api<void>("/auth/logout", { method: "POST" }), onSuccess: reset });
+}
+
+export const useChangePassword = () =>
+  useMutation({
+    mutationFn: (body: { old_password: string; new_password: string }) =>
+      api<void>("/auth/password", { method: "POST", body: JSON.stringify(body) }),
+  });
+
+export const useLinkCode = () =>
+  useMutation({ mutationFn: () => api<LinkCode>("/me/link-code", { method: "POST" }) });
+
+export function useUnlink() {
+  const reset = useResetAll();
+  return useMutation({
+    mutationFn: (puuid: string) => api<void>(`/me/riot/${encodeURIComponent(puuid)}`, { method: "DELETE" }),
+    onSuccess: reset,
   });
 }

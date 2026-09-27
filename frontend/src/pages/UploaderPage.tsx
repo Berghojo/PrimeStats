@@ -1,8 +1,10 @@
-import { useMeta } from "../api/hooks";
+import { Link } from "react-router-dom";
+
+import { useMe, useMeta } from "../api/hooks";
 
 export function UploaderPage() {
   const { data: meta } = useMeta();
-  const server = window.location.origin;
+  const { data: me } = useMe();
   return (
     <>
       <section>
@@ -14,16 +16,16 @@ export function UploaderPage() {
         </div>
       </section>
 
-      {meta && !meta.uploads_enabled && (
-        <div className="flash error">
-          Uploads sind auf diesem Server noch deaktiviert. Der Admin muss im Backend <code>UPLOAD_TOKEN</code> setzen.
-        </div>
-      )}
-
       <section className="grid two">
         <div className="card stack">
           <h2>So geht&apos;s</h2>
           <ol className="steps">
+            <li>
+              <b>Konto erstellen</b> –{" "}
+              {me?.user ? <>erledigt, du bist als <b>{me.user.username}</b> angemeldet.</> : (
+                <Link to="/login?mode=register&next=/account">jetzt registrieren</Link>
+              )}
+            </li>
             <li>
               <b>Uploader herunterladen:</b>{" "}
               <a href={meta?.uploader_url} target="_blank" rel="noreferrer">PrimeStats-Uploader.exe</a>{" "}
@@ -31,26 +33,26 @@ export function UploaderPage() {
             </li>
             <li><b>League Client starten und einloggen.</b> Das Spiel selbst muss nicht laufen.</li>
             <li>
-              <b>Uploader starten.</b> Beim ersten Start fragt er nach Server-Adresse und Upload-Token und merkt sich beides
-              in <code>primestats-uploader.ini</code> neben der EXE.
+              <b>Uploader starten.</b> Beim ersten Start mit einem Riot-Account fragt er nach einem Code: Den erzeugst du
+              unter <Link to="/account">Konto → „Riot-Account verknüpfen“</Link>. Danach ist der Account mit deinem Konto
+              verbunden und der Uploader lädt bei jedem Start ohne Rückfrage hoch.
             </li>
             <li>
-              <b>Fertig:</b> Der Uploader liest die Match-History, fragt den Server, welche Custom Games schon bekannt sind,
-              und lädt nur neue Spiele samt Timeline hoch. Sie werden automatisch allen passenden Teams zugeordnet.
+              <b>Fertig:</b> Neue Custom Games werden samt Timeline hochgeladen und automatisch allen passenden Teams
+              zugeordnet.
             </li>
           </ol>
         </div>
         <div className="card stack">
-          <h2>Verbindungsdaten</h2>
-          <label className="field">Server-Adresse
-            <input className="input" readOnly value={server} onFocus={(e) => e.target.select()} />
-          </label>
-          <label className="field">Upload-Token
-            <input className="input" readOnly value="bekommst du vom Server-Admin" />
-          </label>
+          <h2>Gut zu wissen</h2>
           <p className="muted small">
-            Ein Teammitglied reicht, wenn es bei (fast) allen Scrims mitspielt – es sieht in seiner History alle 10 Spieler.
-            Spiele, die es verpasst hat, kann jedes andere Mitglied zusätzlich hochladen; doppelte Spiele werden erkannt.
+            Hochgeladen werden nur Spiele, in denen der im Client eingeloggte Riot-Account mitgespielt hat. Scrims sind privat:
+            Sie sehen nur Spieler, die mitgespielt haben, und Mitglieder der zugeordneten Teams (bzw. alle, wenn das Team
+            öffentlich ist).
+          </p>
+          <p className="muted small">
+            Ein Teammitglied reicht, wenn es bei (fast) allen Scrims mitspielt – jedes Spiel enthält alle 10 Spieler. Spiele,
+            die es verpasst hat, kann jedes andere Mitglied zusätzlich hochladen; doppelte Spiele werden erkannt.
           </p>
           <p className="muted small">
             Der Client hält nur eine begrenzte Match-History vor. Am besten nach jedem Scrim-Abend oder mindestens einmal pro
