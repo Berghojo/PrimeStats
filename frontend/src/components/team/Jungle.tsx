@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Jungle, JungleEvent, JunglePath, Side } from "../../api/types";
 import { dt } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
+import { type Point, edges, interpolate } from "../../lib/rift";
 
 /** Kartengröße in Spielkoordinaten (Summoner's Rift, Ursprung unten links) */
 const MAP_W = 14870;
@@ -215,10 +216,14 @@ function HeatView({ events, games }: { events: JungleEvent[]; games: number }) {
   );
 }
 
+const netEdges = edges();
+
 function PathView({ paths, maxMinutes }: { paths: JunglePath[]; maxMinutes: number }) {
   const { champion } = useGameData();
   const [minutes, setMinutes] = useState(Math.min(6, maxMinutes));
   const [side, setSide] = useState<"all" | Side>("all");
+  const [realistic, setRealistic] = useState(true);
+  const [showNet, setShowNet] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
   const shown = paths.filter((p) => side === "all" || p.side === side);
   const hovered = shown.find((p) => p.match_id === hover);
@@ -242,20 +247,36 @@ function PathView({ paths, maxMinutes }: { paths: JunglePath[]; maxMinutes: numb
         <div className="sliders">
           <Slider label="Bis Minute" value={minutes} min={2} max={maxMinutes} onChange={setMinutes} />
         </div>
+        <div className="row small">
+          <label className="check">
+            <input type="checkbox" checked={realistic} onChange={(e) => setRealistic(e.target.checked)} />
+            <span>Realistische Laufwege (kürzester Weg durch Jungle und Fluss)</span>
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={showNet} onChange={(e) => setShowNet(e.target.checked)} />
+            <span>Wegenetz einblenden</span>
+          </label>
+        </div>
         <div className="map">
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer" onMouseLeave={() => setHover(null)}>
             <MapBase />
+            {showNet && (
+              <g className="nav-net">
+                {netEdges.map(([a, b], i) => <line key={i} x1={px(a[0])} y1={py(a[1])} x2={px(b[0])} y2={py(b[1])} />)}
+              </g>
+            )}
             {shown.map((p) => {
               // ab Minute 1: der Weg aus dem Brunnen würde die eigentliche Route überdecken
               const pts = p.points.slice(1, minutes + 1).filter((pt): pt is [number, number] => !!pt);
+              const line = (realistic ? interpolate(pts as Point[]).path : pts)
+                .map(([x, y]) => `${px(x)},${py(y)}`).join(" ");
               const dim = hover && hover !== p.match_id;
               return (
                 <g key={p.match_id} opacity={dim ? 0.12 : hover ? 1 : 0.6} onMouseEnter={() => setHover(p.match_id)}
                   style={{ cursor: "pointer" }}>
-                  <polyline points={pts.map(([x, y]) => `${px(x)},${py(y)}`).join(" ")} fill="none"
-                    stroke="transparent" strokeWidth={12} />
-                  <polyline points={pts.map(([x, y]) => `${px(x)},${py(y)}`).join(" ")} fill="none"
-                    stroke={SIDE_COLOR[p.side]} strokeWidth={2} strokeLinejoin="round" />
+                  <polyline points={line} fill="none" stroke="transparent" strokeWidth={12} />
+                  <polyline points={line} fill="none"
+                    stroke={SIDE_COLOR[p.side]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
                   {pts.map(([x, y], i) => (
                     <circle key={i} cx={px(x)} cy={py(y)} r={i === pts.length - 1 ? 5 : 3}
                       fill={SIDE_COLOR[p.side]} stroke="#07090d" strokeWidth={2} />
@@ -289,8 +310,8 @@ function PathView({ paths, maxMinutes }: { paths: JunglePath[]; maxMinutes: numb
           </tbody>
         </table>
         <p className="muted small">
-          Die Timeline enthält eine Position pro Minute – das zeigt die grobe Route (erster Clear, erster Gank), keine
-          genauen Laufwege.
+          Die Timeline enthält nur eine Position pro Minute (Punkte). Dazwischen zeichnet PrimeStats den kürzesten Weg
+          durch ein angenähertes Wegenetz der Karte (Lanes, Jungle-Gänge, Fluss) – plausibel, aber nicht der exakte Laufweg.
         </p>
       </div>
     </div>
