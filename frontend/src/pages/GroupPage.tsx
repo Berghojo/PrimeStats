@@ -195,105 +195,110 @@ function EntriesCard({ group, stats }: { group: Group; stats: GroupTeamStats[] }
 
 // ------------------------------------------------------------------ Teamvergleich
 interface Metric {
+  key: string;
+  /** kurzer Spaltenkopf */
   label: string;
+  /** ausführlicher Name (Tooltip) */
+  title: string;
   get: (t: GroupTeamStats) => number | null | undefined;
-  fmt: (v: number | null | undefined) => ReactNode;
+  fmt: (v: number) => ReactNode;
   /** 1 = höher ist besser, -1 = niedriger ist besser, 0 = neutral */
   better: 1 | -1 | 0;
-  /** Wert ist ein Anteil (0–1) → Balken */
-  rate?: boolean;
-  signed?: boolean;
-  hint?: string;
 }
 
 const ov = (t: GroupTeamStats) => t.overview;
-const monster = (key: string, field: "share" | "us_avg" | "first_time") => (t: GroupTeamStats) =>
-  t.monsters.find((m) => m.key === key)?.[field] ?? null;
-const rate = (label: string, get: Metric["get"], hint?: string): Metric => ({ label, get, fmt: (v) => pct(v), better: 1, rate: true, hint });
-const signedM = (label: string, get: Metric["get"], hint?: string): Metric =>
-  ({ label, get, fmt: (v) => <span className={tone(v)}>{signed(v)}</span>, better: 1, signed: true, hint });
+const monster = (key: string) => (t: GroupTeamStats) => t.monsters.find((m) => m.key === key)?.share ?? null;
+const rate = (key: string, label: string, title: string, get: Metric["get"]): Metric =>
+  ({ key, label, title, get, fmt: (v) => pct(v), better: 1 });
+const avg = (key: string, label: string, title: string, get: Metric["get"], better: 1 | -1): Metric =>
+  ({ key, label, title, get, fmt: (v) => num(v), better });
+const gold = (key: string, label: string, title: string, get: Metric["get"]): Metric =>
+  ({ key, label, title, get, fmt: (v) => <span className={tone(v)}>{signed(v)}</span>, better: 1 });
 
-const SECTIONS: { title: string; metrics: Metric[] }[] = [
-  { title: "Allgemein", metrics: [
-    { label: "Spiele", get: (t) => ov(t)?.games, fmt: (v) => v ?? "–", better: 0 },
-    rate("Winrate", (t) => ov(t)?.winrate),
-    rate("Winrate Blue", (t) => ov(t)?.blue_winrate),
-    rate("Winrate Red", (t) => ov(t)?.red_winrate),
-    { label: "Ø Spieldauer", get: (t) => ov(t)?.duration, fmt: duration, better: 0 },
-    { label: "Ø Dauer Siege", get: (t) => ov(t)?.duration_win, fmt: duration, better: -1, hint: "Kürzer = Siege schneller zu Ende gespielt" },
-  ] },
-  { title: "Early Game", metrics: [
-    signedM("Gold @10", (t) => ov(t)?.gd10, "Ø Teamgold-Differenz nach 10 Minuten"),
-    signedM("Gold @15", (t) => ov(t)?.gd15, "Ø Teamgold-Differenz nach 15 Minuten"),
-    rate("First Blood", (t) => ov(t)?.first_blood),
-    rate("Erster Turm", (t) => ov(t)?.first_tower),
-  ] },
-  { title: "Kämpfe & Türme", metrics: [
-    { label: "Ø Kills", get: (t) => ov(t)?.kills, fmt: (v) => num(v), better: 1 },
-    { label: "Ø Tode", get: (t) => ov(t)?.deaths, fmt: (v) => num(v), better: -1 },
-    { label: "Ø Türme", get: (t) => ov(t)?.towers, fmt: (v) => num(v), better: 1 },
-    { label: "Ø Türme verloren", get: (t) => ov(t)?.towers_lost, fmt: (v) => num(v), better: -1 },
-  ] },
-  { title: "Objectives", metrics: [
-    rate("Erster Drache", (t) => ov(t)?.first_dragon),
-    rate("Erste Grubs", (t) => ov(t)?.first_grubs),
-    rate("Erster Herald", (t) => ov(t)?.first_herald),
-    rate("Erster Baron", (t) => ov(t)?.first_baron),
-    rate("Drachen-Anteil", monster("DRAGON", "share"), "Eigene / alle getöteten Drachen"),
-    rate("Grubs-Anteil", monster("HORDE", "share")),
-    rate("Herald-Anteil", monster("RIFTHERALD", "share")),
-    rate("Baron-Anteil", monster("BARON_NASHOR", "share")),
-    { label: "Ø Drachen", get: monster("DRAGON", "us_avg"), fmt: (v) => num(v), better: 1 },
-  ] },
+const METRICS: Metric[] = [
+  { key: "games", label: "Spiele", title: "Turnierspiele", get: (t) => ov(t)?.games, fmt: (v) => v, better: 0 },
+  rate("wr", "WR", "Winrate", (t) => ov(t)?.winrate),
+  rate("wr_blue", "WR Blue", "Winrate auf Blue Side", (t) => ov(t)?.blue_winrate),
+  rate("wr_red", "WR Red", "Winrate auf Red Side", (t) => ov(t)?.red_winrate),
+  { key: "dur", label: "Dauer", title: "Ø Spieldauer", get: (t) => ov(t)?.duration, fmt: duration, better: 0 },
+  gold("gd10", "GD@10", "Ø Teamgold-Differenz nach 10 Minuten", (t) => ov(t)?.gd10),
+  gold("gd15", "GD@15", "Ø Teamgold-Differenz nach 15 Minuten", (t) => ov(t)?.gd15),
+  avg("kills", "Kills", "Ø Kills pro Spiel", (t) => ov(t)?.kills, 1),
+  avg("deaths", "Tode", "Ø Tode pro Spiel", (t) => ov(t)?.deaths, -1),
+  avg("towers", "Türme", "Ø zerstörte Türme pro Spiel", (t) => ov(t)?.towers, 1),
+  avg("towers_lost", "Türme verl.", "Ø verlorene Türme pro Spiel", (t) => ov(t)?.towers_lost, -1),
+  rate("fb", "FB", "First Blood", (t) => ov(t)?.first_blood),
+  rate("ft", "1. Turm", "Erster Turm", (t) => ov(t)?.first_tower),
+  rate("fd", "1. Drache", "Erster Drache", (t) => ov(t)?.first_dragon),
+  rate("fg", "1. Grubs", "Erste Grubs", (t) => ov(t)?.first_grubs),
+  rate("fh", "1. Herald", "Erster Herald", (t) => ov(t)?.first_herald),
+  rate("fbar", "1. Baron", "Erster Baron", (t) => ov(t)?.first_baron),
+  rate("dragons", "Drachen %", "Anteil eigener an allen getöteten Drachen", monster("DRAGON")),
+  rate("grubs", "Grubs %", "Anteil eigener an allen getöteten Grubs", monster("HORDE")),
+  rate("heralds", "Herald %", "Anteil eigener an allen getöteten Heralds", monster("RIFTHERALD")),
+  rate("barons", "Baron %", "Anteil eigener an allen getöteten Barons", monster("BARON_NASHOR")),
 ];
 
 function TeamCompare({ teams }: { teams: GroupTeamStats[] }) {
+  const [sort, setSort] = useState<{ key: string; desc: boolean }>({ key: "wr", desc: true });
+  const value = (m: Metric, t: GroupTeamStats) => (t.overview && t.overview.games > 0 ? m.get(t) ?? null : null);
+  const indexed = teams.map((t, i) => ({ t, i }));
+  const sortMetric = METRICS.find((m) => m.key === sort.key);
+  const rows = sort.key === "team"
+    ? [...indexed].sort((a, b) => a.t.entry.title.localeCompare(b.t.entry.title) * (sort.desc ? -1 : 1))
+    : [...indexed].sort((a, b) => {
+      const x = value(sortMetric!, a.t), y = value(sortMetric!, b.t);
+      if (x === null || y === null) return x === null ? (y === null ? 0 : 1) : -1;  // leere Werte immer unten
+      return sort.desc ? y - x : x - y;
+    });
+  // bester Wert je Spalte
+  const best = new Map(METRICS.filter((m) => m.better).map((m) => {
+    const vals = teams.map((t) => value(m, t)).filter((v): v is number => v !== null);
+    return [m.key, vals.length > 1 ? (m.better > 0 ? Math.max(...vals) : Math.min(...vals)) : null];
+  }));
+  const th = (key: string, label: string, title?: string, left = false) => (
+    <th key={key} title={title}
+      className={[left && "left", "sortable", sort.key === key && (sort.desc ? "sorted-desc" : "sorted-asc")].filter(Boolean).join(" ")}
+      onClick={() => setSort((s) => ({ key, desc: s.key === key ? !s.desc : key !== "team" }))}>
+      {label}
+    </th>
+  );
   return (
     <section className="card">
       <h2>
         Teamvergleich
-        <InfoTip>Nur Turnierspiele. Bester Wert je Zeile ist hervorgehoben, schwächster abgeschwächt. Ø = pro Spiel.</InfoTip>
+        <InfoTip>
+          Nur Turnierspiele, Durchschnitt pro Spiel. Spaltenkopf anklicken zum Sortieren (Tooltip = ausführlicher Name);
+          der beste Wert je Spalte ist grün.
+        </InfoTip>
       </h2>
       <div className="table-wrap">
-        <table className="data compare">
+        <table className="data">
           <thead>
             <tr>
-              <th className="left">Kennzahl</th>
-              {teams.map((t, i) => (
-                <th key={`${t.entry.kind}:${t.entry.ref}`} title={t.entry.title}>
-                  <span className="legend-dot" style={{ background: teamColor(i), marginLeft: 0 }} />
-                  {t.entry.tag || t.entry.title}
-                </th>
-              ))}
+              {th("team", "Team", undefined, true)}
+              {METRICS.map((m) => th(m.key, m.label, m.title))}
             </tr>
           </thead>
-          {SECTIONS.map((sec) => (
-            <tbody key={sec.title}>
-              <tr className="section-row"><th className="left" colSpan={teams.length + 1}>{sec.title}</th></tr>
-              {sec.metrics.map((m) => {
-                const values = teams.map((t) => (t.overview && t.overview.games > 0 ? m.get(t) ?? null : null));
-                const present = values.filter((v): v is number => v !== null);
-                const best = m.better && present.length > 1 ? (m.better > 0 ? Math.max(...present) : Math.min(...present)) : null;
-                const worst = m.better && present.length > 2 ? (m.better > 0 ? Math.min(...present) : Math.max(...present)) : null;
-                const maxAbs = Math.max(...present.map(Math.abs), 1e-9);
-                return (
-                  <tr key={m.label}>
-                    <td className="left">{m.label}{m.hint && <InfoTip>{m.hint}</InfoTip>}</td>
-                    {values.map((v, i) => (
-                      <td key={i} className={v !== null && v === best ? "best" : v !== null && v === worst && best !== worst ? "worst" : ""}>
-                        {v === null ? <span className="muted">–</span> : m.fmt(v)}
-                        {v !== null && !m.signed && m.better > 0 && (
-                          <div className="bar cmp-bar">
-                            <span style={{ width: `${Math.max(0, Math.min(1, m.rate ? v : v / maxAbs)) * 100}%`, background: teamColor(i) }} />
-                          </div>
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          ))}
+          <tbody>
+            {rows.map(({ t, i }) => (
+              <tr key={`${t.entry.kind}:${t.entry.ref}`} className={t.entry.available ? "" : "dim"}>
+                <td className="left">
+                  <span className="legend-dot" style={{ background: teamColor(i), marginLeft: 0 }} />
+                  {t.entry.available ? <Link to={entryLink(t.entry)}><b>{t.entry.title}</b></Link> : t.entry.title}
+                  {t.syncing && <> <Spinner /></>}
+                </td>
+                {METRICS.map((m) => {
+                  const v = value(m, t);
+                  return (
+                    <td key={m.key} className={v !== null && v === best.get(m.key) ? "best" : ""}>
+                      {v === null ? <span className="muted">–</span> : m.fmt(v)}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
     </section>

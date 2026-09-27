@@ -610,8 +610,5 @@ table.data tr.off td { opacity: .45; }
 .chip-btn { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 .2rem; font: inherit; }
 .chip-btn:hover { color: var(--text); }
 label.field.inline { display: flex; align-items: center; gap: .5rem; }
-table.data.compare td { min-width: 96px; }
-table.data.compare tr.section-row th { text-align: left; color: var(--accent-2); background: var(--surface-2); position: static; }
-table.data.compare td.best { color: var(--win); font-weight: 700; }
-table.data.compare td.worst { opacity: .6; }
-.cmp-bar { height: 3px; margin-top: .25rem; }
+table.data td.best { color: var(--win); font-weight: 700; }
+table.data td .spinner { display: inline-block; width: 12px; height: 12px; vertical-align: middle; }
