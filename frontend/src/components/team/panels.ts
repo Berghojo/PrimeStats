@@ -1,4 +1,4 @@
-/** Bausteine eines Reports. Auf den Scouting-Seiten frei ein-/ausblendbar und sortierbar. */
+/** Bausteine eines Reports. Auf den Scouting- und Team-Seiten frei ein-/ausblendbar und sortierbar. */
 export interface PanelDef {
   key: string;
   label: string;

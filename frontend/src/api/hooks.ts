@@ -158,16 +158,17 @@ export function useStartScout() {
 }
 
 // ------------------------------------------------------------ Ansichten
-export const useViews = (enabled: boolean) =>
-  useQuery({ queryKey: ["views"], queryFn: () => api<SavedView[]>("/me/views"), enabled });
+/** Gespeicherte Ansichten je Seitenart (Scouting bzw. Team) */
+export const useViews = (enabled: boolean, kind: "scout" | "team" = "scout") =>
+  useQuery({ queryKey: ["views", kind], queryFn: () => api<SavedView[]>("/me/views", { query: { kind } }), enabled });
 
-export function useSaveView() {
+export function useSaveView(kind: "scout" | "team" = "scout") {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (view: { id?: number; name?: string; panels?: string[]; is_default?: boolean }) => {
       const { id, ...body } = view;
       return id === undefined
-        ? api<SavedView>("/me/views", { method: "POST", body: JSON.stringify(body) })
+        ? api<SavedView>("/me/views", { method: "POST", body: JSON.stringify(body), query: { kind } })
         : api<SavedView>(`/me/views/${id}`, { method: "PATCH", body: JSON.stringify(body) });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["views"] }),

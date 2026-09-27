@@ -7,12 +7,14 @@ import { AddToGroup } from "../components/AddToGroup";
 import { Empty, ErrorBox, Loading } from "../components/ui";
 import { useGameData } from "../lib/meta";
 import { InfoTip } from "../components/InfoTip";
+import { usePanels, ViewCustomizer } from "../components/ViewCustomizer";
 
 export function TeamPage() {
   const teamId = Number(useParams().teamId);
   const [filters] = useUrlFilters();
   const { data, error, isPending, isFetching } = useTeamReport(teamId, filters);
   const { position } = useGameData();
+  const view = usePanels("team");
 
   if (isPending) return <Loading message="Berechne Statistiken …" />;
   if (error) return <ErrorBox error={error} />;
@@ -55,6 +57,7 @@ export function TeamPage() {
             </InfoTip>
           </div>
         )}
+        {history.length > 0 && <ViewCustomizer kind="team" {...view} />}
       </section>
 
       {history.length === 0 ? (
@@ -68,7 +71,7 @@ export function TeamPage() {
         </Empty>
       ) : (
         <ReportBody data={data} refreshing={isFetching} teamId={teamId} editable={team.can_edit}
-          hideLabelFilter={!team.can_see_scrims} />
+          hideLabelFilter={!team.can_see_scrims} panels={view.panels} />
       )}
     </>
   );

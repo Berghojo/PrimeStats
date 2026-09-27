@@ -29,3 +29,17 @@ def test_saved_views_per_account(client):
 
     assert client.delete(f"/api/me/views/{view['id']}").status_code == 204
     assert [v["name"] for v in client.get("/api/me/views").json()] == ["Alles"]
+
+
+def test_team_views_are_separate_from_scouting_views(client):
+    register(client, "gamma")
+    client.post("/api/me/views", json={"name": "Scout", "panels": ["draft"], "is_default": True})
+    team = client.post("/api/me/views?kind=team", json={"name": "Team", "panels": ["jungle", "players"],
+                                                          "is_default": True})
+    assert team.status_code == 201, team.text
+    assert [v["name"] for v in client.get("/api/me/views").json()] == ["Scout"]
+    teams = client.get("/api/me/views", params={"kind": "team"}).json()
+    assert [(v["name"], v["is_default"]) for v in teams] == [("Team", True)]
+    # Standard-Ansicht gilt je Art: die Scouting-Ansicht bleibt Standard
+    assert client.get("/api/me/views").json()[0]["is_default"]
+    assert client.get("/api/me/views", params={"kind": "andere"}).status_code == 422

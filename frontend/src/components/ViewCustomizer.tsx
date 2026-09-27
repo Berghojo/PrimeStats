@@ -16,7 +16,7 @@ const same = (a: string[], b: string[]) => a.length === b.length && a.every((k, 
 export function usePanels(kind: ReportKind) {
   const [params, setParams] = useSearchParams();
   const { data: me } = useMe();
-  const views = useViews(!!me?.user);
+  const views = useViews(!!me?.user, kind);
   const raw = params.get(PARAM);
   const fromUrl = raw !== null ? cleanPanels(raw.split(",").filter(Boolean), kind) : null;
   const saved = views.data?.find((v) => v.is_default);
@@ -74,7 +74,7 @@ export function ViewCustomizer({ kind, panels, setPanels, views, loggedIn }: Ret
   kind: ReportKind;
 }) {
   const { pathname, search } = useLocation();
-  const save = useSaveView();
+  const save = useSaveView(kind);
   const remove = useDeleteView();
   const [open, setOpen] = useState(false);
   const [naming, setNaming] = useState(false);
@@ -151,7 +151,7 @@ export function ViewCustomizer({ kind, panels, setPanels, views, loggedIn }: Ret
             maxLength={40} required autoFocus aria-label="Name der Ansicht" />
           <label className="check small">
             <input type="checkbox" checked={asDefault} onChange={(e) => setAsDefault(e.target.checked)} />
-            <span>Standard für alle Scoutings</span>
+            <span>{kind === "team" ? "Standard für alle Team-Seiten" : "Standard für alle Scoutings"}</span>
           </label>
           <button className="btn small primary" type="submit" disabled={save.isPending}>Speichern</button>
         </form>
