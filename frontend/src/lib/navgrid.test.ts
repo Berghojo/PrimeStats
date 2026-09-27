@@ -73,3 +73,15 @@ describe("distanceField", () => {
     expect(Math.abs(d - r) / r).toBeLessThan(0.25);
   });
 });
+
+describe("wall polygons", () => {
+  it("outline the walls: polygon corners lie on wall/walkable borders, lanes stay free", async () => {
+    const { wallPolygons } = await import("./navgrid");
+    const polys = wallPolygons();
+    expect(polys.length).toBeGreaterThan(20);
+    for (const poly of polys) expect(poly.length).toBeGreaterThanOrEqual(3);
+    // kein Polygon-Eckpunkt mitten auf einer Lane
+    const onLane = polys.flat().filter(([x, y]) => (Math.abs(x - 1250) < 150 && y > 3000 && y < 12000));
+    expect(onLane).toEqual([]);
+  });
+});

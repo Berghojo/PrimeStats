@@ -13,6 +13,7 @@ Benötigt: pillow, numpy.
 
 import argparse
 import base64
+import json
 from collections import deque
 from pathlib import Path
 
@@ -21,6 +22,75 @@ from PIL import Image
 
 MX, MY, N = 14870, 14980, 150
 LANE_LOW, LANE_HIGH_X, LANE_HIGH_Y = 1250, 14870 - 1250, 13800
+
+
+def wall_loops(walk: np.ndarray, tolerance: float = 0.9) -> list[list[int]]:
+    """Umrisse der Wandflächen als geschlossene Polygone (Gitterpunkte), vereinfacht (Douglas-Peucker).
+
+    Richtung: Wand links der Kante. Zusammen mit fill-rule="evenodd" ergeben die Umrisse (inkl. äußerem
+    Rand) genau die Wandflächen; Inseln in Wänden werden zu Löchern.
+    """
+    n = walk.shape[0]
+    wall = np.ones((n + 2, n + 2), bool)
+    wall[1:-1, 1:-1] = ~walk
+    edges: dict[tuple[int, int], list[tuple[int, int]]] = {}
+
+    def add(a, b):
+        edges.setdefault(a, []).append(b)
+
+    for r in range(n + 2):
+        for c in range(n + 2):
+            if not wall[r, c]:
+                continue
+            if r > 0 and not wall[r - 1, c]:
+                add((c + 1, r), (c, r))
+            if r < n + 1 and not wall[r + 1, c]:
+                add((c, r + 1), (c + 1, r + 1))
+            if c > 0 and not wall[r, c - 1]:
+                add((c, r), (c, r + 1))
+            if c < n + 1 and not wall[r, c + 1]:
+                add((c + 1, r + 1), (c + 1, r))
+
+    loops = []
+    while edges:
+        start = next(iter(edges))
+        loop, cur = [start], start
+        while True:
+            nxt = edges[cur].pop()
+            if not edges[cur]:
+                del edges[cur]
+            if nxt == start:
+                break
+            loop.append(nxt)
+            cur = nxt
+            if cur not in edges:
+                break
+        if len(loop) >= 4:
+            loops.append(loop)
+
+    def rdp(points, eps):
+        if len(points) < 3:
+            return points
+        (x0, y0), (x1, y1) = points[0], points[-1]
+        dx, dy = x1 - x0, y1 - y0
+        norm = (dx * dx + dy * dy) ** 0.5 or 1.0
+        dists = [abs(dy * (x - x0) - dx * (y - y0)) / norm for x, y in points[1:-1]]
+        i = int(np.argmax(dists)) + 1
+        if dists[i - 1] > eps:
+            return rdp(points[: i + 1], eps)[:-1] + rdp(points[i:], eps)
+        return [points[0], points[-1]]
+
+    out = []
+    for loop in loops:
+        # geschlossenen Ring am entferntesten Punktepaar aufteilen und beide Hälften vereinfachen
+        far = max(range(len(loop)), key=lambda i: (loop[i][0] - loop[0][0]) ** 2 + (loop[i][1] - loop[0][1]) ** 2)
+        a = rdp(loop[: far + 1], tolerance)
+        b = rdp(loop[far:] + [loop[0]], tolerance)
+        pts = a[:-1] + b[:-1]
+        if len(pts) >= 3:
+            # Gitterpunkte ohne Rand-Polster (−1)
+            out.append([v - 1 for p in pts for v in p])
+    return out
 
 
 def main() -> None:
@@ -121,6 +191,7 @@ def main() -> None:
             for y, x in cells:
                 grid[y, x] = True
 
+    loops = wall_loops(grid)
     bits = np.packbits(grid.astype(np.uint8).ravel())
     data = base64.b64encode(bits.tobytes()).decode()
     out = Path(__file__).resolve().parents[1] / "src" / "lib" / "navgridData.ts"
@@ -129,8 +200,10 @@ def main() -> None:
         f"/** Rastergröße (Zellen je Seite); Zeile 0 = oben (rote Seite), Spalte 0 = links */\n"
         f"export const GRID_SIZE = {N};\n"
         "/** Begehbar-Bits, zeilenweise, base64 */\n"
-        f'export const GRID_BITS = "{data}";\n', encoding="utf-8")
-    print(f"{grid.sum()} von {N * N} Zellen begehbar -> {out}")
+        f'export const GRID_BITS = "{data}";\n'
+        "/** Wandumrisse als Polygone in Gitterpunkten [x0, y0, x1, y1, …] (x = Spalte, y = Zeile von oben) */\n"
+        f"export const WALL_LOOPS: number[][] = {json.dumps(loops, separators=(',', ':'))};\n", encoding="utf-8")
+    print(f"{grid.sum()} von {N * N} Zellen begehbar, {len(loops)} Wandumrisse -> {out}")
 
 
 if __name__ == "__main__":

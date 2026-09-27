@@ -4,7 +4,7 @@ import type { Jungle, JungleEvent, JunglePath, Side } from "../../api/types";
 import { dt, duration } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 import { type Clear, reconstruct } from "../../lib/jungleRoute";
-import { type Point, interpolate, wallRects } from "../../lib/navgrid";
+import { type Point, interpolate, wallPolygons } from "../../lib/navgrid";
 import { InfoTip } from "../InfoTip";
 
 /** Kartengröße in Spielkoordinaten (Summoner's Rift, Ursprung unten links) */
@@ -62,10 +62,16 @@ export function zone(x: number, y: number, side: Side): string {
 const ZONES = ["Toplane", "Midlane", "Botlane", "Fluss", "Eigener Jungle", "Gegnerischer Jungle", "Basis"];
 
 /** Summoner's Rift als schlichte Vektorgrafik – Hintergrund, falls das Kartenbild nicht lädt. */
-/** Wände aus dem Raster als ein SVG-Pfad (Pixelkoordinaten) */
-const WALL_PATH = wallRects()
-  .map(([x0, y0, x1, y1]) => `M${px(x0).toFixed(1)} ${py(y1).toFixed(1)}H${px(x1).toFixed(1)}V${py(y0).toFixed(1)}H${px(x0).toFixed(1)}Z`)
+/** Wände als ein SVG-Pfad (Pixelkoordinaten); Umrisse aus dem Raster, kantig vereinfacht */
+// Der Kartenrand zählt als Wand: Rechteck um alles, darin die Umrisse (Spielfeld = Loch, Wände darin = Fläche)
+const WALL_PATH = `M0 0H${SIZE}V${SIZE}H0Z` + wallPolygons()
+  .map((poly) => `M${poly.map(([x, y]) => `${px(x).toFixed(1)} ${py(y).toFixed(1)}`).join("L")}Z`)
   .join("");
+
+/** Lanes (Mitte bei ≈1250 bzw. ≈13 700) und Basen für den Kartenhintergrund */
+const LANE_LOW = 1250;
+const LANE_HIGH_X = MAP_W - 1250;
+const LANE_HIGH_Y = MAP_H - 1250;
 
 export function MapBase(_: { walls?: boolean }) {
   const { mapUrl } = useGameData();
@@ -73,10 +79,15 @@ export function MapBase(_: { walls?: boolean }) {
   const [failed, setFailed] = useState(false);
   return (
     <>
-      <rect width={SIZE} height={SIZE} fill="#1d2823" />
-      <path d={`M0 0 L${SIZE} ${SIZE}`} stroke="#15394a" strokeWidth={40} />
-      <circle cx={px(700)} cy={py(700)} r={48} fill="#1c2a40" />
-      <circle cx={px(14170)} cy={py(14280)} r={48} fill="#3a1d27" />
+      <rect width={SIZE} height={SIZE} fill="#0e1a16" />
+      <path d={`M${px(0)} ${py(MAP_H)} L${px(MAP_W)} ${py(0)}`} stroke="#12303a" strokeWidth={34} />
+      <g fill="none" stroke="#24302c" strokeWidth={14} strokeLinecap="round" strokeLinejoin="round">
+        <path d={`M${px(LANE_LOW)} ${py(LANE_LOW)} L${px(LANE_LOW)} ${py(LANE_HIGH_Y)} L${px(LANE_HIGH_X)} ${py(LANE_HIGH_Y)}`} />
+        <path d={`M${px(LANE_LOW)} ${py(LANE_LOW)} L${px(LANE_HIGH_X)} ${py(LANE_LOW)} L${px(LANE_HIGH_X)} ${py(LANE_HIGH_Y)}`} />
+        <path d={`M${px(LANE_LOW)} ${py(LANE_LOW)} L${px(LANE_HIGH_X)} ${py(LANE_HIGH_Y)}`} />
+      </g>
+      <circle cx={px(700)} cy={py(700)} r={30} fill="#16233d" />
+      <circle cx={px(MAP_W - 700)} cy={py(MAP_H - 700)} r={30} fill="#3a1820" />
       {mapUrl && !failed && (
         <image href={mapUrl} width={SIZE} height={SIZE} opacity={imageOpacity}
           onLoad={() => onImage("ok")}
@@ -85,7 +96,7 @@ export function MapBase(_: { walls?: boolean }) {
             onImage("failed");
           }} />
       )}
-      {(walls || calibrate) && <path className={calibrate ? "walls outline" : "walls"} d={WALL_PATH} />}
+      {(walls || calibrate) && <path className={calibrate ? "walls outline" : "walls"} d={WALL_PATH} fillRule="evenodd" />}
     </>
   );
 }
@@ -424,7 +435,7 @@ export function JungleCard({ jungle }: { jungle: Jungle }) {
           <span>Kartenabgleich: echtes Kartenbild mit Wand-Umrissen</span>
         </label>
         <InfoTip>
-          Gelb markierte Flächen = Wände, wie PrimeStats sie für die Laufwege verwendet (aus einer schematischen Karte
+          Gestrichelte Umrisse = Wände, wie PrimeStats sie für die Laufwege verwendet (aus einer schematischen Karte
           erzeugt). Liegen sie neben den echten Wänden, bitte einen Screenshot schicken.
         </InfoTip>
       </div>

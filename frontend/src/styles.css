@@ -394,8 +394,8 @@ input[type=range] { accent-color: var(--accent); }
   text-transform: uppercase; letter-spacing: .05em; }
 .slider-head b { color: var(--text); font-variant-numeric: tabular-nums; }
 .slider input { width: 100%; }
-path.walls { fill: #070b12; opacity: .92; }
-path.walls.outline { fill: rgba(255, 194, 61, .22); stroke: none; opacity: 1; }
+path.walls { fill: #1c2a24; stroke: #3d5249; stroke-width: 1.5; stroke-linejoin: round; opacity: .9; }
+path.walls.outline { fill: rgba(255, 194, 61, .12); stroke: #ffc23d; stroke-width: 1.5; stroke-dasharray: 4 3; opacity: 1; }
 
 /* ---------- Info-Symbol mit Tooltip ---------- */
 .infotip { position: relative; display: inline-flex; vertical-align: middle; margin-left: .35rem; }

@@ -4,7 +4,7 @@
  *
  * Koordinaten: Spielkoordinaten, Ursprung unten links (blaue Basis).
  */
-import { GRID_BITS, GRID_SIZE } from "./navgridData";
+import { GRID_BITS, GRID_SIZE, WALL_LOOPS } from "./navgridData";
 
 export type Point = [number, number];
 
@@ -249,6 +249,15 @@ export function traceField(field: Float64Array, from: Point, to: Point): Point[]
     cells.push(cur);
   }
   return [from, ...smooth(cells).slice(1, -1).map(center), to];
+}
+
+/** Wandumrisse als Polygone in Spielkoordinaten (mit fill-rule="evenodd" zeichnen: Inseln werden zu Löchern) */
+export function wallPolygons(): Point[][] {
+  return WALL_LOOPS.map((loop) => {
+    const pts: Point[] = [];
+    for (let i = 0; i < loop.length; i += 2) pts.push([loop[i] * CW, MAX_Y - loop[i + 1] * CH]);
+    return pts;
+  });
 }
 
 /** Wandflächen als Rechtecke (je Zeile zusammengefasste Zellen) in Spielkoordinaten: [x0, y0, x1, y1]. */
