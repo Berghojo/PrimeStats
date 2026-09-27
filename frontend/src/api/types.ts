@@ -233,7 +233,10 @@ export interface ChampionRow {
   assists: number | null;
   cspm: number | null;
   dpm: number | null;
+  /** häufigste Rolle */
   position: string;
+  /** alle Rollen, auf denen der Champion gespielt wurde */
+  positions: { position: string; games: number }[];
   players: { name: string; games: number; wins: number }[];
   bans_by_us: number;
   bans_against: number;

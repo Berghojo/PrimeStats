@@ -299,8 +299,13 @@ class ChampionPlayer(BaseModel):
     wins: int
 
 
+class ChampionPosition(BaseModel):
+    position: str
+    games: int
+
+
 class ChampionRow(BaseModel):
-    """Zeile der Champion-Pick-Tabelle (eigene Picks, Bans beider Seiten)."""
+    """Zeile der Champion-Pick-Tabelle (eigene Picks, Bans beider Seiten) – eine Zeile pro Champion."""
 
     champion_id: int
     picks: int
@@ -312,7 +317,8 @@ class ChampionRow(BaseModel):
     assists: float | None
     cspm: float | None
     dpm: float | None
-    position: str
+    position: str                      # häufigste Rolle
+    positions: list[ChampionPosition]  # alle Rollen mit Anzahl
     players: list[ChampionPlayer]
     bans_by_us: int
     bans_against: int

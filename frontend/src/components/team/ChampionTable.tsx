@@ -28,7 +28,10 @@ export function ChampionTable({ rows }: { rows: ChampionRow[] }) {
   const cols: Col[] = [
     { key: "champ", label: "Champion", left: true, sort: (r) => champion(r.champion_id).name,
       render: (r) => <div className="champ-cell"><ChampIcon id={r.champion_id} size="sm" /><b>{champion(r.champion_id).name}</b></div> },
-    { key: "pos", label: "Rolle", sort: (r) => position(r.position), render: (r) => (r.position ? position(r.position) : "–") },
+    { key: "pos", label: "Rollen", left: true, sort: (r) => position(r.position),
+      render: (r) => (r.positions.length
+        ? r.positions.map((p) => `${position(p.position)} (${p.games})`).join(", ")
+        : "–") },
     { key: "players", label: "Gespielt von", left: true, sort: (r) => r.players[0]?.name ?? "",
       render: (r) => r.players.length
         ? r.players.map((p) => `${p.name} (${p.games})`).join(", ")
@@ -49,7 +52,7 @@ export function ChampionTable({ rows }: { rows: ChampionRow[] }) {
       sort: (r) => nn(r.presence), render: (r) => pct(r.presence) },
   ];
 
-  let shown = rows.filter((r) => (withBans || r.picks > 0) && (!role || r.position === role));
+  let shown = rows.filter((r) => (withBans || r.picks > 0) && (!role || r.positions.some((p) => p.position === role)));
   const col = cols.find((c) => c.key === sort.key)!;
   shown = [...shown].sort((a, b) => {
     const x = col.sort(a), y = col.sort(b);
@@ -92,7 +95,7 @@ export function ChampionTable({ rows }: { rows: ChampionRow[] }) {
             {shown.map((r) => (
               <tr key={r.champion_id} className={r.picks ? "" : "dim"}>
                 {cols.map((c) => (
-                  <td key={c.key} className={[c.left && "left", c.key === "players" && "wrap", c.className?.(r)].filter(Boolean).join(" ")}>
+                  <td key={c.key} className={[c.left && "left", (c.key === "players" || c.key === "pos") && "wrap", c.className?.(r)].filter(Boolean).join(" ")}>
                     {c.render(r)}
                   </td>
                 ))}

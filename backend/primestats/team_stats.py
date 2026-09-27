@@ -252,7 +252,8 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
     for cid in set(champ_stats) | set(our_bans) | set(enemy_bans):
         cs = champ_stats.get(cid)
         row = {"champion_id": cid, "picks": 0, "wins": 0, "winrate": None, "kda": None, "kills": None,
-               "deaths": None, "assists": None, "cspm": None, "dpm": None, "position": "", "players": [],
+               "deaths": None, "assists": None, "cspm": None, "dpm": None, "position": "", "positions": [],
+               "players": [],
                "bans_by_us": our_bans[cid], "bans_against": enemy_bans[cid]}
         if cs:
             g = cs["picks"]
@@ -261,6 +262,8 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
                        kills=cs["kills"] / g, deaths=cs["deaths"] / g, assists=cs["assists"] / g,
                        cspm=cs["cs"] / cs["minutes"], dpm=cs["damage"] / cs["minutes"],
                        position=cs["positions"].most_common(1)[0][0],
+                       # alle Rollen, auf denen der Champion gespielt wurde (eine Zeile pro Champion)
+                       positions=[{"position": pos, "games": k} for pos, k in cs["positions"].most_common()],
                        players=sorted(cs["players"].values(), key=lambda x: -x["games"]))
         # Präsenz: Anteil der Spiele, in denen der Champion gepickt oder (von einer Seite) gebannt wurde
         row["presence"] = (row["picks"] + row["bans_by_us"] + row["bans_against"]) / n if n else None

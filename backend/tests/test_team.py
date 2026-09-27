@@ -73,7 +73,20 @@ def test_champion_table(service, synced_team):
         assert 0 <= row["presence"] <= 1
         if row["picks"]:
             assert sum(p["games"] for p in row["players"]) == row["picks"]
-            assert 0 <= row["winrate"] <= 1 and row["position"]
+            assert 0 <= row["winrate"] <= 1 and row["position"] == row["positions"][0]["position"]
+            assert sum(p["games"] for p in row["positions"]) == row["picks"]
         else:  # nur gebannt
             assert row["winrate"] is None and row["players"] == []
     assert [r["picks"] for r in table] == sorted((r["picks"] for r in table), reverse=True)
+
+
+def test_champion_on_several_roles_is_one_row(service, synced_team):
+    records = service.team_records(synced_team)
+    # künstlich: denselben Champion in zwei Spielen auf verschiedenen Rollen spielen lassen
+    a, b = records[0].us.players[0], records[1].us.players[2]   # Top bzw. Mid
+    a.champion_id = b.champion_id = 99999
+    table = build_report(synced_team, records[:2])["champion_table"]
+    rows = [r for r in table if r["champion_id"] == 99999]
+    assert len(rows) == 1
+    assert {p["position"] for p in rows[0]["positions"]} == {a.position, b.position}
+    assert {p["name"] for p in rows[0]["players"]} == {a.name, b.name}
