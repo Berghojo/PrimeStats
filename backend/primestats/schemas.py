@@ -406,7 +406,7 @@ class DeathEvent(BaseModel):
     t: int
     x: int
     y: int
-    kind: Literal["teamfight", "dive", "skirmish", "gank", "roam", "lane", "duel", "other"]
+    kind: Literal["teamfight", "dive", "skirmish", "gank", "roam", "lane", "execute"]
     by: list[DeathBy]
 
 
@@ -424,7 +424,7 @@ class KillEvent(BaseModel):
     t: int
     x: int
     y: int
-    kind: Literal["teamfight", "dive", "skirmish", "gank", "roam", "lane", "duel", "other"]
+    kind: Literal["teamfight", "dive", "skirmish", "gank", "roam", "lane", "execute"]
     victim: DeathBy
     by: list[KillBy]
 

@@ -122,9 +122,9 @@ def test_death_kinds():
     assert death_kind("MIDDLE", ["UTILITY"]) == "roam"
     assert death_kind("BOTTOM", ["UTILITY", "BOTTOM"]) == "lane"        # Botlane-Duo zählt als eigene Lane
     assert death_kind("UTILITY", ["MIDDLE", "JUNGLE"]) == "gank"     # Jungler + Roamer ohne 3. Angreifer
-    assert death_kind("JUNGLE", ["JUNGLE"]) == "duel"
+    assert death_kind("JUNGLE", ["JUNGLE"]) == "lane"                # Jungler gegen Jungler ist auch 1v1
     assert death_kind("JUNGLE", ["JUNGLE", "MIDDLE"]) == "roam"
-    assert death_kind("TOP", []) == "other"
+    assert death_kind("TOP", []) == "execute"
 
 
 def test_report_lists_deaths_of_own_players(service, synced_team, demo_source):
@@ -134,7 +134,7 @@ def test_report_lists_deaths_of_own_players(service, synced_team, demo_source):
     assert deaths and all(d["puuid"] in own for d in deaths)
     kinds = {d["kind"] for d in deaths}
     assert {"teamfight", "skirmish"} <= kinds and kinds <= {"teamfight", "dive", "skirmish", "gank", "roam", "lane",
-                                                             "duel", "other"}
+                                                             "execute"}
     for d in deaths[:40]:
         match = service.match(d["match_id"])
         enemy = {p.puuid for p in match.participants if p.team_id != match.player(d["puuid"]).team_id}

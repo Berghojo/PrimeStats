@@ -7,9 +7,8 @@ Geprüft wird in dieser Reihenfolge; die erste zutreffende Kategorie gilt:
 2. ``dive`` – in Reichweite eines noch stehenden Turms des Opfers
 3. ``skirmish`` – mindestens 3 Angreifer (Killer + Assists)
 4. ``gank`` (Jungler der Angreifer beteiligt) bzw. ``roam`` (Laner einer anderen Lane)
-5. ``lane`` – nur die direkten Lane-Gegner (Bot + Support zählen als eine Lane → 2v2);
-   ``duel`` – Jungler gegen Jungler
-6. ``other`` – ohne gegnerischen Champion (Turm, Minions)
+5. ``lane`` – 1v1: nur die direkten Gegner (Bot + Support zählen als eine Lane → 2v2; Jungler gegen Jungler)
+6. ``execute`` – ohne gegnerischen Champion (Turm, Minions, Monster)
 """
 
 from __future__ import annotations
@@ -42,10 +41,10 @@ def base_kind(victim_position: str, attacker_positions: list[str]) -> str:
     """Gank/Roam/1v1 nur nach den beteiligten Rollen (ohne Teamfight, Dive, Skirmish)."""
     lanes = [_lane(p) for p in attacker_positions]
     if not [lane for lane in lanes if lane]:
-        return "other"
+        return "execute"
     own = _lane(victim_position)
     if own == "jungle":
-        return "roam" if any(lane not in ("jungle", "") for lane in lanes) else "duel"
+        return "roam" if any(lane not in ("jungle", "") for lane in lanes) else "lane"
     if "jungle" in lanes:
         return "gank"
     return "roam" if any(lane not in ("jungle", "", own) for lane in lanes) else "lane"
@@ -98,7 +97,7 @@ def classify_kills(match: MatchSummary, timeline: dict) -> list[str]:
         attackers = [by_pid[pid] for pid in dict.fromkeys([k["killer"], *k["assists"]])
                      if pid in by_pid and victim is not None and by_pid[pid].team_id != victim.team_id]
         if victim is None or not attackers:
-            kinds.append("other")
+            kinds.append("execute")
         elif i in fights:
             kinds.append("teamfight")
         elif tower_standing(victim.team_id, k["x"], k["y"], k["t"], lost):

@@ -15,16 +15,16 @@ const KINDS: { key: DeathKind; label: string }[] = [
   { key: "dive", label: "Dive" },
   { key: "skirmish", label: "Skirmish" },
   { key: "teamfight", label: "Teamfight" },
-  { key: "duel", label: "Jungle 1v1" },
-  { key: "other", label: "Sonstige" },
+  { key: "execute", label: "Execute" },
 ];
 
 /** Regeln der Einordnung (gleich für Kills und Tode) */
 const RULES = "Geprüft wird von oben nach unten, die erste zutreffende Kategorie zählt: Teamfight = Teil einer "
   + "Kette von mindestens 3 Kills (beider Teams) mit höchstens 20 s und 2 500 Einheiten Abstand · Dive = in "
   + "Reichweite eines noch stehenden Turms des Opfers · Skirmish = mindestens 3 Angreifer · Gank = Jungler der "
-  + "Angreifer beteiligt · Roam = Laner einer anderen Lane beteiligt · 1v1 = nur die direkten Lane-Gegner (Botlane: "
-  + "Bot + Support, also 2v2) · Jungle 1v1 = Jungler gegen Jungler · Sonstige = ohne Champion (Turm, Minions).";
+  + "Angreifer beteiligt · Roam = Laner einer anderen Lane beteiligt · 1v1 = nur die direkten Gegner (Botlane: "
+  + "Bot + Support, also 2v2; auch Jungler gegen Jungler) · Execute = ohne gegnerischen Champion (Turm, Minions, "
+  + "Monster).";
 const ORDER = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
 const lane = (pos: string) => (pos === "UTILITY" ? "BOTTOM" : pos);
 
@@ -82,7 +82,7 @@ export function FightCard({ mode, deaths = [], kills = [], players }: {
   const [who, setWho] = useState<string | null>(null);
   const [from, setFrom] = useState(0);
   const [to, setTo] = useState(15);
-  const [hidden, setHidden] = useState<Set<DeathKind>>(new Set(["other"]));
+  const [hidden, setHidden] = useState<Set<DeathKind>>(new Set(["execute"]));
   const [radius, setRadius] = useState(32);
   const [intensity, setIntensity] = useState(1);
   const lastMinute = Math.max(15, Math.ceil(Math.max(0, ...events.map((d) => d.t)) / 60));
@@ -95,7 +95,7 @@ export function FightCard({ mode, deaths = [], kills = [], players }: {
     const count = (k: DeathKind) => mine.filter((d) => d.kind === k).length;
     const tally = new Map<string, number>();
     for (const d of mine) {
-      if (d.kind === "other") continue;
+      if (d.kind === "execute") continue;
       for (const o of d.others) {
         // Tode: nur die gankenden/roamenden Gegner; Kills: jedes Opfer
         const relevant = mode === "kills" || (p.position === "JUNGLE"
@@ -164,7 +164,7 @@ export function FightCard({ mode, deaths = [], kills = [], players }: {
         <thead>
           <tr>
             <th className="left">Spieler</th><th>{text.total}</th>
-            <th title="1v1, auf der Botlane 2v2 (beim Jungler: Jungle 1v1)">1v1</th><th>Gank</th><th>Roam</th>
+            <th title="1v1, auf der Botlane 2v2">1v1</th><th>Gank</th><th>Roam</th>
             <th>Dive</th><th title="Skirmish: mindestens 3 Angreifer">Skirm.</th><th title="Teamfight">TF</th>
           </tr>
         </thead>
@@ -179,7 +179,7 @@ export function FightCard({ mode, deaths = [], kills = [], players }: {
                   <div className="cell-sub">{text.top}: {top.map(([pos, n]) => `${position(pos)} ${n}×`).join(", ") || "–"}</div>
                 </td>
                 <td>{total} <span className="muted small">Ø {(total / Math.max(1, p.games)).toFixed(1)}</span></td>
-                <td title={jungler ? "Jungle 1v1" : undefined}>{jungler ? count("duel") : count("lane")}</td>
+                <td>{count("lane")}</td>
                 {/* ein toter Jungler wird nicht „gegankt“ – dort zählt nur Roam (Laner beteiligt) */}
                 <td>{jungler && mode === "deaths" ? "–" : count("gank")}</td>
                 <td>{count("roam")}</td>

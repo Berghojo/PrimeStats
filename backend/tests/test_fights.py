@@ -34,11 +34,11 @@ def test_classify_order(demo_source):
         _kill(400, 7400, 7400, red["MIDDLE"], blue["BOTTOM"], [red["UTILITY"]]),           # Roam (Mid)
         _kill(500, tx, ty, red["MIDDLE"], blue["MIDDLE"]),                                 # Dive
         _kill(900, 7000, 3000, red["JUNGLE"], blue["BOTTOM"], [red["MIDDLE"], red["TOP"]]),  # Skirmish
-        _kill(1000, 3000, 12000, blue["JUNGLE"], red["JUNGLE"]),                           # Jungle 1v1
-        _kill(1100, 3000, 12000, 0, blue["MIDDLE"]),                                       # ohne Champion
+        _kill(1000, 3000, 12000, blue["JUNGLE"], red["JUNGLE"]),                           # Jungle 1v1 = 1v1
+        _kill(1100, 3000, 12000, 0, blue["MIDDLE"]),                                       # Execute
     ]
     assert pos[blue["TOP"]] == "TOP"
-    assert classify_kills(match, {"kills": kills}) == ["lane", "gank", "roam", "dive", "skirmish", "duel", "other"]
+    assert classify_kills(match, {"kills": kills}) == ["lane", "gank", "roam", "dive", "skirmish", "lane", "execute"]
 
 
 def test_tower_positions_match_frontend():
