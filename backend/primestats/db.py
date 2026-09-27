@@ -92,6 +92,20 @@ class TeamGameRow(Base):
     opponent: Mapped[str] = mapped_column(String(40), default="")
 
 
+class PuuidAlias(Base):
+    """League-Client-PUUID -> PUUID der Riot-API.
+
+    Der Client kennt Spieler unter ihrer unverschlüsselten PUUID (UUID-Format), die Riot-API nur
+    unter der je API-Key verschlüsselten. Hochgeladene Spiele werden auf die API-PUUID umgestellt,
+    damit sie zu Teams, Verknüpfungen und Turnierspielen passen.
+    """
+
+    __tablename__ = "puuid_aliases"
+
+    client_puuid: Mapped[str] = mapped_column(String(100), primary_key=True)
+    puuid: Mapped[str] = mapped_column(String(100))
+
+
 # ------------------------------------------------------------ LCU-Importe
 class RawImport(Base):
     """Originaldaten aus dem League Client – erlaubt spätere Neukonvertierung."""

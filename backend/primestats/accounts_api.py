@@ -107,7 +107,7 @@ def unlink(puuid: str, service: Service, user: CurrentUser):
 @router.post("/uploader/status", response_model=UploaderStatusOut)
 def uploader_status(body: UploaderStatusIn, service: Service):
     """Ist der im Client eingeloggte Riot-Account (mit diesem Geräteschlüssel) verknüpft?"""
-    user_id = service.store.riot_link_owner(body.puuid, body.key or "") if body.key else None
+    user_id = service.link_owner(body.puuid, body.key) if body.key else None
     user = service.store.get_user(user_id) if user_id else None
     return UploaderStatusOut(linked=user is not None, username=user.username if user else None)
 
@@ -122,21 +122,27 @@ def uploader_link(body: UploaderLinkIn, request: Request, service: Service):
     if user is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Code ungültig oder abgelaufen – bitte auf der Website neu erzeugen.")
     key = auth.new_token()
-    service.store.link_riot(user.id, body.puuid, body.game_name, body.tag_line, key)
-    service.store.put_account(f"{body.game_name}#{body.tag_line}",
-                              {"puuid": body.puuid, "gameName": body.game_name, "tagLine": body.tag_line})
+    # Das Tool meldet die PUUID des Clients; gespeichert wird die der Riot-API (sofern auflösbar)
+    puuid = service.api_puuid(body.puuid, body.game_name, body.tag_line)
+    service.store.link_riot(user.id, puuid, body.game_name, body.tag_line, key)
+    if puuid != body.puuid:
+        service.store.move_riot_link(body.puuid, puuid)  # alte Verknüpfung unter der Client-PUUID
+    elif not service.online:
+        # ohne API-Key: Spielersuche/Kader über die hochgeladenen Daten ermöglichen
+        service.store.put_account(f"{body.game_name}#{body.tag_line}",
+                                  {"puuid": puuid, "gameName": body.game_name, "tagLine": body.tag_line})
     return UploaderLinkOut(username=user.username, key=key)
 
 
 def uploader_account(service: Service, x_riot_puuid: Annotated[str, Header()] = "",
                      x_link_key: Annotated[str, Header()] = "") -> tuple[UserAccount, set[str], str]:
     """Authentifiziert das Tool über den eingeloggten Riot-Account und dessen Geräteschlüssel."""
-    user_id = service.store.riot_link_owner(x_riot_puuid, x_link_key) if x_riot_puuid and x_link_key else None
+    user_id = service.link_owner(x_riot_puuid, x_link_key) if x_riot_puuid and x_link_key else None
     user = service.store.get_user(user_id) if user_id else None
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED,
                             "Dieser Riot-Account ist nicht (mehr) mit einem PrimeStats-Konto verknüpft.")
-    puuids = {link.puuid for link in service.store.linked_riot_accounts(user.id)}
+    puuids = {link.puuid for link in service.store.linked_riot_accounts(user.id)} | {x_riot_puuid}
     return user, puuids, x_riot_puuid
 
 
@@ -154,5 +160,5 @@ def uploader_games(body: ImportIn, service: Service, account: UploaderAccount):
     user, puuids, puuid = account
     result = service.import_lcu([item.model_dump() for item in body.games], uploader=user.username,
                                 allowed_puuids=puuids)
-    service.store.touch_riot_link(puuid)
+    service.store.touch_riot_link(puuid, service.store.get_aliases([puuid]).get(puuid, puuid))
     return ImportOut(**result.__dict__)

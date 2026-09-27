@@ -19,7 +19,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from .auth import token_hash
-from .db import (Account, LinkCode, Match, RawImport, RiotLink, Scout, TeamGameRow, TeamMemberRow, TeamRow,
+from .lcu import CLIENT_PUUID_SQL
+from .db import (Account, LinkCode, Match, PuuidAlias, RawImport, RiotLink, Scout, TeamGameRow, TeamMemberRow, TeamRow,
                  Timeline, TimelineSummary, User, UserSession)
 
 
@@ -184,6 +185,37 @@ class Store:
                   "uploader": uploader}
         stmt = insert(RawImport).values(**values).on_conflict_do_update(
             index_elements=[RawImport.match_id], set_={k: v for k, v in values.items() if k != "match_id"})
+        with self.session() as s:
+            s.execute(stmt)
+
+    def get_raw_import(self, match_id: str) -> tuple[dict, dict | None] | None:
+        with self.session() as s:
+            row = s.execute(select(RawImport.game, RawImport.timeline).where(RawImport.match_id == match_id)).first()
+            return tuple(row) if row else None
+
+    def matches_with_client_puuids(self) -> list[str]:
+        """Spiele, deren Teilnehmer noch unter League-Client-PUUIDs (UUID-Format) gespeichert sind."""
+        participants = Match.data["metadata"]["participants"].astext
+        with self.session() as s:
+            return list(s.scalars(select(Match.match_id).where(participants.op("~*")(CLIENT_PUUID_SQL))))
+
+    def delete_timeline_summaries(self, match_ids: list[str]) -> None:
+        if match_ids:
+            with self.session() as s:
+                s.execute(delete(TimelineSummary).where(TimelineSummary.match_id.in_(match_ids)))
+
+    # ---------------------------------------------------------------- aliases
+    def get_aliases(self, client_puuids: list[str]) -> dict[str, str]:
+        if not client_puuids:
+            return {}
+        with self.session() as s:
+            rows = s.execute(select(PuuidAlias.client_puuid, PuuidAlias.puuid)
+                             .where(PuuidAlias.client_puuid.in_(client_puuids)))
+            return {client: puuid for client, puuid in rows}
+
+    def put_alias(self, client_puuid: str, puuid: str) -> None:
+        stmt = insert(PuuidAlias).values(client_puuid=client_puuid, puuid=puuid).on_conflict_do_update(
+            index_elements=[PuuidAlias.client_puuid], set_={"puuid": puuid})
         with self.session() as s:
             s.execute(stmt)
 
@@ -365,6 +397,31 @@ class Store:
         with self.session() as s:
             s.execute(stmt)
 
+    def links_with_client_puuids(self) -> list[LinkedRiot]:
+        with self.session() as s:
+            rows = s.scalars(select(RiotLink).where(RiotLink.puuid.op("~*")(CLIENT_PUUID_SQL)))
+            return [LinkedRiot(r.puuid, r.game_name, r.tag_line, r.linked_at, r.last_upload_at) for r in rows]
+
+    def members_with_client_puuids(self) -> dict[str, tuple[str, str]]:
+        with self.session() as s:
+            rows = s.execute(select(TeamMemberRow.puuid, TeamMemberRow.game_name, TeamMemberRow.tag_line)
+                             .where(TeamMemberRow.puuid.op("~*")(CLIENT_PUUID_SQL)))
+            return {puuid: (name, tag) for puuid, name, tag in rows}
+
+    def move_member_puuid(self, old_puuid: str, new_puuid: str) -> None:
+        with self.session() as s:
+            taken = select(TeamMemberRow.team_id).where(TeamMemberRow.puuid == new_puuid)
+            s.execute(delete(TeamMemberRow).where(TeamMemberRow.puuid == old_puuid, TeamMemberRow.team_id.in_(taken)))
+            s.execute(update(TeamMemberRow).where(TeamMemberRow.puuid == old_puuid).values(puuid=new_puuid))
+
+    def move_riot_link(self, old_puuid: str, new_puuid: str) -> None:
+        """Stellt eine Verknüpfung auf eine andere PUUID um (eine vorhandene gewinnt)."""
+        with self.session() as s:
+            if s.get(RiotLink, new_puuid) is not None:
+                s.execute(delete(RiotLink).where(RiotLink.puuid == old_puuid))
+            else:
+                s.execute(update(RiotLink).where(RiotLink.puuid == old_puuid).values(puuid=new_puuid))
+
     def unlink_riot(self, user_id: int, puuid: str) -> bool:
         with self.session() as s:
             result = s.execute(delete(RiotLink).where(RiotLink.user_id == user_id, RiotLink.puuid == puuid))
@@ -380,9 +437,9 @@ class Store:
                 return None
             return row.user_id
 
-    def touch_riot_link(self, puuid: str) -> None:
+    def touch_riot_link(self, *puuids: str) -> None:
         with self.session() as s:
-            s.execute(update(RiotLink).where(RiotLink.puuid == puuid)
+            s.execute(update(RiotLink).where(RiotLink.puuid.in_(puuids))
                       .values(last_upload_at=datetime.now(timezone.utc)))
 
     def linked_riot_accounts(self, user_id: int) -> list[LinkedRiot]:

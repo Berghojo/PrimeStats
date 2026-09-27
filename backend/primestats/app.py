@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -23,6 +24,13 @@ from .store import Store
 log = logging.getLogger(__name__)
 
 
+def _repair(service: PrimeStats) -> None:
+    try:
+        service.repair_client_puuids()
+    except Exception:  # noqa: BLE001 - Hintergrund-Reparatur darf den Start nicht stören
+        log.exception("Umstellung der Client-PUUIDs fehlgeschlagen")
+
+
 def create_app(settings: Settings | None = None, *, source: MatchSource | None = None,
                store: Store | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
@@ -33,17 +41,20 @@ def create_app(settings: Settings | None = None, *, source: MatchSource | None =
         if settings.auto_migrate:
             from .migrate import upgrade
             upgrade(app.state.store.engine)
-        src = source
+        src, repair = source, False
         if src is None:
             if settings.demo:
                 from .demo import DemoSource
                 src = DemoSource()
             elif settings.api_key:
                 src = RiotClient(settings.api_key, region=settings.region)
+                repair = True
             else:
                 log.warning("Kein LOL_API_KEY gesetzt – nur hochgeladene Spiele (LCU-Uploader) sind verfügbar.")
                 src = OfflineSource()
         app.state.service = PrimeStats(app.state.store, src, settings.sync_match_count)
+        if repair:  # früher hochgeladene Client-PUUIDs auf Riot-API-PUUIDs umstellen
+            threading.Thread(target=_repair, args=(app.state.service,), daemon=True).start()
         if settings.demo and source is None:
             from .demo import import_demo_scrims, setup_demo_account
             import_demo_scrims(app.state.service, src)

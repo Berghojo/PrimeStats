@@ -11,9 +11,20 @@ tolerant gegenüber fehlenden oder anders benannten Feldern.
 
 from __future__ import annotations
 
+import copy
+import re
 from typing import Any
 
 from .matches import POSITIONS
+
+#: Der Client liefert die unverschlüsselte PUUID (UUID-Format); die Riot-API kennt nur die je
+#: API-Key verschlüsselte (78 Zeichen). Beide sind nicht ineinander umrechenbar.
+CLIENT_PUUID_SQL = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+_CLIENT_PUUID = re.compile(f"^{CLIENT_PUUID_SQL}$", re.IGNORECASE)
+
+
+def is_client_puuid(puuid: str) -> bool:
+    return bool(_CLIENT_PUUID.match(puuid or ""))
 
 #: v4-Lane/Rolle -> v5-Position
 _LANES = {"TOP": "TOP", "JUNGLE": "JUNGLE", "MIDDLE": "MIDDLE", "MID": "MIDDLE", "BOTTOM": "BOTTOM", "BOT": "BOTTOM"}
@@ -59,6 +70,28 @@ def _win(value: Any) -> bool:
     if isinstance(value, str):
         return value.lower() in {"win", "true"}
     return bool(value)
+
+
+def client_players(game: dict) -> dict[str, tuple[str, str]]:
+    """Spieler mit Client-PUUID -> (Name, Tag) aus einem LCU-Spiel."""
+    players = {}
+    for pi in game.get("participantIdentities") or []:
+        player = pi.get("player") or {}
+        if is_client_puuid(player.get("puuid", "")):
+            players[player["puuid"]] = (player.get("gameName") or "", player.get("tagLine") or "")
+    return players
+
+
+def with_puuids(game: dict, mapping: dict[str, str]) -> dict:
+    """Kopie des LCU-Spiels mit ersetzten PUUIDs."""
+    if not any(mapping.get(p, p) != p for p in mapping):
+        return game
+    game = copy.deepcopy(game)
+    for pi in game.get("participantIdentities") or []:
+        player = pi.get("player") or {}
+        if player.get("puuid") in mapping:
+            player["puuid"] = mapping[player["puuid"]]
+    return game
 
 
 def convert_game(game: dict) -> dict:

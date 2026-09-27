@@ -74,7 +74,8 @@ class PrimeStats:
         name, tag = split_riot_id(riot_id)
         key = f"{name}#{tag}"
         cached = self.store.get_account(key)
-        if cached:
+        # vom Uploader gelernte Client-PUUIDs taugen nicht für die Riot-API -> neu abfragen
+        if cached and not (self.online and lcu.is_client_puuid(cached["puuid"])):
             return cached
         data = self.source.account(key)
         self.store.put_account(key, data)
@@ -190,6 +191,9 @@ class PrimeStats:
         return self.match(match_id)
 
     def sync_team(self, team: Team, progress: "SyncJob") -> None:
+        if self.online:
+            self.repair_client_puuids()
+            team = self.store.get_team(team.id) or team
         puuids = team.puuids
         min_members = min(team.min_members, max(len(puuids), 1))
 
@@ -246,6 +250,78 @@ class PrimeStats:
     def known_matches(self, match_ids: list[str]) -> set[str]:
         return self.store.existing_matches(match_ids)
 
+    def api_puuids(self, players: dict[str, tuple[str, str]]) -> dict[str, str]:
+        """Client-PUUIDs -> Riot-API-PUUIDs (über die Riot-ID; unbekannte bleiben unverändert)."""
+        mapping = self.store.get_aliases(list(players))
+        for client, (name, tag) in players.items():
+            if client in mapping or not self.online or not name or not tag:
+                continue
+            try:
+                puuid = self.account(f"{name}#{tag}")["puuid"]
+            except NotFound:
+                # umbenannt o.ä.: nicht bei jedem Sync erneut nachfragen
+                self.store.put_alias(client, client)
+                continue
+            except (ValueError, RiotAPIError) as exc:
+                log.info("Riot-ID %s#%s nicht auflösbar: %s", name, tag, exc)
+                continue
+            self.store.put_alias(client, puuid)
+            mapping[client] = puuid
+        return {client: mapping.get(client, client) for client in players}
+
+    def api_puuid(self, client_puuid: str, game_name: str = "", tag_line: str = "") -> str:
+        return self.api_puuids({client_puuid: (game_name, tag_line)})[client_puuid]
+
+    def link_owner(self, puuid: str, key: str) -> int | None:
+        """Konto zum Riot-Account, den das Tool (mit Client-PUUID) meldet."""
+        canonical = self.store.get_aliases([puuid]).get(puuid, puuid)
+        owner = self.store.riot_link_owner(canonical, key)
+        if owner is None and canonical != puuid:
+            owner = self.store.riot_link_owner(puuid, key)
+        return owner
+
+    def _convert_lcu(self, game: dict, raw_timeline: dict | None) -> tuple[dict, dict | None]:
+        game = lcu.with_puuids(game, self.api_puuids(lcu.client_players(game)))
+        converted = lcu.convert_game(game)
+        timeline = lcu.convert_timeline(raw_timeline, converted) if raw_timeline else None
+        return converted, timeline
+
+    def repair_client_puuids(self) -> int:
+        """Stellt früher gespeicherte Client-PUUIDs (Verknüpfungen, Kader, hochgeladene Spiele) auf
+        Riot-API-PUUIDs um, sobald ein API-Key vorhanden ist. Liefert die Zahl korrigierter Spiele."""
+        if not self.online:
+            return 0
+        for link in self.store.links_with_client_puuids():
+            puuid = self.api_puuid(link.puuid, link.game_name, link.tag_line)
+            if puuid != link.puuid:
+                self.store.move_riot_link(link.puuid, puuid)
+        members = self.store.members_with_client_puuids()
+        for client, puuid in self.api_puuids(members).items():
+            if puuid != client:
+                self.store.move_member_puuid(client, puuid)
+        repaired = []
+        for mid in self.store.matches_with_client_puuids():
+            raw = self.store.get_raw_import(mid)
+            if raw is None:
+                continue
+            try:
+                converted, timeline = self._convert_lcu(*raw)
+            except (lcu.LcuFormatError, KeyError, TypeError):
+                continue
+            if converted["metadata"]["participants"] == self.store.get_match(mid)["metadata"]["participants"]:
+                continue
+            self.store.put_match(mid, converted)
+            if timeline:
+                self.store.put_timeline(mid, timeline)
+            with self._parsed_lock:
+                self._parsed.pop(mid, None)
+            repaired.append(mid)
+        if repaired:
+            self.store.delete_timeline_summaries(repaired)
+            self.assign_to_teams(repaired)
+            log.info("%d hochgeladene Spiele auf Riot-API-PUUIDs umgestellt.", len(repaired))
+        return len(repaired)
+
     def import_lcu(self, items: list[dict], uploader: str = "",
                    allowed_puuids: set[str] | None = None) -> ImportResult:
         """Importiert Spiele aus dem League Client (Format der LCU-API).
@@ -260,9 +336,8 @@ class PrimeStats:
         for item in items:
             game, raw_timeline = item.get("game") or {}, item.get("timeline")
             try:
-                converted = lcu.convert_game(game)
+                converted, timeline = self._convert_lcu(game, raw_timeline)
                 mid = converted["metadata"]["matchId"]
-                timeline = lcu.convert_timeline(raw_timeline, converted) if raw_timeline else None
             except (lcu.LcuFormatError, KeyError, TypeError) as exc:
                 result.errors.append(f"{game.get('gameId', '?')}: {exc}")
                 continue
