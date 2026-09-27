@@ -157,7 +157,7 @@ export function Slider({ label, value, min, max, step = 1, format, onChange }: {
     </label>
   );
 }
-const KILL_RGB: [number, number, number] = [0, 220, 192];
+export const KILL_RGB: [number, number, number] = [0, 220, 192];
 export const DEATH_RGB: [number, number, number] = [255, 77, 94];
 
 function Segmented<T extends string | number>({ value, options, onChange, label }: {

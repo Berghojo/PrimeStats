@@ -410,6 +410,25 @@ class DeathEvent(BaseModel):
     by: list[DeathBy]
 
 
+class KillBy(DeathBy):
+    puuid: str
+
+
+class KillEvent(BaseModel):
+    """Kill des eigenen Teams; ``kind`` wie bei den Toden, aus Sicht der eigenen Beteiligten."""
+
+    match_id: str
+    date: datetime
+    win: bool
+    side: Literal["blue", "red"]
+    t: int
+    x: int
+    y: int
+    kind: Literal["gank", "roam", "gank_roam", "lane", "duel", "other"]
+    victim: DeathBy
+    by: list[KillBy]
+
+
 class Jungle(BaseModel):
     players: list[JunglePlayer] = []
     paths: list[JunglePath] = []
@@ -430,6 +449,7 @@ class Report(BaseModel):
     trend: list[TrendPoint]
     jungle: Jungle = Jungle()
     deaths: list[DeathEvent] = []
+    kills: list[KillEvent] = []
 
 
 class HistoryRow(BaseModel):

@@ -140,3 +140,18 @@ def test_report_lists_deaths_of_own_players(service, synced_team, demo_source):
         assert all(b["position"] for b in d["by"])
         assert len(d["by"]) == len({b["name"] for b in d["by"]})
         assert all(p.puuid in enemy for p in match.participants if p.name in {b["name"] for b in d["by"]})
+
+
+def test_report_lists_kills_of_own_team(service, synced_team):
+    records = service.team_records(synced_team)
+    kills = build_report(synced_team, records)["kills"]
+    own = {m.puuid for m in synced_team.members}
+    assert kills and {"gank", "roam", "lane"} <= {k["kind"] for k in kills}
+    for k in kills[:40]:
+        assert k["by"] and all(b["puuid"] for b in k["by"])
+        match = service.match(k["match_id"])
+        ours = {p.puuid for p in match.participants if p.team_id == {"blue": 100, "red": 200}[k["side"]]}
+        assert all(b["puuid"] in ours for b in k["by"])
+        assert k["victim"]["name"] not in {p.name for p in match.participants if p.puuid in ours}
+    # mindestens ein eigener Spieler aus dem Kader an den meisten Kills beteiligt
+    assert sum(any(b["puuid"] in own for b in k["by"]) for k in kills) > len(kills) / 2

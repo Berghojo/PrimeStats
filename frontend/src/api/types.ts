@@ -251,11 +251,26 @@ export interface Report {
   trend: TrendPoint[];
   jungle: Jungle;
   deaths: DeathEvent[];
+  kills: KillEvent[];
 }
 
 /** gank = gegnerischer Jungler beteiligt, roam = Laner einer anderen Lane, lane = nur Lane-Gegner,
  *  duel = Jungler nur gegen Jungler, other = ohne Champion (Turm, Minions) */
 export type DeathKind = "gank" | "roam" | "gank_roam" | "lane" | "duel" | "other";
+
+export interface KillEvent {
+  match_id: string;
+  date: string;
+  win: boolean;
+  side: Side;
+  t: number;
+  x: number;
+  y: number;
+  /** aus Sicht der eigenen Beteiligten: lane = 1v1 (Bot: 2v2), gank = eigener Jungler dabei, roam = Laner einer anderen Lane */
+  kind: DeathKind;
+  victim: { position: string; champion_id: number; name: string };
+  by: { puuid: string; position: string; champion_id: number; name: string; killer: boolean }[];
+}
 
 export interface DeathEvent {
   match_id: string;

@@ -10,6 +10,10 @@ describe("panels", () => {
     expect(defaultPanels("scout")).not.toContain("jungle");
   });
 
+  it("maps the old Ganks & Roams panel to kills + deaths", () => {
+    expect(cleanPanels(["overview", "ganks"], "scout")).toEqual(["overview", "kills", "deaths"]);
+  });
+
   it("keeps order, drops unknown and duplicate keys", () => {
     expect(cleanPanels(["games", "jungle", "evil", "overview", "games"], "scout")).toEqual(["games", "overview"]);
   });

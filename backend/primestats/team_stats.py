@@ -180,6 +180,30 @@ def _deaths(rec: GameRecord, out: list) -> None:
         })
 
 
+def _kills(rec: GameRecord, out: list) -> None:
+    """Kills des eigenen Teams: Opfer, beteiligte eigene Spieler und Einordnung aus eigener Sicht
+    (gleiche Regeln wie bei den Toden, nur mit den eigenen Beteiligten)."""
+    tl, match = rec.timeline, rec.match
+    by_pid = {p.participant_id: p for p in match.participants}
+    ours = {p.participant_id for p in rec.us.players}
+    for k in (tl or {}).get("kills", []):
+        victim = by_pid.get(k["victim"])
+        if victim is None or victim.participant_id in ours:
+            continue
+        involved = [by_pid[pid] for pid in dict.fromkeys([k["killer"], *k["assists"]]) if pid in ours]
+        if not involved:
+            continue
+        out.append({
+            "match_id": match.match_id, "date": match.created, "win": rec.win, "side": rec.us.side,
+            "t": k["t"], "x": k["x"], "y": k["y"],
+            "kind": death_kind(victim.position, [p.position for p in involved]),
+            "victim": {"position": victim.position, "champion_id": victim.champion_id, "name": victim.name,
+                       "killer": False},
+            "by": [{"puuid": p.puuid, "position": p.position, "champion_id": p.champion_id, "name": p.name,
+                    "killer": p.participant_id == k["killer"]} for p in involved],
+        })
+
+
 def build_report(team: Team, records: list[GameRecord]) -> dict:
     """Berechnet alle Kennzahlen für die übergebenen (bereits gefilterten) Spiele."""
     records = sorted(records, key=lambda r: r.match.created)
@@ -199,6 +223,7 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
     jungle_paths: list[dict] = []
     jungle_events: list[dict] = []
     deaths: list[dict] = []
+    kills: list[dict] = []
 
     ov = Counter()
     durations = {"win": [], "loss": []}
@@ -249,6 +274,7 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
                     monsters[key]["first_times"].append(ev["t"])
             _jungle(rec, jungle_players, jungle_paths, jungle_events)
             _deaths(rec, deaths)
+            _kills(rec, kills)
 
         trend.append({"match_id": match.match_id, "date": match.created, "win": rec.win,
                       "gd15": gd, "kills": us.kills, "deaths": them.kills})
@@ -395,6 +421,7 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
         "gold_curves": curves,
         "trend": trend,
         "deaths": deaths,
+        "kills": kills,
         "jungle": {"players": sorted(jungle_players.values(), key=lambda p: -p["games"]),
                    "paths": jungle_paths, "events": jungle_events, "path_minutes": PATH_MINUTES},
     }
