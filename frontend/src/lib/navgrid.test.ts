@@ -60,3 +60,16 @@ describe("navgrid", () => {
     expect(minuteIndex.map((i) => path[i])).toEqual(pts);
   });
 });
+
+describe("distanceField", () => {
+  it("reaches every walkable cell and matches the route length roughly", async () => {
+    const { distanceField, cellOf } = await import("./navgrid");
+    const f = distanceField([3800, 6500]);
+    let reached = 0;
+    for (let k = 0; k < f.length; k++) if (WALKABLE[k] && Number.isFinite(f[k])) reached++;
+    expect(reached).toBe(WALKABLE.reduce((a, b) => a + b, 0));
+    const d = f[cellOf([6823, 5508])];
+    const r = length(route([3800, 6500], [6823, 5508]));
+    expect(Math.abs(d - r) / r).toBeLessThan(0.25);
+  });
+});

@@ -8,9 +8,9 @@ from collections import defaultdict
 from .matches import MatchSummary
 
 #: Bei Änderungen am Format der Zusammenfassung erhöhen -> Cache wird neu berechnet
-SUMMARY_VERSION = 2
+SUMMARY_VERSION = 3
 
-RAW_SERIES = ("gold", "current_gold", "xp", "level", "cs", "dmg", "dmg_taken", "kills", "deaths", "assists")
+RAW_SERIES = ("gold", "current_gold", "xp", "level", "cs", "jcs", "dmg", "dmg_taken", "kills", "deaths", "assists")
 
 #: Werte, die auf der Analyse-Seite ausgewählt werden können
 STATS: list[tuple[str, str]] = [
@@ -81,6 +81,7 @@ def summarize_timeline(timeline: dict, match: MatchSummary) -> dict:
             row["xp"].append(pf.get("xp", 0))
             row["level"].append(pf.get("level", 1))
             row["cs"].append(pf.get("minionsKilled", 0) + pf.get("jungleMinionsKilled", 0))
+            row["jcs"].append(pf.get("jungleMinionsKilled", 0))
             row["dmg"].append(dmg.get("totalDamageDoneToChampions", 0))
             row["dmg_taken"].append(dmg.get("totalDamageTaken", 0))
             row["kills"].append(kda[pid][0])

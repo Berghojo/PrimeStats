@@ -282,6 +282,8 @@ export interface JunglePath {
   champion_id: number;
   /** Position je Minute (Kartenkoordinaten), null wenn unbekannt */
   points: ([number, number] | null)[];
+  /** Jungle-CS je Minute – daraus werden die geräumten Camps abgeleitet */
+  jungle_cs: number[];
 }
 
 export interface JungleEvent {

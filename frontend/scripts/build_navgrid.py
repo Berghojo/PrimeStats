@@ -79,10 +79,43 @@ def main() -> None:
                                 queue.append((yy, xx))
                     yield cells
 
-    largest = max(components(grid), key=len)          # nur die zusammenhängende Spielfläche
-    grid = np.zeros_like(grid)
-    for y, x in largest:
-        grid[y, x] = True
+    # Inseln (z.B. Camp-Lichtungen, deren Eingang schmaler als eine Zelle ist) mit der Hauptfläche
+    # verbinden: kürzester Durchbruch durch die Wand. Winzige Inseln (Lichter, Effekte) verwerfen.
+    parts = sorted(components(grid), key=len, reverse=True)
+    main = np.zeros_like(grid)
+    for y, x in parts[0]:
+        main[y, x] = True
+    for cells in parts[1:]:
+        if len(cells) < 6:
+            for y, x in cells:
+                grid[y, x] = False
+            continue
+        prev = {c: None for c in cells}
+        queue = deque(cells)
+        hit = None
+        while queue and hit is None:
+            y, x = queue.popleft()
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                yy, xx = y + dy, x + dx
+                if 0 <= yy < N and 0 <= xx < N and (yy, xx) not in prev:
+                    prev[(yy, xx)] = (y, x)
+                    if main[yy, xx]:
+                        hit = (yy, xx)
+                        break
+                    queue.append((yy, xx))
+        if hit is None or len(prev) > N * N:
+            continue
+        cur = prev[hit]
+        while cur is not None and prev[cur] is not None:   # Durchbruch begehbar machen
+            grid[cur] = True
+            cur = prev[cur]
+        for y, x in cells:
+            main[y, x] = True
+        c = prev[hit]
+        while c is not None:
+            main[c] = True
+            c = prev[c]
+    grid = main
     for cells in list(components(~grid)):             # kleine Wandflecken (Lichter, Effekte) füllen
         if len(cells) < 5:
             for y, x in cells:

@@ -128,7 +128,8 @@ def _jungle(rec: GameRecord, players: dict, paths: list, events: list) -> None:
     base = {"match_id": match.match_id, "win": rec.win, "side": us.side, "puuid": jungler.puuid}
     points = (row.get("path") or [])[:PATH_MINUTES + 1]
     if any(points):
-        paths.append({**base, "date": match.created, "champion_id": jungler.champion_id, "points": points})
+        paths.append({**base, "date": match.created, "champion_id": jungler.champion_id, "points": points,
+                      "jungle_cs": list(row.get("jcs") or [])[:PATH_MINUTES + 1]})
     for k in tl.get("kills", []):
         kind = ("kill" if k["killer"] == pid else "assist" if pid in k["assists"]
                 else "death" if k["victim"] == pid else None)

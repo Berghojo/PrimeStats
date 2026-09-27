@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Jungle, JungleEvent, JunglePath, Side } from "../../api/types";
-import { dt } from "../../lib/format";
+import { dt, duration } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
+import { type Clear, reconstruct } from "../../lib/jungleRoute";
 import { type Point, interpolate, wallRects } from "../../lib/navgrid";
 import { InfoTip } from "../InfoTip";
 
@@ -235,6 +236,17 @@ function HeatView({ events, games, walls }: { events: JungleEvent[]; games: numb
   );
 }
 
+/** Route eines Spiels: mit Jungle-CS über die geräumten Camps, sonst direkt zwischen den Minutenpositionen */
+function buildRoute(p: JunglePath, minutes: number, realistic: boolean) {
+  const minutePts = p.points.slice(0, minutes + 1).map((pt, m) => (m >= 1 && pt ? (pt as Point) : null));
+  if (realistic && p.jungle_cs?.length) {
+    const r = reconstruct(p.points as (Point | null)[], p.jungle_cs, minutes, 1, true, p.side);
+    return { line: r.path, minutePts, clears: r.clears };
+  }
+  const pts = minutePts.filter((pt): pt is Point => !!pt);
+  return { line: realistic ? interpolate(pts).path : pts, minutePts, clears: [] as Clear[] };
+}
+
 function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinutes: number; walls: boolean }) {
   const { champion } = useGameData();
   const [minutes, setMinutes] = useState(Math.min(6, maxMinutes));
@@ -243,15 +255,24 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
   const [hover, setHover] = useState<string | null>(null);
   const shown = paths.filter((p) => side === "all" || p.side === side);
   const hovered = shown.find((p) => p.match_id === hover);
-
-  const starts = useMemo(() => {
+  const routes = useMemo(
+    () => new Map(shown.map((p) => [p.match_id, buildRoute(p, minutes, realistic)])),
+    [shown, minutes, realistic],
+  );
+  // Startroute unabhängig vom Regler: die ersten drei geräumten Camps (volle Pfadlänge)
+  const openings = useMemo(() => {
     const counts = new Map<string, number>();
     for (const p of shown) {
+      const clears = p.jungle_cs?.length ? reconstruct(p.points as (Point | null)[], p.jungle_cs, maxMinutes, 1, false, p.side).clears : [];
       const first = p.points[1];
-      if (first) counts.set(nearestCamp(first, p.side), (counts.get(nearestCamp(first, p.side)) ?? 0) + 1);
+      const key = clears.length
+        ? clears.slice(0, 3).map((c) => c.camp.name).join(" → ")
+        : first ? nearestCamp(first, p.side) : "";
+      if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  }, [shown]);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  }, [shown, maxMinutes]);
+  const hoveredRoute = hovered ? routes.get(hovered.match_id) : undefined;
 
   return (
     <div className="jungle-grid">
@@ -266,30 +287,40 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
         <div className="row small">
           <label className="check">
             <input type="checkbox" checked={realistic} onChange={(e) => setRealistic(e.target.checked)} />
-            <span>Realistische Laufwege (kürzester begehbarer Weg)</span>
+            <span>Realistische Laufwege (über die laut CS geräumten Camps)</span>
           </label>
+          <InfoTip>
+            Aus dem Anstieg der Jungle-CS zwischen zwei Minuten ergibt sich die Zahl der geräumten Camps (4 CS je Camp).
+            Gewählt werden die Camps, die zu der Zeit stehen (Spawn 1:30, Scuttle 3:30, Respawn 2:15 bzw. 5:00 bei den
+            Buffs) und den kürzesten begehbaren Weg zwischen den beiden Positionen ergeben. Eine Schätzung – nicht
+            aufgezeichnet sind nur die Minutenpositionen und die CS.
+          </InfoTip>
         </div>
         <div className="map">
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer" onMouseLeave={() => setHover(null)}>
             <MapBase walls={walls} />
             {shown.map((p) => {
-              // ab Minute 1: der Weg aus dem Brunnen würde die eigentliche Route überdecken
-              const pts = p.points.slice(1, minutes + 1).filter((pt): pt is [number, number] => !!pt);
-              const line = (realistic ? interpolate(pts as Point[]).path : pts)
-                .map(([x, y]) => `${px(x)},${py(y)}`).join(" ");
+              const r = routes.get(p.match_id)!;
+              const line = r.line.map(([x, y]) => `${px(x)},${py(y)}`).join(" ");
               const dim = hover && hover !== p.match_id;
+              const last = r.minutePts.reduce((n, pt, i) => (pt ? i : n), 0);
               return (
                 <g key={p.match_id} opacity={dim ? 0.12 : hover ? 1 : 0.6} onMouseEnter={() => setHover(p.match_id)}
                   style={{ cursor: "pointer" }}>
                   <polyline points={line} fill="none" stroke="transparent" strokeWidth={12} />
                   <polyline points={line} fill="none"
                     stroke={SIDE_COLOR[p.side]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-                  {pts.map(([x, y], i) => (
-                    <circle key={i} cx={px(x)} cy={py(y)} r={i === pts.length - 1 ? 5 : 3}
+                  {r.clears.map((c) => (
+                    <rect key={`c${c.order}`} x={px(c.camp.pos[0]) - 4} y={py(c.camp.pos[1]) - 4} width={8} height={8}
+                      transform={`rotate(45 ${px(c.camp.pos[0])} ${py(c.camp.pos[1])})`}
+                      className="camp-mark" />
+                  ))}
+                  {r.minutePts.map((pt, i) => pt && (
+                    <circle key={i} cx={px(pt[0])} cy={py(pt[1])} r={i === last ? 5 : 3}
                       fill={SIDE_COLOR[p.side]} stroke="#07090d" strokeWidth={2} />
                   ))}
-                  {hover === p.match_id && pts.map(([x, y], i) => (
-                    <text key={`t${i}`} x={px(x) + 7} y={py(y) - 6} className="map-label">{i + 1}</text>
+                  {hover === p.match_id && r.minutePts.map((pt, i) => pt && (
+                    <text key={`t${i}`} x={px(pt[0]) + 7} y={py(pt[1]) - 6} className="map-label">{i}</text>
                   ))}
                 </g>
               );
@@ -297,9 +328,15 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
           </svg>
         </div>
         <div className="muted small">
-          {hovered
-            ? <>{dt(hovered.date)} · {champion(hovered.champion_id).name} · {hovered.side === "blue" ? "Blau" : "Rot"} · {hovered.win ? "Sieg" : "Niederlage"}</>
-            : <>Position je Minute; Linie überfahren für Details (Zahlen = Minute).</>}
+          {hovered ? (
+            <>
+              {dt(hovered.date)} · {champion(hovered.champion_id).name} · {hovered.side === "blue" ? "Blau" : "Rot"} ·{" "}
+              {hovered.win ? "Sieg" : "Niederlage"}
+              {!!hoveredRoute?.clears.length && (
+                <><br />Camps: {hoveredRoute.clears.map((c) => `${c.camp.name} (~${duration(c.t)})`).join(" → ")}</>
+              )}
+            </>
+          ) : <>Punkte = Position je Minute (Zahl = Minute), Rauten = geräumte Camps. Linie überfahren für Details.</>}
         </div>
       </div>
       <div className="stack">
@@ -308,12 +345,12 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
           <span className="legend-dot" style={{ background: SIDE_COLOR.red }} /> Rote Seite
         </div>
         <table className="data">
-          <thead><tr><th className="left">Start (Minute 1)</th><th>Spiele</th><th>Anteil</th></tr></thead>
+          <thead><tr><th className="left">Startroute (erste 3 Camps)</th><th>Spiele</th><th>Anteil</th></tr></thead>
           <tbody>
-            {starts.map(([name, n]) => (
-              <tr key={name}><td className="left">{name}</td><td>{n}</td><td>{Math.round((n / shown.length) * 100)}%</td></tr>
+            {openings.map(([name, n]) => (
+              <tr key={name}><td className="left wrap">{name}</td><td>{n}</td><td>{Math.round((n / shown.length) * 100)}%</td></tr>
             ))}
-            {!starts.length && <tr><td className="left muted" colSpan={3}>Keine Positionsdaten.</td></tr>}
+            {!openings.length && <tr><td className="left muted" colSpan={3}>Keine Positionsdaten.</td></tr>}
           </tbody>
         </table>
       </div>

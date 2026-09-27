@@ -83,6 +83,19 @@ def _clamp(v: float) -> int:
     return int(max(300, min(_MAP - 300, v)))
 
 
+#: CS je Jungle-Camp (Demo; im Frontend dieselbe Annahme)
+CAMP_CS = 4
+
+
+def demo_jungle_cs(match_id: str, pid: int, team_id: int, minute: int) -> int:
+    """Jungle-CS passend zur Demo-Route: Minute m steht der Jungler am Camp 2m-2, alle davor sind geräumt."""
+    route_rng = random.Random(f"{match_id}:{pid}")
+    route = route_rng.choice(_ROUTES)
+    cleared = min(len(route), max(0, 2 * minute - 2))
+    extra = sum(random.Random(f"{match_id}:{pid}:cs{m}").randint(0, 2) for m in range(len(route) // 2 + 2, minute + 1))
+    return CAMP_CS * (cleared + extra)
+
+
 def demo_position(match_id: str, pid: int, team_id: int, pos: str, minute: int) -> dict:
     """Plausible Position: Junglers laufen früh ihre Camps ab und ganken dann, alle anderen stehen auf Lane."""
     rng = random.Random(f"{match_id}:{pid}:{minute}")
@@ -342,7 +355,7 @@ class DemoSource:
                     "xp": int(max(0, xp)),
                     "level": _level(max(0, xp)),
                     "minionsKilled": int(max(0, cs * (0.25 if pos == "JUNGLE" else 1))),
-                    "jungleMinionsKilled": int(max(0, cs * 0.75)) if pos == "JUNGLE" else 0,
+                    "jungleMinionsKilled": demo_jungle_cs(match_id, pid, team_id, t) if pos == "JUNGLE" else 0,
                     "damageStats": {"totalDamageDoneToChampions": int(max(0, dmg)),
                                     "totalDamageTaken": int(max(0, dmg * rng.uniform(0.8, 1.4)))},
                     "position": {"x": rng.randint(500, 14000), "y": rng.randint(500, 14000)},

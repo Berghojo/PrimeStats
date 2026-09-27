@@ -370,6 +370,8 @@ class JunglePath(BaseModel):
     champion_id: int
     #: Position je Minute (Kartenkoordinaten 0–15000), None wenn unbekannt
     points: list[list[int] | None]
+    #: Jungle-CS je Minute (jungleMinionsKilled) – daraus lassen sich geräumte Camps ableiten
+    jungle_cs: list[int] = []
 
 
 class JungleEvent(BaseModel):

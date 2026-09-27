@@ -192,6 +192,65 @@ export function interpolate(points: Point[]): { path: Point[]; minuteIndex: numb
   return { path, minuteIndex };
 }
 
+/** Zelle zu einer Position (auf die nächste begehbare Zelle gesetzt) */
+export const cellOf = (p: Point) => nearestWalkable(row(p[1]) * N + col(p[0]));
+
+/**
+ * Laufdistanz (Spieleinheiten) von einem Punkt zu jeder Zelle der Karte (Dijkstra, 8 Nachbarn).
+ * Für feste Orte wie Camps einmal berechnen und wiederverwenden.
+ */
+export function distanceField(from: Point): Float64Array {
+  const dist = new Float64Array(N * N).fill(Infinity);
+  const start = cellOf(from);
+  const unit = (CW + CH) / 2;
+  dist[start] = 0;
+  const open = new Heap();
+  open.push([0, start]);
+  while (open.size) {
+    const [d, cur] = open.pop();
+    if (d > dist[cur]) continue;
+    const r = Math.floor(cur / N), c = cur % N;
+    for (const [dr, dc, cost] of DIRS) {
+      const rr = r + dr, cc = c + dc;
+      if (rr < 0 || rr >= N || cc < 0 || cc >= N) continue;
+      const next = rr * N + cc;
+      if (!WALKABLE[next]) continue;
+      if (dr && dc && (!WALKABLE[r * N + cc] || !WALKABLE[rr * N + c])) continue;
+      const nd = d + cost * unit;
+      if (nd < dist[next]) {
+        dist[next] = nd;
+        open.push([nd, next]);
+      }
+    }
+  }
+  return dist;
+}
+
+/**
+ * Weg von ``from`` zum Ursprung eines Distanzfelds (dem Feld absteigend folgen) – ohne neue Suche.
+ * Liefert [from, …Zwischenpunkte, to]; ``to`` ist der Ort, für den das Feld berechnet wurde.
+ */
+export function traceField(field: Float64Array, from: Point, to: Point): Point[] {
+  let cur = cellOf(from);
+  if (!Number.isFinite(field[cur])) return route(from, to);
+  const cells = [cur];
+  for (let guard = 0; field[cur] > 0 && guard < N * N; guard++) {
+    const r = Math.floor(cur / N), c = cur % N;
+    let best = cur;
+    for (const [dr, dc] of DIRS) {
+      const rr = r + dr, cc = c + dc;
+      if (rr < 0 || rr >= N || cc < 0 || cc >= N) continue;
+      const next = rr * N + cc;
+      if (dr && dc && (!WALKABLE[r * N + cc] || !WALKABLE[rr * N + c])) continue;
+      if (field[next] < field[best]) best = next;
+    }
+    if (best === cur) break;
+    cur = best;
+    cells.push(cur);
+  }
+  return [from, ...smooth(cells).slice(1, -1).map(center), to];
+}
+
 /** Wandflächen als Rechtecke (je Zeile zusammengefasste Zellen) in Spielkoordinaten: [x0, y0, x1, y1]. */
 export function wallRects(): [number, number, number, number][] {
   const out: [number, number, number, number][] = [];

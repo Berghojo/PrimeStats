@@ -412,3 +412,4 @@ path.walls.outline { fill: rgba(255, 194, 61, .22); stroke: none; opacity: 1; }
   box-shadow: var(--shadow); color: var(--text);
   font: 400 13px/1.45 var(--font); font-style: normal; text-transform: none; letter-spacing: 0; white-space: normal;
 }
+.camp-mark { fill: #ffc23d; stroke: #07090d; stroke-width: 1.5; }
