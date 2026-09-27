@@ -40,13 +40,15 @@ def start_scout(body: ScoutIn, request: Request, service: Service):
     if errors:
         raise HTTPException(422, {"message": "Spieler konnten nicht gefunden werden.", "errors": errors})
     accounts = list({a["puuid"]: a for a in accounts}.values())
-    key = scout_key([a["puuid"] for a in accounts])
+    mode = body.mode if len(accounts) > 1 else "all"
+    key = scout_key([a["puuid"] for a in accounts], mode)
     running = service.jobs.get(_job_key(key))
     if not (running and running.status == "running"):
         scout_limit.check(client_ip(request))
-    job = service.jobs.run(_job_key(key), lambda j: service.scout(accounts, j))
+    job = service.jobs.run(_job_key(key), lambda j: service.scout(accounts, j, mode=mode))
     return ScoutStartOut(
         key=key,
+        mode=mode,
         players=[ScoutPlayer(puuid=a["puuid"], game_name=a["gameName"], tag_line=a["tagLine"]) for a in accounts],
         job=SyncJobOut.model_validate(job),
     )
@@ -80,6 +82,7 @@ def scout_report(key: str, service: Service, filters: Annotated[Filters, Query()
     job = service.jobs.get(_job_key(key))
     return ScoutReportOut(
         key=key,
+        mode=scout["mode"],
         players=[ScoutPlayer(**p) for p in scout["players"]],
         roster=[RosterPlayer(**r) for r in roster],
         updated_at=scout["updated_at"],

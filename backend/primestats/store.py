@@ -406,8 +406,9 @@ class Store:
             return set(s.scalars(select(TeamGameRow.team_id).where(TeamGameRow.match_id == match_id)))
 
     # --------------------------------------------------------------- Scouting
-    def put_scout(self, key: str, players: list[dict], roster: list[dict], games: list[tuple[str, int]]) -> None:
-        values = {"players": players, "roster": roster, "games": [list(g) for g in games],
+    def put_scout(self, key: str, players: list[dict], roster: list[dict], games: list[tuple[str, int]],
+                  mode: str = "all") -> None:
+        values = {"players": players, "mode": mode, "roster": roster, "games": [list(g) for g in games],
                   "updated_at": datetime.now(timezone.utc)}
         stmt = insert(Scout).values(key=key, **values).on_conflict_do_update(index_elements=[Scout.key], set_=values)
         with self.session() as s:
@@ -418,11 +419,11 @@ class Store:
             row = s.get(Scout, key)
             if row is None:
                 return None
-            return {"key": row.key, "players": row.players, "roster": row.roster,
+            return {"key": row.key, "players": row.players, "mode": row.mode, "roster": row.roster,
                     "games": [tuple(g) for g in row.games], "updated_at": row.updated_at}
 
     def recent_scouts(self, limit: int = 10) -> list[dict]:
         with self.session() as s:
             rows = s.scalars(select(Scout).order_by(Scout.updated_at.desc()).limit(limit))
-            return [{"key": r.key, "players": r.players, "roster": r.roster, "games": len(r.games),
+            return [{"key": r.key, "players": r.players, "mode": r.mode, "roster": r.roster, "games": len(r.games),
                      "updated_at": r.updated_at} for r in rows]

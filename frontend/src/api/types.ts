@@ -309,8 +309,12 @@ export interface ScoutPlayer { puuid: string; game_name: string; tag_line: strin
 
 export interface RosterPlayer extends ScoutPlayer { games: number; position: string; searched: boolean }
 
+/** "all" = alle gesuchten Spieler im selben Team, "any" = mindestens einer spielt mit */
+export type ScoutMode = "all" | "any";
+
 export interface ScoutSummary {
   key: string;
+  mode: ScoutMode;
   players: ScoutPlayer[];
   roster: RosterPlayer[];
   games: number;
@@ -319,6 +323,7 @@ export interface ScoutSummary {
 
 export interface ScoutReport {
   key: string;
+  mode: ScoutMode;
   players: ScoutPlayer[];
   roster: RosterPlayer[];
   updated_at: string;

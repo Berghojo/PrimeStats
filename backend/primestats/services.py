@@ -13,7 +13,8 @@ from . import lcu
 from .matches import MatchSummary, parse_match
 from .riot import MatchSource, NotFound, RiotAPIError, split_riot_id
 from .store import Member, Store, Team
-from .team_stats import GameRecord, default_label, match_side_for_team, roster_from_games, together_side
+from .team_stats import (GameRecord, any_side, default_label, match_side_for_team, roster_from_games,
+                         together_side)
 from .timeline import SUMMARY_VERSION, summarize_timeline
 
 log = logging.getLogger(__name__)
@@ -304,12 +305,14 @@ class PrimeStats:
 
 
     # ------------------------------------------------------------ Scouting
-    def scout(self, accounts: list[dict], progress: "SyncJob", depth: int = SCOUT_MATCH_COUNT,
+    def scout(self, accounts: list[dict], progress: "SyncJob", mode: str = "all", depth: int = SCOUT_MATCH_COUNT,
               timelines: int = SCOUT_TIMELINES) -> str:
         """Turnier-Scouting für einen oder mehrere Spieler.
 
-        Ein Spiel zählt nur, wenn **alle** gesuchten Spieler darin im selben Team standen – bei einem
-        einzelnen Spieler also alle seiner Turnierspiele. Die übrigen Spieler dieses Teams werden als
+        ``mode="all"``: Ein Spiel zählt nur, wenn **alle** gesuchten Spieler darin im selben Team standen.
+        ``mode="any"``: Jedes Spiel, in dem **mindestens einer** der gesuchten Spieler mitspielte; gewertet
+        wird dessen Team (bei Spielern auf beiden Seiten das mit den meisten gesuchten Spielern).
+        Bei einem einzelnen Spieler sind beide Modi gleich. Die übrigen Spieler des Teams werden als
         Mitspieler ausgewiesen. Nutzt ausschließlich öffentliche Riot-API-Daten (keine Scrims).
         Liefert den Schlüssel des gespeicherten Ergebnisses.
         """
@@ -318,13 +321,17 @@ class PrimeStats:
         puuids = [a["puuid"] for a in accounts]
         names = ", ".join(f"{a['gameName']}#{a['tagLine']}" for a in accounts)
 
-        # nur Match-IDs, die in den Listen aller gesuchten Spieler vorkommen, werden abgerufen
-        common: set[str] | None = None
+        # "all": nur Match-IDs aus den Listen aller Spieler abrufen; "any": alle
+        selected: set[str] | None = None
         for i, acc in enumerate(accounts, 1):
             progress.update(f"Lade Turnierspiele von {acc['gameName']} …", i - 1, len(accounts))
             ids = set(self.custom_match_ids(acc["puuid"], depth))
-            common = ids if common is None else common & ids
-        candidates = sorted(common or set(), key=_match_sort_key, reverse=True)
+            if selected is None:
+                selected = ids
+            else:
+                selected = selected & ids if mode == "all" else selected | ids
+        candidates = sorted(selected or set(), key=_match_sort_key, reverse=True)
+        pick_side = together_side if mode == "all" else any_side
 
         games: list[tuple[str, int]] = []
         for i, mid in enumerate(candidates, 1):
@@ -332,12 +339,12 @@ class PrimeStats:
             match = self.match(mid)
             if match.private or not match.is_custom:
                 continue
-            side = together_side(match, puuids)
+            side = pick_side(match, puuids)
             if side is not None:
                 games.append((mid, side))
         if not games:
-            if len(accounts) == 1:
-                raise RiotAPIError(404, f"{names} hat keine Turnierspiele.")
+            if len(accounts) == 1 or mode == "any":
+                raise RiotAPIError(404, f"{names}: keine Turnierspiele gefunden.")
             raise RiotAPIError(404, f"Keine Turnierspiele, in denen {names} im selben Team standen.")
 
         recent = [mid for mid, _ in games][:timelines]
@@ -352,8 +359,8 @@ class PrimeStats:
 
         roster = roster_from_games([(self.match(mid), side) for mid, side in games], puuids)
         players = [{"puuid": a["puuid"], "game_name": a["gameName"], "tag_line": a["tagLine"]} for a in accounts]
-        key = scout_key(puuids)
-        self.store.put_scout(key, players, roster, games)
+        key = scout_key(puuids, mode)
+        self.store.put_scout(key, players, roster, games, mode)
         progress.new_games = len(games)
         progress.done_message = f"Fertig – {len(games)} Turnierspiele gefunden."
         return key
@@ -363,9 +370,12 @@ class PrimeStats:
                 if not r.match.private]
 
 
-def scout_key(puuids: list[str]) -> str:
-    """Stabiler Schlüssel für eine Spielerkombination (Reihenfolge egal)."""
-    return hashlib.sha1("|".join(sorted(set(puuids))).encode()).hexdigest()
+def scout_key(puuids: list[str], mode: str = "all") -> str:
+    """Stabiler Schlüssel für Spielerkombination + Modus (Reihenfolge egal; bei einem Spieler ist der
+    Modus bedeutungslos)."""
+    unique = sorted(set(puuids))
+    mode = "all" if len(unique) == 1 else mode
+    return hashlib.sha1(("|".join(unique) + ("" if mode == "all" else "|any")).encode()).hexdigest()
 
 
 def _match_sort_key(match_id: str) -> int:

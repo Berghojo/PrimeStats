@@ -160,6 +160,8 @@ class Scout(Base):
     key: Mapped[str] = mapped_column(String(40), primary_key=True)
     #: gesuchte Spieler [{puuid, game_name, tag_line}]
     players: Mapped[list] = mapped_column(JSONB)
+    #: "all" = alle gesuchten Spieler im selben Team, "any" = mindestens einer spielt mit
+    mode: Mapped[str] = mapped_column(String(8), default="all")
     #: alle Spieler, die in diesen Spielen im Team standen (gesuchte zuerst)
     roster: Mapped[list] = mapped_column(JSONB)
     #: [[match_id, side], ...]

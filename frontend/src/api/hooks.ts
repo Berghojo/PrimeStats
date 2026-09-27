@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api } from "./client";
 import type {
-  Analysis, Filters, Label, LinkCode, Match, Me, Meta, PlayerGames, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
+  Analysis, Filters, Label, LinkCode, Match, Me, Meta, PlayerGames, ScoutMode, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
   Team, TeamInput, TeamReport,
 } from "./types";
 
@@ -154,9 +154,9 @@ export const useScoutStatus = (key: string, enabled: boolean) =>
 export function useStartScout() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (riotIds: string[]) =>
-      api<{ key: string; players: ScoutPlayer[]; job: SyncJob }>("/scout", {
-        method: "POST", body: JSON.stringify({ riot_ids: riotIds }),
+    mutationFn: ({ riotIds, mode = "all" }: { riotIds: string[]; mode?: ScoutMode }) =>
+      api<{ key: string; mode: ScoutMode; players: ScoutPlayer[]; job: SyncJob }>("/scout", {
+        method: "POST", body: JSON.stringify({ riot_ids: riotIds, mode }),
       }),
     onSuccess: (res) => qc.setQueryData(["scout", res.key, "status"], res.job),
   });

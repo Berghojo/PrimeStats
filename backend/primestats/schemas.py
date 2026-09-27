@@ -501,6 +501,8 @@ class ImportOut(BaseModel):
 # ------------------------------------------------------------ Scouting
 class ScoutIn(BaseModel):
     riot_ids: list[str] = Field(min_length=1, max_length=5)
+    #: "all" = alle im selben Team, "any" = mindestens einer der Spieler spielt mit
+    mode: Literal["all", "any"] = "all"
 
     @field_validator("riot_ids")
     @classmethod
@@ -519,6 +521,7 @@ class ScoutPlayer(BaseModel):
 
 class ScoutStartOut(BaseModel):
     key: str
+    mode: str
     players: list[ScoutPlayer]
     job: SyncJobOut
 
@@ -534,6 +537,7 @@ class RosterPlayer(BaseModel):
 
 class ScoutSummary(BaseModel):
     key: str
+    mode: str
     players: list[ScoutPlayer]
     roster: list[RosterPlayer]
     games: int
@@ -542,6 +546,7 @@ class ScoutSummary(BaseModel):
 
 class ScoutReportOut(BaseModel):
     key: str
+    mode: str
     players: list[ScoutPlayer]
     roster: list[RosterPlayer]
     updated_at: datetime

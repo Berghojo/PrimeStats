@@ -47,9 +47,15 @@ Im Demo-Modus z.B. nach `NLE Polaris#EUW` suchen oder ein Team mit
 ## Turnier-Scouting
 
 Unter **Scouting** (oder „Team scouten“ auf einer Spielerseite) gibt man **einen oder mehrere Spieler** ein
-(bis zu 5). Ausgewertet werden alle Turniercode-Spiele (Prime League), in denen **alle eingegebenen Spieler im
-selben Team** standen – bei einem Spieler also alle seine Turnierspiele, bei mehreren nur die Spiele dieses
-Lineups. Die übrigen Spieler dieser Spiele werden als Mitspieler angezeigt.
+(bis zu 5) und wertet deren Turniercode-Spiele (Prime League) aus. Bei mehreren Spielern wählt man:
+
+- **Alle im selben Team** – nur Spiele, in denen alle gewählten Spieler zusammen in einem Team standen
+  (z.B. um das aktuelle Lineup eines Gegners einzugrenzen).
+- **Mindestens einer** – alle Spiele, in denen einer der gewählten Spieler mitspielte; gewertet wird dessen
+  Team. Stehen gewählte Spieler auf beiden Seiten, zählt die Seite mit mehr gewählten Spielern (bei
+  Gleichstand die des zuerst eingegebenen).
+
+Die übrigen Spieler dieser Spiele werden als Mitspieler angezeigt.
 
 Der Report enthält Winrate je Seite, Objectives, Goldverlauf, Spielerwerte, Champion-Pools, die
 Champion-Pick-Tabelle, Picks & Bans und die Spielliste. Scouting ist für alle offen (auch ohne Konto), nutzt
@@ -249,7 +255,7 @@ frontend/
 | DELETE | `/api/me/riot/{puuid}` | Verknüpfung lösen |
 | POST | `/api/uploader/status`, `/api/uploader/link` | Uploader: Verknüpfung prüfen / per Code herstellen |
 | POST | `/api/uploader/known`, `/api/uploader/games` | Uploader: bekannte Match-IDs abfragen / Spiele hochladen |
-| POST | `/api/scout` | Scouting starten (`riot_ids`: 1–5 Spieler, die im selben Team stehen müssen) |
+| POST | `/api/scout` | Scouting starten (`riot_ids`: 1–5 Spieler, `mode`: `all` = alle im selben Team, `any` = mindestens einer) |
 | GET | `/api/scout`, `/api/scout/{key}`, `/api/scout/{key}/status` | Letzte Scoutings, Report (mit Filtern), Fortschritt |
 
 Die vollständige, interaktive Doku gibt es unter `/docs` (OpenAPI).

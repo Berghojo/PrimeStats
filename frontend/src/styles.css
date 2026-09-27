@@ -285,3 +285,6 @@ table.data input.opponent { padding: .2rem .45rem; width: 150px; font-size: .85r
 .scout-form .row { flex-wrap: nowrap; }
 .scout-form .input { flex: 1; }
 table.data td.wrap { white-space: normal; min-width: 180px; max-width: 320px; font-size: .82rem; }
+.mode-select { border: 1px solid var(--border); border-radius: 10px; padding: .6rem .8rem; margin: 0; display: grid; gap: .4rem; text-align: left; }
+.mode-select legend { padding: 0 .3rem; }
+.mode-select .check input { accent-color: var(--accent); }

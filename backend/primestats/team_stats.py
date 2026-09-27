@@ -384,6 +384,22 @@ def together_side(match: MatchSummary, puuids: list[str]) -> int | None:
     return sides.pop() if len(sides) == 1 else None
 
 
+def any_side(match: MatchSummary, puuids: list[str]) -> int | None:
+    """teamId des Teams mit den meisten gesuchten Spielern (mindestens einer); bei Gleichstand zählt
+    die Seite des zuerst genannten anwesenden Spielers."""
+    counts: Counter = Counter()
+    first: int | None = None
+    for puuid in puuids:
+        team = match.team_of(puuid)
+        if team is not None:
+            counts[team.team_id] += 1
+            first = team.team_id if first is None else first
+    if not counts:
+        return None
+    best = max(counts.values())
+    return first if counts[first] == best else next(t for t, c in counts.items() if c == best)
+
+
 def roster_from_games(games: list[tuple[MatchSummary, int]], searched: list[str]) -> list[dict]:
     """Alle Spieler, die in diesen Spielen im Team standen – gesuchte Spieler zuerst, dann nach Häufigkeit."""
     counts: Counter = Counter()
@@ -410,5 +426,5 @@ def patches(records: list[GameRecord]) -> list[str]:
 
 __all__ = [
     "GameRecord", "LABELS", "build_report", "history_rows", "filter_records", "match_side_for_team",
-    "default_label", "patches", "roster_from_games", "together_side",
+    "any_side", "default_label", "patches", "roster_from_games", "together_side",
 ]

@@ -8,7 +8,7 @@ import { ReportBody, useUrlFilters } from "../components/team/ReportBody";
 import { ErrorBox, Loading, Spinner } from "../components/ui";
 import { ago } from "../lib/format";
 import { useGameData } from "../lib/meta";
-import { scoutTitle } from "./ScoutPage";
+import { MODE_TEXT, scoutTitle } from "./ScoutPage";
 
 export function ScoutReportPage() {
   const { key = "" } = useParams();
@@ -53,7 +53,7 @@ export function ScoutReportPage() {
   }
 
   const data = report.data;
-  const refresh = () => restart.mutate(data.players.map((p) => `${p.game_name}#${p.tag_line}`));
+  const refresh = () => restart.mutate({ riotIds: data.players.map((p) => `${p.game_name}#${p.tag_line}`), mode: data.mode });
   const multiple = data.players.length > 1;
 
   return (
@@ -63,9 +63,9 @@ export function ScoutReportPage() {
           <div className="team-head">
             <div className="team-logo">{data.players[0].game_name.slice(0, 2).toUpperCase()}</div>
             <div>
-              <h1>{scoutTitle(data.players)} <span className="badge accent">Scouting</span></h1>
+              <h1>{scoutTitle(data.players, data.mode)} <span className="badge accent">Scouting</span></h1>
               <div className="muted small">
-                {multiple ? "Turnierspiele, in denen alle gesuchten Spieler im selben Team standen" : "Alle Turnierspiele des Spielers"}
+                {multiple ? MODE_TEXT[data.mode] : "Alle Turnierspiele des Spielers"}
                 {" "}· aktualisiert {ago(data.updated_at)}
               </div>
               <div className="row small" style={{ marginTop: ".4rem" }}>

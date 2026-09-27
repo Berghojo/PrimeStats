@@ -30,7 +30,7 @@ export function PlayerPage() {
         <div className="row">
         <button className="btn" type="button" disabled={scout.isPending}
           title="Team-Statistiken aus allen Turnierspielen dieses Spielers"
-          onClick={() => scout.mutate([`${account.game_name}#${account.tag_line}`],
+          onClick={() => scout.mutate({ riotIds: [`${account.game_name}#${account.tag_line}`] },
             { onSuccess: (res) => navigate(`/scout/${res.key}`) })}>
           Team scouten →
         </button>
