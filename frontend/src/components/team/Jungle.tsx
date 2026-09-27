@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import type { Jungle, JungleEvent, JunglePath, Side } from "../../api/types";
 import { dt } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
-import { type Point, WALLS, edges, interpolate } from "../../lib/rift";
+import { type Point, interpolate, wallRects } from "../../lib/navgrid";
 import { InfoTip } from "../InfoTip";
 
 /** Kartengröße in Spielkoordinaten (Summoner's Rift, Ursprung unten links) */
@@ -61,21 +61,21 @@ export function zone(x: number, y: number, side: Side): string {
 const ZONES = ["Toplane", "Midlane", "Botlane", "Fluss", "Eigener Jungle", "Gegnerischer Jungle", "Basis"];
 
 /** Summoner's Rift als schlichte Vektorgrafik – Hintergrund, falls das Kartenbild nicht lädt. */
+/** Wände aus dem Raster als ein SVG-Pfad (Pixelkoordinaten) */
+const WALL_PATH = wallRects()
+  .map(([x0, y0, x1, y1]) => `M${px(x0).toFixed(1)} ${py(y1).toFixed(1)}H${px(x1).toFixed(1)}V${py(y0).toFixed(1)}H${px(x0).toFixed(1)}Z`)
+  .join("");
+
 export function MapBase(_: { walls?: boolean }) {
   const { mapUrl } = useGameData();
   const { walls, calibrate, imageOpacity, onImage } = useContext(MapContext);
   const [failed, setFailed] = useState(false);
   return (
     <>
-      <rect width={SIZE} height={SIZE} fill="#0e1a16" />
-      <path d={`M0 0 L${SIZE} ${SIZE}`} stroke="#12303a" strokeWidth={34} />
-      <g fill="none" stroke="#24302c" strokeWidth={14} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M38 474 L38 38 L474 38" />
-        <path d="M38 474 L474 474 L474 38" />
-        <path d="M38 474 L474 38" />
-      </g>
-      <circle cx={34} cy={478} r={30} fill="#16233d" />
-      <circle cx={478} cy={34} r={30} fill="#3a1820" />
+      <rect width={SIZE} height={SIZE} fill="#1d2823" />
+      <path d={`M0 0 L${SIZE} ${SIZE}`} stroke="#15394a" strokeWidth={40} />
+      <circle cx={px(700)} cy={py(700)} r={48} fill="#1c2a40" />
+      <circle cx={px(14170)} cy={py(14280)} r={48} fill="#3a1d27" />
       {mapUrl && !failed && (
         <image href={mapUrl} width={SIZE} height={SIZE} opacity={imageOpacity}
           onLoad={() => onImage("ok")}
@@ -84,11 +84,7 @@ export function MapBase(_: { walls?: boolean }) {
             onImage("failed");
           }} />
       )}
-      {(walls || calibrate) && (
-        <g className={calibrate ? "walls outline" : "walls"}>
-          {WALLS.map((w, i) => <polygon key={i} points={w.map(([x, y]) => `${px(x)},${py(y)}`).join(" ")} />)}
-        </g>
-      )}
+      {(walls || calibrate) && <path className={calibrate ? "walls outline" : "walls"} d={WALL_PATH} />}
     </>
   );
 }
@@ -239,14 +235,11 @@ function HeatView({ events, games, walls }: { events: JungleEvent[]; games: numb
   );
 }
 
-const netEdges = edges();
-
 function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinutes: number; walls: boolean }) {
   const { champion } = useGameData();
   const [minutes, setMinutes] = useState(Math.min(6, maxMinutes));
   const [side, setSide] = useState<"all" | Side>("all");
   const [realistic, setRealistic] = useState(true);
-  const [showNet, setShowNet] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
   const shown = paths.filter((p) => side === "all" || p.side === side);
   const hovered = shown.find((p) => p.match_id === hover);
@@ -273,21 +266,12 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
         <div className="row small">
           <label className="check">
             <input type="checkbox" checked={realistic} onChange={(e) => setRealistic(e.target.checked)} />
-            <span>Realistische Laufwege (kürzester Weg durch Jungle und Fluss)</span>
-          </label>
-          <label className="check">
-            <input type="checkbox" checked={showNet} onChange={(e) => setShowNet(e.target.checked)} />
-            <span>Wegenetz einblenden</span>
+            <span>Realistische Laufwege (kürzester begehbarer Weg)</span>
           </label>
         </div>
         <div className="map">
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer" onMouseLeave={() => setHover(null)}>
             <MapBase walls={walls} />
-            {showNet && (
-              <g className="nav-net">
-                {netEdges.map(([a, b], i) => <line key={i} x1={px(a[0])} y1={py(a[1])} x2={px(b[0])} y2={py(b[1])} />)}
-              </g>
-            )}
             {shown.map((p) => {
               // ab Minute 1: der Weg aus dem Brunnen würde die eigentliche Route überdecken
               const pts = p.points.slice(1, minutes + 1).filter((pt): pt is [number, number] => !!pt);
@@ -396,15 +380,15 @@ export function JungleCard({ jungle }: { jungle: Jungle }) {
       <div className="row small">
         <label className="check">
           <input type="checkbox" checked={walls} onChange={(e) => setWalls(e.target.checked)} />
-          <span>Wände einblenden (angenäherte Umrisse)</span>
+          <span>Wände einblenden</span>
         </label>
         <label className="check">
           <input type="checkbox" checked={calibrate} onChange={(e) => setCalibrate(e.target.checked)} />
           <span>Kartenabgleich: echtes Kartenbild mit Wand-Umrissen</span>
         </label>
         <InfoTip>
-          Gestrichelte Umrisse = angenommene Wände, gepunktete Linien („Wegenetz“ im Pathing) = angenommene Wege.
-          Liegen sie neben den echten Wänden, bitte einen Screenshot schicken.
+          Gelb markierte Flächen = Wände, wie PrimeStats sie für die Laufwege verwendet (aus einer schematischen Karte
+          erzeugt). Liegen sie neben den echten Wänden, bitte einen Screenshot schicken.
         </InfoTip>
       </div>
       {calibrate && (
