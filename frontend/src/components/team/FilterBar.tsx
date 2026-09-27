@@ -4,14 +4,13 @@ import { useGameData } from "../../lib/meta";
 interface Props {
   filters: Filters;
   patches: string[];
-  opponents: string[];
   onChange: (next: Partial<Filters>) => void;
   onReset: () => void;
   /** Scouting/ohne Scrims: Spieltyp-Filter ergibt keinen Sinn */
   hideLabel?: boolean;
 }
 
-export function FilterBar({ filters, patches, opponents, onChange, onReset, hideLabel }: Props) {
+export function FilterBar({ filters, patches, onChange, onReset, hideLabel }: Props) {
   const { meta } = useGameData();
   return (
     <div className="card filters">
@@ -32,12 +31,6 @@ export function FilterBar({ filters, patches, opponents, onChange, onReset, hide
         <select value={filters.patch} onChange={(e) => onChange({ patch: e.target.value })}>
           <option value="">Alle</option>
           {patches.map((p) => <option key={p}>{p}</option>)}
-        </select>
-      </label>
-      <label className="field">Gegner
-        <select value={filters.opponent} onChange={(e) => onChange({ opponent: e.target.value })}>
-          <option value="">Alle</option>
-          {opponents.map((o) => <option key={o}>{o}</option>)}
         </select>
       </label>
       <label className="field">Zeitraum

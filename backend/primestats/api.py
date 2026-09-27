@@ -14,7 +14,7 @@ from .schemas import (AccountOut, AnalysisOut, ChampionOut, Filters, HistoryRow,
                       PlayerGamesOut, SyncJobOut, TeamGameUpdate, TeamIn, TeamOut, TeamReportOut)
 from .services import PrimeStats
 from .store import Team
-from .team_stats import LABELS, build_report, filter_records, history_rows, opponents, patches
+from .team_stats import LABELS, build_report, filter_records, history_rows, patches
 from .timeline import analysis_payload
 
 router = APIRouter(prefix="/api")
@@ -170,7 +170,6 @@ def team_report(team_id: int, service: Service, viewer: CurrentViewer, filters: 
         report=build_report(team, selected),
         history=history,
         patches=patches(records),
-        opponents=opponents(records),
         job=SyncJobOut.model_validate(job) if job else None,
     )
 
@@ -190,6 +189,7 @@ def sync_status(team_id: int, service: Service, viewer: CurrentViewer):
 @router.patch("/teams/{team_id}/games/{match_id}", status_code=status.HTTP_204_NO_CONTENT)
 def update_team_game(team_id: int, match_id: str, body: TeamGameUpdate, service: Service, viewer: CurrentViewer):
     _editable_team(service, viewer, team_id)
-    if not service.store.update_team_game(team_id, match_id, label=body.label, included=body.included):
+    if not service.store.update_team_game(team_id, match_id, label=body.label, included=body.included,
+                                          opponent=body.opponent):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Spiel gehört nicht zu diesem Team.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

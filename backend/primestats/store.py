@@ -78,6 +78,7 @@ class TeamGame:
     side: int
     label: str
     included: bool
+    opponent: str = ""
 
 
 def make_engine(url: str) -> Engine:
@@ -259,7 +260,7 @@ class Store:
         if not games:
             return 0
         stmt = insert(TeamGameRow).values(
-            [{"team_id": team_id, "match_id": mid, "side": side, "label": label, "included": True}
+            [{"team_id": team_id, "match_id": mid, "side": side, "label": label, "included": True, "opponent": ""}
              for mid, side, label in games]
         ).on_conflict_do_nothing().returning(TeamGameRow.match_id)
         with self.session() as s:
@@ -268,7 +269,8 @@ class Store:
     def team_games(self, team_id: int) -> list[TeamGame]:
         with self.session() as s:
             rows = s.execute(
-                select(TeamGameRow.match_id, TeamGameRow.side, TeamGameRow.label, TeamGameRow.included)
+                select(TeamGameRow.match_id, TeamGameRow.side, TeamGameRow.label, TeamGameRow.included,
+                       TeamGameRow.opponent)
                 .outerjoin(Match, Match.match_id == TeamGameRow.match_id)
                 .where(TeamGameRow.team_id == team_id)
                 .order_by(Match.game_creation.desc().nulls_last(), TeamGameRow.match_id.desc())
@@ -276,8 +278,10 @@ class Store:
             return [TeamGame(*r) for r in rows]
 
     def update_team_game(self, team_id: int, match_id: str, *, label: str | None = None,
-                         included: bool | None = None) -> bool:
+                         included: bool | None = None, opponent: str | None = None) -> bool:
         values: dict = {}
+        if opponent is not None:
+            values["opponent"] = opponent
         if label is not None:
             values["label"] = label
         if included is not None:

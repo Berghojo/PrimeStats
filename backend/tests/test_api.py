@@ -96,7 +96,7 @@ def test_team_lifecycle(client, demo_source):
     assert all(row["selected"] for row in report["history"])
 
     filtered = client.get(f"/api/teams/{tid}/report", params={"label": "official", "side": "blue", "last": 3}).json()
-    assert filtered["filters"] == {"label": "official", "side": "blue", "patch": "", "opponent": "", "last": 3}
+    assert filtered["filters"] == {"label": "official", "side": "blue", "patch": "", "last": 3}
     assert filtered["report"]["overview"]["games"] <= 3
 
     mid = report["history"][0]["match_id"]
@@ -106,6 +106,13 @@ def test_team_lifecycle(client, demo_source):
     row = next(r for r in after["history"] if r["match_id"] == mid)
     assert row["label"] == "scrim" and not row["included"]
     assert client.patch(f"/api/teams/{tid}/games/EUW1_0", json={"included": False}).status_code == 404
+
+    # Gegner wird von Hand eingetragen (kein geratenes Kürzel)
+    assert all(r["opponent"] == "" for r in report["history"])
+    assert client.patch(f"/api/teams/{tid}/games/{mid}", json={"opponent": "  Team Rheinwerk "}).status_code == 204
+    row = next(r for r in client.get(f"/api/teams/{tid}/report").json()["history"] if r["match_id"] == mid)
+    assert row["opponent"] == "Team Rheinwerk" and row["label"] == "scrim"   # andere Felder unverändert
+    assert client.patch(f"/api/teams/{tid}/games/{mid}", json={"opponent": "x" * 41}).status_code == 422
 
     resp = client.put(f"/api/teams/{tid}", json={"name": "NLE", "tag": "N", "min_members": 5, "public": True,
                                                   "members": [{"riot_id": "NLE Polaris#EUW"}]})

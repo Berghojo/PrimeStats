@@ -88,6 +88,8 @@ class TeamGameRow(Base):
     side: Mapped[int] = mapped_column(SmallInteger)            # teamId des Teams (100/200)
     label: Mapped[str] = mapped_column(String(20), default="")  # '', 'official', 'scrim'
     included: Mapped[bool] = mapped_column(Boolean, default=True)
+    #: Gegner, frei eingetragen vom Team (z.B. für Scrims)
+    opponent: Mapped[str] = mapped_column(String(40), default="")
 
 
 # ------------------------------------------------------------ LCU-Importe

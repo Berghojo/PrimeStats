@@ -20,6 +20,7 @@ class GameRecord:
     label: str = ""
     included: bool = True
     timeline: dict | None = None    # Ergebnis von timeline.summarize_timeline
+    opponent: str = ""              # von Hand eingetragener Gegner (eigene Teamansicht)
 
     @property
     def us(self):
@@ -41,16 +42,6 @@ def _rate(part: float, total: float) -> float | None:
 def _avg(values: list) -> float | None:
     values = [v for v in values if v is not None]
     return sum(values) / len(values) if values else None
-
-
-def guess_team_tag(names: list[str]) -> str:
-    """Leitet ein Teamkürzel aus gemeinsamen Namenspräfixen ab ("WP Faun", "WP MoeBD" -> "WP")."""
-    prefixes = Counter(n.split()[0] for n in names if " " in n.strip())
-    if prefixes:
-        tag, count = prefixes.most_common(1)[0]
-        if count >= 3 and len(tag) <= 5:
-            return tag
-    return ""
 
 
 @dataclass
@@ -309,7 +300,7 @@ def history_rows(records: list[GameRecord]) -> list[dict]:
             "side": rec.us.side,
             "us": rec.us,
             "them": rec.them,
-            "opponent": guess_team_tag([p.name for p in rec.them.players]),
+            "opponent": rec.opponent,
             "gold_diff": rec.us.gold - rec.them.gold,
             "gd15": gd15,
             "label": rec.label,
@@ -320,7 +311,7 @@ def history_rows(records: list[GameRecord]) -> list[dict]:
 
 
 def filter_records(records: list[GameRecord], *, label: str = "all", side: str = "all",
-                   patch: str = "", last: int = 0, opponent: str = "") -> list[GameRecord]:
+                   patch: str = "", last: int = 0) -> list[GameRecord]:
     out = [r for r in records if r.included]
     if label != "all":
         out = [r for r in out if r.label == label]
@@ -328,8 +319,6 @@ def filter_records(records: list[GameRecord], *, label: str = "all", side: str =
         out = [r for r in out if r.us.side == side]
     if patch:
         out = [r for r in out if r.match.version == patch]
-    if opponent:
-        out = [r for r in out if guess_team_tag([p.name for p in r.them.players]) == opponent]
     out.sort(key=lambda r: r.match.created, reverse=True)
     if last > 0:
         out = out[:last]
@@ -375,12 +364,6 @@ def default_label(match: MatchSummary) -> str:
     return "official" if match.tournament_code else "scrim"
 
 
-def opponents(records: list[GameRecord]) -> list[str]:
-    tags = Counter(guess_team_tag([p.name for p in r.them.players]) for r in records)
-    tags.pop("", None)
-    return [t for t, _ in tags.most_common()]
-
-
 def patches(records: list[GameRecord]) -> list[str]:
     return sorted({r.match.version for r in records},
                   key=lambda v: [int(x) if x.isdigit() else 0 for x in v.split(".")], reverse=True)
@@ -388,5 +371,5 @@ def patches(records: list[GameRecord]) -> list[str]:
 
 __all__ = [
     "GameRecord", "LABELS", "build_report", "history_rows", "filter_records", "match_side_for_team",
-    "default_label", "guess_team_tag", "infer_roster", "opponents", "patches",
+    "default_label", "infer_roster", "patches",
 ]

@@ -256,7 +256,6 @@ export interface Filters {
   label: "all" | Label;
   side: "all" | Side;
   patch: string;
-  opponent: string;
   last: number;
 }
 
@@ -266,7 +265,6 @@ export interface TeamReport {
   report: Report;
   history: HistoryRow[];
   patches: string[];
-  opponents: string[];
   job: SyncJob | null;
 }
 
@@ -291,7 +289,6 @@ export interface ScoutSummary {
   puuid: string;
   game_name: string;
   tag_line: string;
-  team_tag: string;
   games: number;
   roster: RosterPlayer[];
   updated_at: string;
@@ -299,7 +296,6 @@ export interface ScoutSummary {
 
 export interface ScoutReport {
   player: { puuid: string; game_name: string; tag_line: string };
-  team_tag: string;
   roster: RosterPlayer[];
   min_members: number;
   updated_at: string;
@@ -307,6 +303,5 @@ export interface ScoutReport {
   report: Report;
   history: HistoryRow[];
   patches: string[];
-  opponents: string[];
   job: SyncJob | null;
 }

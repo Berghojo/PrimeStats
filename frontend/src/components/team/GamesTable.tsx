@@ -15,9 +15,27 @@ interface Props {
   editable: boolean;
   /** Spieler, die in der Zeitverlaufs-Analyse vorausgewählt werden */
   focus?: string[];
+  /** Spalte mit von Hand eingetragenem Gegner (nur eigene Teamansicht) */
+  showOpponent?: boolean;
 }
 
-export function GamesTable({ teamId, history, editable, focus }: Props) {
+function OpponentInput({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const commit = () => {
+    if (draft.trim() !== value) onSave(draft.trim());
+  };
+  return (
+    <input className="input opponent" value={draft} maxLength={40} placeholder="Gegner …" aria-label="Gegner"
+      onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        if (e.key === "Escape") setDraft(value);
+      }} />
+  );
+}
+
+export function GamesTable({ teamId, history, editable, focus, showOpponent = false }: Props) {
   const { meta, label } = useGameData();
   const updateGame = useUpdateTeamGame(teamId ?? 0);
   const initial = () => new Set(history.filter((r) => r.selected).slice(0, 10).map((r) => r.match_id));
@@ -36,7 +54,7 @@ export function GamesTable({ teamId, history, editable, focus }: Props) {
         <table className="data">
           <thead>
             <tr>
-              <th /><th className="left">Datum</th><th className="left">Ergebnis</th><th className="left">Gegner</th>
+              <th /><th className="left">Datum</th><th className="left">Ergebnis</th>{showOpponent && <th className="left">Gegner</th>}
               <th className="left">Unsere Picks</th><th className="left">Gegnerische Picks</th><th>K–T</th><th>Gold Δ</th>
               <th>GD@15</th><th>Dauer</th><th className="left">Typ</th><th />
             </tr>
@@ -50,7 +68,13 @@ export function GamesTable({ teamId, history, editable, focus }: Props) {
                 </td>
                 <td className="left nowrap"><Link to={`/match/${g.match_id}${teamId ? `?team=${teamId}` : ""}`}>{dt(g.date)}</Link></td>
                 <td className="left nowrap"><ResultBadge win={g.win} /> <SideBadge side={g.side} /></td>
-                <td className="left">{g.opponent || "–"}</td>
+                {showOpponent && (
+                  <td className="left">
+                    {editable
+                      ? <OpponentInput value={g.opponent} onSave={(opponent) => updateGame.mutate({ matchId: g.match_id, opponent })} />
+                      : g.opponent || "–"}
+                  </td>
+                )}
                 <td className="left"><span className="champ-row">{g.us.players.map((p) => <ChampIcon key={p.puuid} id={p.champion_id} size="sm" />)}</span></td>
                 <td className="left"><span className="champ-row">{g.them.players.map((p) => <ChampIcon key={p.puuid} id={p.champion_id} size="sm" />)}</span></td>
                 <td>{g.us.kills}–{g.them.kills}</td>

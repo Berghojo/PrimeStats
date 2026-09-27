@@ -52,7 +52,6 @@ export function ScoutReportPage() {
   }
 
   const data = report.data;
-  const name = data.team_tag ? `Team ${data.team_tag}` : `Team von ${data.player.game_name}`;
   const refresh = () =>
     restart.mutate({ riot_id: `${data.player.game_name}#${data.player.tag_line}`, min_members: data.min_members });
 
@@ -61,12 +60,12 @@ export function ScoutReportPage() {
       <section className="card">
         <div className="row between">
           <div className="team-head">
-            <div className="team-logo">{(data.team_tag || data.player.game_name).slice(0, 4)}</div>
+            <div className="team-logo">{data.player.game_name.slice(0, 2).toUpperCase()}</div>
             <div>
-              <h1>{name} <span className="badge accent">Scouting</span></h1>
+              <h1>{data.player.game_name}<span className="muted">#{data.player.tag_line}</span>{" "}
+                <span className="badge accent">Scouting</span></h1>
               <div className="muted small">
-                Ausgehend von {data.player.game_name}#{data.player.tag_line} · Spiele mit ≥ {data.min_members} Kader-Spielern ·
-                aktualisiert {ago(data.updated_at)}
+                Turnierspiele mit ≥ {data.min_members} Spielern aus diesem Kader · aktualisiert {ago(data.updated_at)}
               </div>
               <div className="row small" style={{ marginTop: ".4rem" }}>
                 {data.roster.map((r) => (

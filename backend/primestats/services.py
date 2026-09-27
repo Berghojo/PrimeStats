@@ -159,20 +159,21 @@ class PrimeStats:
     def team_records(self, team: Team, with_timeline: bool = True) -> list[GameRecord]:
         """Alle gespeicherten Spiele eines Teams (ohne API-Aufrufe)."""
         games = self.store.team_games(team.id)
-        return self._records([(tg.match_id, tg.side, tg.label, tg.included) for tg in games], with_timeline)
+        return self._records([(tg.match_id, tg.side, tg.label, tg.included, tg.opponent) for tg in games],
+                             with_timeline)
 
-    def _records(self, games: list[tuple[str, int, str, bool]], with_timeline: bool = True) -> list[GameRecord]:
+    def _records(self, games: list[tuple[str, int, str, bool, str]], with_timeline: bool = True) -> list[GameRecord]:
         ids = [g[0] for g in games]
         raw = self.store.get_matches([mid for mid in ids if not self._is_parsed(mid)])
         summaries = self.store.get_timeline_summaries(ids, SUMMARY_VERSION) if with_timeline else {}
         records = []
-        for mid, side, label, included in games:
+        for mid, side, label, included, opponent in games:
             try:
                 match = self._parse_from(mid, raw.get(mid))
             except RiotAPIError as exc:
                 log.warning("Spiel %s nicht ladbar: %s", mid, exc)
                 continue
-            records.append(GameRecord(match, side, label, included, summaries.get(mid)))
+            records.append(GameRecord(match, side, label, included, summaries.get(mid), opponent))
         return records
 
     def _is_parsed(self, match_id: str) -> bool:
@@ -367,7 +368,7 @@ class PrimeStats:
         progress.done_message = f"Fertig – {len(games)} Turnierspiele von {len(roster)} Spielern gefunden."
 
     def scout_records(self, scout: dict) -> list[GameRecord]:
-        return [r for r in self._records([(mid, side, "official", True) for mid, side in scout["games"]])
+        return [r for r in self._records([(mid, side, "official", True, "") for mid, side in scout["games"]])
                 if not r.match.private]
 
 

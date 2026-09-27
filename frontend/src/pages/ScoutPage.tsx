@@ -10,13 +10,15 @@ export function ScoutCard({ scout }: { scout: ScoutSummary }) {
   return (
     <Link className="card team-card" to={`/scout/${scout.puuid}`}>
       <div className="team-head">
-        <div className="team-logo">{(scout.team_tag || scout.game_name).slice(0, 4)}</div>
+        <div className="team-logo">{scout.game_name.slice(0, 2).toUpperCase()}</div>
         <div>
-          <h3>{scout.team_tag ? `Team ${scout.team_tag}` : `Team von ${scout.game_name}`}</h3>
+          <h3>{scout.game_name}<span className="muted">#{scout.tag_line}</span></h3>
           <div className="muted small">{scout.games} Turnierspiele · gescoutet {ago(scout.updated_at)}</div>
         </div>
       </div>
-      <div className="names muted small">{scout.roster.map((r) => r.game_name).join(" · ")}</div>
+      <div className="names muted small">
+        Mitspieler: {scout.roster.filter((r) => r.puuid !== scout.puuid).map((r) => r.game_name).join(" · ")}
+      </div>
     </Link>
   );
 }

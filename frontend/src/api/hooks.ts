@@ -75,7 +75,7 @@ export function useStartSync(id: number) {
 export function useUpdateTeamGame(teamId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ matchId, ...body }: { matchId: string; label?: Label; included?: boolean }) =>
+    mutationFn: ({ matchId, ...body }: { matchId: string; label?: Label; included?: boolean; opponent?: string }) =>
       api<void>(`/teams/${teamId}/games/${encodeURIComponent(matchId)}`, { method: "PATCH", body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["team", teamId, "report"] }),
   });

@@ -195,6 +195,12 @@ class TeamOut(_Attrs):
 class TeamGameUpdate(BaseModel):
     label: Literal["", "official", "scrim"] | None = None
     included: bool | None = None
+    opponent: str | None = Field(default=None, max_length=40)
+
+    @field_validator("opponent")
+    @classmethod
+    def _strip_opponent(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
 
 
 class SyncJobOut(_Attrs):
@@ -351,7 +357,6 @@ class Filters(BaseModel):
     label: str = "all"
     side: str = "all"
     patch: str = ""
-    opponent: str = ""
     last: int = 0
 
 
@@ -361,7 +366,6 @@ class TeamReportOut(BaseModel):
     report: Report
     history: list[HistoryRow]
     patches: list[str]
-    opponents: list[str]
     job: SyncJobOut | None
 
 
@@ -486,7 +490,6 @@ class ScoutSummary(BaseModel):
     puuid: str
     game_name: str
     tag_line: str
-    team_tag: str
     games: int
     roster: list[RosterPlayer]
     updated_at: datetime
@@ -494,7 +497,6 @@ class ScoutSummary(BaseModel):
 
 class ScoutReportOut(BaseModel):
     player: AccountOut
-    team_tag: str
     roster: list[RosterPlayer]
     min_members: int
     updated_at: datetime
@@ -502,5 +504,4 @@ class ScoutReportOut(BaseModel):
     report: Report
     history: list[HistoryRow]
     patches: list[str]
-    opponents: list[str]
     job: SyncJobOut | None

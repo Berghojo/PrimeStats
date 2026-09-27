@@ -44,7 +44,8 @@ def test_scout_opponent_from_single_player(client, demo_source):
     assert job["status"] == "done", job
 
     report = client.get(f"/api/scout/{puuid}").json()
-    assert report["team_tag"] == "BSK"
+    assert report["player"]["game_name"] == "BSK Skalde"     # alles läuft unter dem gesuchten Spieler
+    assert "team_tag" not in report and "opponents" not in report
     assert {r["game_name"] for r in report["roster"]} == {f"BSK {n}" for n in
                                                           ("Runenstein", "Wikinger", "Skalde", "Drakkar", "Hjalmar")}
     assert report["report"]["overview"]["games"] == len(report["history"]) > 0
@@ -54,7 +55,7 @@ def test_scout_opponent_from_single_player(client, demo_source):
     assert client.get(f"/api/scout/{puuid}", params={"side": "blue"}).json()["filters"]["side"] == "blue"
 
     # erscheint in der Liste der letzten Scoutings und ist für alle abrufbar
-    assert client.get("/api/scout").json()[0]["team_tag"] == "BSK"
+    assert client.get("/api/scout").json()[0]["game_name"] == "BSK Skalde"
     assert other_client(client).get(f"/api/scout/{puuid}").status_code == 200
 
 

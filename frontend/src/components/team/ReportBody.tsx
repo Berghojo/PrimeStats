@@ -10,7 +10,7 @@ import { ObjectivesCard, OverviewKpis } from "./Overview";
 import { PlayersTable } from "./PlayersTable";
 import { ChampionPools, DraftCards } from "./Pools";
 
-const DEFAULT_FILTERS: Filters = { label: "all", side: "all", patch: "", opponent: "", last: 0 };
+const DEFAULT_FILTERS: Filters = { label: "all", side: "all", patch: "", last: 0 };
 
 /** Filter stehen in der URL (teilbar, Zurück-Button funktioniert). */
 export function useUrlFilters(): [Filters, (next: Partial<Filters>) => void, () => void] {
@@ -19,7 +19,6 @@ export function useUrlFilters(): [Filters, (next: Partial<Filters>) => void, () 
     label: (params.get("label") ?? "all") as Filters["label"],
     side: (params.get("side") ?? "all") as Filters["side"],
     patch: params.get("patch") ?? "",
-    opponent: params.get("opponent") ?? "",
     last: Number(params.get("last") ?? 0),
   };
   const set = (next: Partial<Filters>) => {
@@ -34,7 +33,7 @@ export function useUrlFilters(): [Filters, (next: Partial<Filters>) => void, () 
 }
 
 interface Props {
-  data: { filters: Filters; report: Report; history: HistoryRow[]; patches: string[]; opponents: string[] };
+  data: { filters: Filters; report: Report; history: HistoryRow[]; patches: string[] };
   refreshing: boolean;
   /** Team-Dashboard: Spiele bearbeitbar; Scouting: nur lesen */
   teamId?: number;
@@ -50,7 +49,7 @@ export function ReportBody({ data, refreshing, teamId, editable = false, hideLab
   const ov = report.overview;
   return (
     <>
-      <FilterBar filters={data.filters} patches={data.patches} opponents={data.opponents} hideLabel={hideLabelFilter}
+      <FilterBar filters={data.filters} patches={data.patches} hideLabel={hideLabelFilter}
         onChange={setFilters} onReset={resetFilters} />
       <div className={refreshing ? "stack refreshing" : "stack"}>
         {ov.games === 0 ? <Empty>Keine Spiele für diese Filter.</Empty> : (
@@ -93,7 +92,7 @@ export function ReportBody({ data, refreshing, teamId, editable = false, hideLab
             )}
           </>
         )}
-        <GamesTable teamId={teamId} history={history} editable={editable} focus={focus} />
+        <GamesTable teamId={teamId} history={history} editable={editable} focus={focus} showOpponent={teamId !== undefined} />
       </div>
     </>
   );

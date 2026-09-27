@@ -280,3 +280,4 @@ code { background: var(--surface-2); padding: .05rem .35rem; border-radius: 4px;
 .check input { width: 18px; height: 18px; margin-top: .15rem; accent-color: var(--accent); }
 form.stack > .input, form.stack > label.field .input, form.stack > label.field select { display: block; width: 100%; }
 form.stack > .btn { justify-self: start; align-self: flex-start; }
+table.data input.opponent { padding: .2rem .45rem; width: 150px; font-size: .85rem; }

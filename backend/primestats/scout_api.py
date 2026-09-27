@@ -10,8 +10,7 @@ from .deps import RateLimit, Service, client_ip
 from .schemas import (AccountOut, Filters, HistoryRow, RosterPlayer, ScoutIn, ScoutReportOut, ScoutStartOut,
                       ScoutSummary, SyncJobOut)
 from .store import Member, Team
-from .team_stats import (LABELS, build_report, filter_records, guess_team_tag, history_rows, opponents,
-                         patches)
+from .team_stats import LABELS, build_report, filter_records, history_rows, patches
 
 router = APIRouter(prefix="/api/scout")
 scout_limit = RateLimit(limit=20, window=3600)
@@ -19,10 +18,6 @@ scout_limit = RateLimit(limit=20, window=3600)
 
 def _job_key(puuid: str) -> tuple[str, str]:
     return ("scout", puuid)
-
-
-def _team_tag(roster: list[dict]) -> str:
-    return guess_team_tag([r["game_name"] for r in roster])
 
 
 @router.post("", response_model=ScoutStartOut, status_code=status.HTTP_202_ACCEPTED)
@@ -44,7 +39,7 @@ def start_scout(body: ScoutIn, request: Request, service: Service):
 
 @router.get("", response_model=list[ScoutSummary])
 def recent_scouts(service: Service, limit: Annotated[int, Query(ge=1, le=50)] = 12):
-    return [ScoutSummary(**s, team_tag=_team_tag(s["roster"])) for s in service.store.recent_scouts(limit)]
+    return [ScoutSummary(**s) for s in service.store.recent_scouts(limit)]
 
 
 @router.get("/{puuid}/status", response_model=SyncJobOut | None)
@@ -60,7 +55,8 @@ def scout_report(puuid: str, service: Service, filters: Annotated[Filters, Query
     if filters.label not in {"all", *LABELS}:
         filters.label = "all"
     roster = scout["roster"]
-    team = Team(id=0, name=_team_tag(roster) or scout["game_name"], tag="", min_members=scout["min_members"],
+    # Alles läuft unter dem gesuchten Spieler – kein geratenes Teamkürzel
+    team = Team(id=0, name=f"{scout['game_name']}#{scout['tag_line']}", tag="", min_members=scout["min_members"],
                 created_at=scout["updated_at"], last_synced=scout["updated_at"],
                 members=[Member(r["puuid"], r["game_name"], r["tag_line"], r["position"]) for r in roster])
     records = service.scout_records(scout)
@@ -69,7 +65,6 @@ def scout_report(puuid: str, service: Service, filters: Annotated[Filters, Query
     job = service.jobs.get(_job_key(puuid))
     return ScoutReportOut(
         player=AccountOut(puuid=scout["puuid"], game_name=scout["game_name"], tag_line=scout["tag_line"]),
-        team_tag=_team_tag(roster),
         roster=[RosterPlayer(**r) for r in roster],
         min_members=scout["min_members"],
         updated_at=scout["updated_at"],
@@ -77,7 +72,6 @@ def scout_report(puuid: str, service: Service, filters: Annotated[Filters, Query
         report=build_report(team, selected),
         history=[HistoryRow(**row, selected=row["match_id"] in selected_ids) for row in history_rows(records)],
         patches=patches(records),
-        opponents=opponents(records),
         job=SyncJobOut.model_validate(job) if job else None,
     )
 

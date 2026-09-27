@@ -1,4 +1,4 @@
-from primestats.team_stats import build_report, filter_records, guess_team_tag, match_side_for_team
+from primestats.team_stats import build_report, filter_records, match_side_for_team
 
 
 def test_sync_finds_only_team_games(service, synced_team, demo_source):
@@ -59,8 +59,3 @@ def test_match_side_for_team(service, synced_team):
     match = service.match(tg.match_id)
     assert match_side_for_team(match, synced_team.puuids, 4) == tg.side
     assert match_side_for_team(match, synced_team.puuids, 6) is None
-
-
-def test_guess_team_tag():
-    assert guess_team_tag(["WP Faun", "WP MoeBD", "WP x", "Other", "Foo"]) == "WP"
-    assert guess_team_tag(["A", "B", "C"]) == ""

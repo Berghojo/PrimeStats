@@ -21,7 +21,7 @@ Statistik-Tool für **Prime-League- und Custom Games** in League of Legends –
   - Champion-Pools pro Spieler, eigene Picks & Bans, Bans gegen das Team, gegnerische Picks
   - Spielliste mit Label (*Prime League* / *Scrim* – Spiele mit Turniercode werden automatisch als Prime League
     markiert), Ausschließen einzelner Spiele und direktem Sprung in die Zeitverlaufs-Analyse
-  - Filter nach Spieltyp, Seite, Patch, Gegner (aus Namenskürzeln erkannt) und letzten *N* Spielen –
+  - Gegner pro Spiel frei eintragbar (z.B. für Scrims), Filter nach Spieltyp, Seite, Patch und letzten *N* Spielen –
     die Filter stehen in der URL und lassen sich teilen
 
 ## Schnellstart mit Docker
@@ -37,7 +37,7 @@ Das Datenbankschema wird beim Start automatisch per Alembic migriert.
 Ohne API-Key lässt sich alles mit generierten Beispieldaten ausprobieren (`PRIMESTATS_DEMO=1` in `.env`;
 die Demo-Scrims werden beim Start so importiert, als kämen sie vom Uploader). Im Demo-Modus gibt es das
 Konto `demo` / `demo1234` (verknüpft mit `NLE Polaris#EUW`), das öffentliche Team „Nordlicht Esports“ und
-ein Beispiel-Scouting des Gegners „BSK“ (weitere z.B. mit `RHW Anker#EUW`).
+ein Beispiel-Scouting ab `BSK Skalde#EUW` (weitere z.B. mit `RHW Anker#EUW`).
 Im Demo-Modus z.B. nach `NLE Polaris#EUW` suchen oder ein Team mit
 `NLE Frostbite#EUW`, `NLE Waldgeist#EUW`, `NLE Polaris#EUW`, `NLE Kompass#EUW`, `NLE Leuchtturm#EUW`
 (und optional `NLE Treibholz#EUW`) anlegen. Alle Namen sind frei erfunden.
@@ -55,7 +55,8 @@ Unter **Scouting** (oder „Team scouten“ auf einer Spielerseite) reicht ein e
 
 Scouting ist für alle offen (auch ohne Konto), nutzt nur öffentliche Riot-API-Daten – hochgeladene Scrims
 fließen nie ein – und braucht deshalb einen `LOL_API_KEY`. Ergebnisse werden gespeichert und sind über
-„Zuletzt gescoutet“ bzw. ihre URL erneut abrufbar; „Neu scouten“ aktualisiert sie.
+„Zuletzt gescoutet“ bzw. ihre URL erneut abrufbar; „Neu scouten“ aktualisiert sie. Ein Scouting läuft
+immer unter dem gesuchten Spieler – es wird kein Teamname oder -kürzel geraten.
 
 ## Konten und Riot-Verknüpfung
 
@@ -240,9 +241,9 @@ frontend/
 | GET | `/api/analysis?m=…&m=…&focus=…&team=…` | Minutenreihen für die Zeitverlaufs-Analyse |
 | GET/POST | `/api/teams` | Teams auflisten / anlegen |
 | GET/PUT/DELETE | `/api/teams/{id}` | Team lesen / bearbeiten / löschen |
-| GET | `/api/teams/{id}/report?label=&side=&patch=&opponent=&last=` | Aggregierte Team-Statistiken |
+| GET | `/api/teams/{id}/report?label=&side=&patch=&last=` | Aggregierte Team-Statistiken |
 | POST/GET | `/api/teams/{id}/sync` | Synchronisation starten / Status abfragen |
-| PATCH | `/api/teams/{id}/games/{match_id}` | Label ändern, Spiel ein-/ausschließen |
+| PATCH | `/api/teams/{id}/games/{match_id}` | Label, Gegner (Freitext) ändern, Spiel ein-/ausschließen |
 | POST | `/api/auth/register`, `/api/auth/login`, `/api/auth/logout` | Konto anlegen, an-/abmelden (Cookie) |
 | GET | `/api/auth/me` | Angemeldetes Konto + verknüpfte Riot-Accounts |
 | POST | `/api/me/link-code` | Einmal-Code für die Verknüpfung erzeugen |
