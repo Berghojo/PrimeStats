@@ -19,8 +19,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from .auth import token_hash
-from .db import (Account, LinkCode, Match, RawImport, RiotLink, TeamGameRow, TeamMemberRow, TeamRow, Timeline,
-                 TimelineSummary, User, UserSession)
+from .db import (Account, LinkCode, Match, RawImport, RiotLink, Scout, TeamGameRow, TeamMemberRow, TeamRow,
+                 Timeline, TimelineSummary, User, UserSession)
 
 
 @dataclass
@@ -386,18 +386,43 @@ class Store:
             rows = s.scalars(select(RiotLink).where(RiotLink.user_id == user_id).order_by(RiotLink.linked_at))
             return [LinkedRiot(r.puuid, r.game_name, r.tag_line, r.linked_at, r.last_upload_at) for r in rows]
 
-    def team_ids_for(self, user_id: int, puuids: set[str]) -> set[int]:
-        """Teams, die das Konto erstellt hat oder in deren Kader ein verknüpfter Account steht."""
+    def owned_team_ids(self, user_id: int) -> set[int]:
         with self.session() as s:
-            owned = set(s.scalars(select(TeamRow.id).where(TeamRow.owner_id == user_id)))
-            member = set(s.scalars(select(TeamMemberRow.team_id).where(TeamMemberRow.puuid.in_(puuids)))) \
-                if puuids else set()
-            return owned | member
+            return set(s.scalars(select(TeamRow.id).where(TeamRow.owner_id == user_id)))
 
-    def public_team_ids(self) -> set[int]:
+    def roster_team_ids(self, puuids: set[str]) -> set[int]:
+        """Teams, in deren Kader einer der Riot-Accounts steht."""
+        if not puuids:
+            return set()
         with self.session() as s:
-            return set(s.scalars(select(TeamRow.id).where(TeamRow.public.is_(True))))
+            return set(s.scalars(select(TeamMemberRow.team_id).where(TeamMemberRow.puuid.in_(puuids))))
 
     def teams_with_match(self, match_id: str) -> set[int]:
         with self.session() as s:
             return set(s.scalars(select(TeamGameRow.team_id).where(TeamGameRow.match_id == match_id)))
+
+    # --------------------------------------------------------------- Scouting
+    def put_scout(self, puuid: str, game_name: str, tag_line: str, roster: list[dict],
+                  games: list[tuple[str, int]], min_members: int) -> None:
+        values = {"game_name": game_name, "tag_line": tag_line, "roster": roster,
+                  "games": [list(g) for g in games], "min_members": min_members,
+                  "updated_at": datetime.now(timezone.utc)}
+        stmt = insert(Scout).values(puuid=puuid, **values).on_conflict_do_update(
+            index_elements=[Scout.puuid], set_=values)
+        with self.session() as s:
+            s.execute(stmt)
+
+    def get_scout(self, puuid: str) -> dict | None:
+        with self.session() as s:
+            row = s.get(Scout, puuid)
+            if row is None:
+                return None
+            return {"puuid": row.puuid, "game_name": row.game_name, "tag_line": row.tag_line,
+                    "roster": row.roster, "games": [tuple(g) for g in row.games], "min_members": row.min_members,
+                    "updated_at": row.updated_at}
+
+    def recent_scouts(self, limit: int = 10) -> list[dict]:
+        with self.session() as s:
+            rows = s.scalars(select(Scout).order_by(Scout.updated_at.desc()).limit(limit))
+            return [{"puuid": r.puuid, "game_name": r.game_name, "tag_line": r.tag_line, "roster": r.roster,
+                     "games": len(r.games), "updated_at": r.updated_at} for r in rows]

@@ -180,12 +180,15 @@ class TeamOut(_Attrs):
     #: Berechtigungen des aktuellen Betrachters
     can_edit: bool = False
     can_delete: bool = False
+    #: Scrims sind nur für Spieler im Kader (mit verknüpftem Riot-Account) sichtbar
+    can_see_scrims: bool = False
 
     @classmethod
     def of(cls, team, viewer) -> "TeamOut":
         out = cls.model_validate(team)
         out.can_edit = viewer.can_edit_team(team)
         out.can_delete = viewer.can_delete_team(team)
+        out.can_see_scrims = viewer.can_see_scrims(team)
         return out
 
 
@@ -456,3 +459,48 @@ class ImportOut(BaseModel):
     skipped: list[str]
     errors: list[str]
     assigned: dict[str, int]
+
+
+# ------------------------------------------------------------ Scouting
+class ScoutIn(BaseModel):
+    riot_id: str = Field(min_length=3, max_length=30)
+    min_members: int = Field(default=4, ge=2, le=5)
+
+
+class ScoutStartOut(BaseModel):
+    puuid: str
+    game_name: str
+    tag_line: str
+    job: SyncJobOut
+
+
+class RosterPlayer(BaseModel):
+    puuid: str
+    game_name: str
+    tag_line: str
+    games: int
+    position: str
+
+
+class ScoutSummary(BaseModel):
+    puuid: str
+    game_name: str
+    tag_line: str
+    team_tag: str
+    games: int
+    roster: list[RosterPlayer]
+    updated_at: datetime
+
+
+class ScoutReportOut(BaseModel):
+    player: AccountOut
+    team_tag: str
+    roster: list[RosterPlayer]
+    min_members: int
+    updated_at: datetime
+    filters: Filters
+    report: Report
+    history: list[HistoryRow]
+    patches: list[str]
+    opponents: list[str]
+    job: SyncJobOut | None

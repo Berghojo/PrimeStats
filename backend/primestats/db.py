@@ -146,3 +146,19 @@ class LinkCode(Base):
     code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+# --------------------------------------------------------------- Scouting
+class Scout(Base):
+    """Ergebnis eines Turnier-Scoutings: abgeleiteter Kader und dessen Turnierspiele."""
+
+    __tablename__ = "scouts"
+
+    puuid: Mapped[str] = mapped_column(String(100), primary_key=True)  # gesuchter Spieler
+    game_name: Mapped[str] = mapped_column(Text)
+    tag_line: Mapped[str] = mapped_column(Text)
+    roster: Mapped[list] = mapped_column(JSONB)
+    #: [[match_id, side], ...]
+    games: Mapped[list] = mapped_column(JSONB)
+    min_members: Mapped[int] = mapped_column(SmallInteger)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

@@ -9,9 +9,17 @@ import { ChampIcon } from "../ChampIcon";
 import { SelectionBar, toggle } from "../SelectionBar";
 import { ResultBadge, SideBadge } from "../ui";
 
-export function GamesTable({ teamId, history, editable }: { teamId: number; history: HistoryRow[]; editable: boolean }) {
+interface Props {
+  teamId?: number;
+  history: HistoryRow[];
+  editable: boolean;
+  /** Spieler, die in der Zeitverlaufs-Analyse vorausgewählt werden */
+  focus?: string[];
+}
+
+export function GamesTable({ teamId, history, editable, focus }: Props) {
   const { meta, label } = useGameData();
-  const updateGame = useUpdateTeamGame(teamId);
+  const updateGame = useUpdateTeamGame(teamId ?? 0);
   const initial = () => new Set(history.filter((r) => r.selected).slice(0, 10).map((r) => r.match_id));
   const [selected, setSelected] = useState<Set<string>>(initial);
   const filterKey = history.map((r) => `${r.match_id}:${r.selected}`).join(",");
@@ -40,7 +48,7 @@ export function GamesTable({ teamId, history, editable }: { teamId: number; hist
                   <input type="checkbox" checked={selected.has(g.match_id)} aria-label="Für Analyse auswählen"
                     onChange={() => setSelected((s) => toggle(s, g.match_id))} />
                 </td>
-                <td className="left nowrap"><Link to={`/match/${g.match_id}?team=${teamId}`}>{dt(g.date)}</Link></td>
+                <td className="left nowrap"><Link to={`/match/${g.match_id}${teamId ? `?team=${teamId}` : ""}`}>{dt(g.date)}</Link></td>
                 <td className="left nowrap"><ResultBadge win={g.win} /> <SideBadge side={g.side} /></td>
                 <td className="left">{g.opponent || "–"}</td>
                 <td className="left"><span className="champ-row">{g.us.players.map((p) => <ChampIcon key={p.puuid} id={p.champion_id} size="sm" />)}</span></td>
@@ -75,6 +83,7 @@ export function GamesTable({ teamId, history, editable }: { teamId: number; hist
       <SelectionBar
         selected={selected}
         team={teamId}
+        focus={focus}
         showFiltered
         onSelect={(mode) =>
           setSelected(new Set(mode === "none" ? [] : history.filter((r) => mode === "all" || r.selected).map((r) => r.match_id)))}

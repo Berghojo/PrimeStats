@@ -47,8 +47,8 @@ export function UploaderPage() {
           <h2>Gut zu wissen</h2>
           <p className="muted small">
             Hochgeladen werden nur Spiele, in denen der im Client eingeloggte Riot-Account mitgespielt hat. Scrims sind privat:
-            Sie sehen nur Spieler, die mitgespielt haben, und Mitglieder der zugeordneten Teams (bzw. alle, wenn das Team
-            öffentlich ist).
+            Sie sehen ausschließlich Spieler, deren verknüpfter Riot-Account im Kader eines Teams steht, dem das Spiel
+            zugeordnet ist – auch bei öffentlichen Teams und nicht über das Scouting.
           </p>
           <p className="muted small">
             Ein Teammitglied reicht, wenn es bei (fast) allen Scrims mitspielt – jedes Spiel enthält alle 10 Spieler. Spiele,

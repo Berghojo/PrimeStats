@@ -2,7 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api } from "./client";
 import type {
-  Analysis, Filters, Label, LinkCode, Match, Me, Meta, PlayerGames, SyncJob, Team, TeamInput, TeamReport,
+  Analysis, Filters, Label, LinkCode, Match, Me, Meta, PlayerGames, ScoutReport, ScoutSummary, SyncJob, Team,
+  TeamInput, TeamReport,
 } from "./types";
 
 export const useMeta = () =>
@@ -127,5 +128,36 @@ export function useUnlink() {
   return useMutation({
     mutationFn: (puuid: string) => api<void>(`/me/riot/${encodeURIComponent(puuid)}`, { method: "DELETE" }),
     onSuccess: reset,
+  });
+}
+
+// -------------------------------------------------------------- Scouting
+export const useRecentScouts = () =>
+  useQuery({ queryKey: ["scouts"], queryFn: () => api<ScoutSummary[]>("/scout") });
+
+export const useScoutReport = (puuid: string, filters: Partial<Filters>) =>
+  useQuery({
+    queryKey: ["scout", puuid, "report", filters],
+    queryFn: () => api<ScoutReport>(`/scout/${encodeURIComponent(puuid)}`, { query: { ...filters } }),
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+
+export const useScoutStatus = (puuid: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ["scout", puuid, "status"],
+    queryFn: () => api<SyncJob | null>(`/scout/${encodeURIComponent(puuid)}/status`),
+    enabled,
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 1000 : false),
+  });
+
+export function useStartScout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { riot_id: string; min_members?: number }) =>
+      api<{ puuid: string; game_name: string; tag_line: string; job: SyncJob }>("/scout", {
+        method: "POST", body: JSON.stringify(body),
+      }),
+    onSuccess: (res) => qc.setQueryData(["scout", res.puuid, "status"], res.job),
   });
 }

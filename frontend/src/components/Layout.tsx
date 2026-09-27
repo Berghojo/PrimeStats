@@ -61,6 +61,7 @@ export function Layout() {
           <NavLink className="brand" to="/"><span className="logo">PS</span> PrimeStats</NavLink>
           <nav className="nav">
             <NavLink to="/" className={() => (pathname === "/" || pathname.startsWith("/player") ? "active" : "")}>Spielersuche</NavLink>
+            <NavLink to="/scout">Scouting</NavLink>
             <NavLink to="/teams">Teams</NavLink>
             <NavLink to="/uploader">Scrims hochladen</NavLink>
           </nav>

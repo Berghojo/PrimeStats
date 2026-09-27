@@ -158,6 +158,8 @@ def team_report(team_id: int, service: Service, viewer: CurrentViewer, filters: 
     if filters.label not in {"all", *LABELS}:
         filters.label = "all"
     records = service.team_records(team)
+    if not viewer.can_see_scrims(team):
+        records = [r for r in records if not r.match.private]
     selected = filter_records(records, **filters.model_dump())
     selected_ids = {r.match.match_id for r in selected}
     history = [HistoryRow(**row, selected=row["match_id"] in selected_ids) for row in history_rows(records)]

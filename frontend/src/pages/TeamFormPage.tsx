@@ -78,8 +78,8 @@ export function TeamFormPage() {
         <label className="check">
           <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
           <span>
-            <b>Öffentlich</b> – Statistiken inkl. Scrims für alle sichtbar. Sonst sehen das Team nur du und Kader-Mitglieder
-            mit verknüpftem Riot-Account.
+            <b>Öffentlich</b> – Statistiken aus Turnierspielen für alle sichtbar. Scrims bleiben immer den Spielern im
+            Kader (mit verknüpftem Riot-Account) vorbehalten.
           </span>
         </label>
         <p className="muted small" style={{ margin: 0 }}>

@@ -156,7 +156,8 @@ def average_series(rows: list[list], min_share: float = 0.0) -> tuple[list, list
             if v is not None:
                 sums[i] += v
                 counts[i] += 1
-    needed = max(1, math.ceil(len(rows) * min_share))
+    # mindestens zwei Spiele pro Minute (sofern vorhanden), sonst dominiert ein einzelnes langes Spiel
+    needed = max(min(2, len(rows)) if min_share else 1, math.ceil(len(rows) * min_share))
     while counts and counts[-1] < needed:
         counts.pop()
         sums.pop()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -345,6 +346,31 @@ def match_side_for_team(match: MatchSummary, puuids: set[str], min_members: int)
     return best if best_count >= min_members else None
 
 
+def infer_roster(matches: list[MatchSummary], puuid: str, *, min_share: float = 0.2,
+                 limit: int = 10) -> list[dict]:
+    """Leitet aus den Spielen eines Spielers seinen Kader ab: alle, die oft genug mit ihm im selben
+    Team standen (mindestens 2 gemeinsame Spiele bzw. ``min_share`` seiner Spiele)."""
+    counts: Counter = Counter()
+    positions: dict[str, Counter] = {}
+    names: dict[str, tuple[str, str]] = {}
+    own_games = 0
+    for match in sorted(matches, key=lambda m: m.created):
+        team = match.team_of(puuid)
+        if team is None:
+            continue
+        own_games += 1
+        for p in team.players:
+            counts[p.puuid] += 1
+            positions.setdefault(p.puuid, Counter())[p.position] += 1
+            names[p.puuid] = (p.name, p.tag)  # neuester Name gewinnt
+    if not own_games:
+        return []
+    threshold = max(min(2, own_games), math.ceil(min_share * own_games))
+    chosen = [puuid] + [pid for pid, c in counts.most_common() if pid != puuid and c >= threshold][:limit - 1]
+    return [{"puuid": pid, "game_name": names[pid][0], "tag_line": names[pid][1], "games": counts[pid],
+             "position": positions[pid].most_common(1)[0][0]} for pid in chosen]
+
+
 def default_label(match: MatchSummary) -> str:
     return "official" if match.tournament_code else "scrim"
 
@@ -362,5 +388,5 @@ def patches(records: list[GameRecord]) -> list[str]:
 
 __all__ = [
     "GameRecord", "LABELS", "build_report", "history_rows", "filter_records", "match_side_for_team",
-    "default_label", "guess_team_tag", "opponents", "patches",
+    "default_label", "guess_team_tag", "infer_roster", "opponents", "patches",
 ]

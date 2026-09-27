@@ -12,7 +12,7 @@ from . import lcu
 from .matches import MatchSummary, parse_match
 from .riot import MatchSource, NotFound, RiotAPIError, split_riot_id
 from .store import Member, Store, Team
-from .team_stats import GameRecord, default_label, match_side_for_team
+from .team_stats import GameRecord, default_label, infer_roster, match_side_for_team
 from .timeline import SUMMARY_VERSION, summarize_timeline
 
 log = logging.getLogger(__name__)
@@ -21,6 +21,10 @@ log = logging.getLogger(__name__)
 #: Normale Custom-Lobbys (Scrims) kommen ausschließlich über den LCU-Uploader herein.
 CUSTOM_QUERIES = ({"type": "tourney"},)
 PARSE_CACHE_SIZE = 4096
+#: Wie viele Turnierspiele je Spieler beim Scouting durchsucht werden
+SCOUT_MATCH_COUNT = 50
+#: Für wie viele der neuesten Scouting-Spiele Timelines geladen werden
+SCOUT_TIMELINES = 30
 
 
 class OfflineSource:
@@ -155,17 +159,20 @@ class PrimeStats:
     def team_records(self, team: Team, with_timeline: bool = True) -> list[GameRecord]:
         """Alle gespeicherten Spiele eines Teams (ohne API-Aufrufe)."""
         games = self.store.team_games(team.id)
-        ids = [tg.match_id for tg in games]
+        return self._records([(tg.match_id, tg.side, tg.label, tg.included) for tg in games], with_timeline)
+
+    def _records(self, games: list[tuple[str, int, str, bool]], with_timeline: bool = True) -> list[GameRecord]:
+        ids = [g[0] for g in games]
         raw = self.store.get_matches([mid for mid in ids if not self._is_parsed(mid)])
         summaries = self.store.get_timeline_summaries(ids, SUMMARY_VERSION) if with_timeline else {}
         records = []
-        for tg in games:
+        for mid, side, label, included in games:
             try:
-                match = self._parse_from(tg.match_id, raw.get(tg.match_id))
+                match = self._parse_from(mid, raw.get(mid))
             except RiotAPIError as exc:
-                log.warning("Spiel %s nicht ladbar: %s", tg.match_id, exc)
+                log.warning("Spiel %s nicht ladbar: %s", mid, exc)
                 continue
-            records.append(GameRecord(match, tg.side, tg.label, tg.included, summaries.get(tg.match_id)))
+            records.append(GameRecord(match, side, label, included, summaries.get(mid)))
         return records
 
     def _is_parsed(self, match_id: str) -> bool:
@@ -294,6 +301,76 @@ class PrimeStats:
         return assigned
 
 
+    # ------------------------------------------------------------ Scouting
+    def scout(self, account: dict, progress: "SyncJob", min_members: int = 4,
+              depth: int = SCOUT_MATCH_COUNT, timelines: int = SCOUT_TIMELINES) -> None:
+        """Turnier-Scouting ab einem einzelnen Spieler.
+
+        1. Turniercode-Spiele des Spielers laden und daraus den Kader ableiten (häufige Mitspieler).
+        2. Turniercode-Spiele aller Kader-Spieler durchsuchen – so werden auch Spiele gefunden, in denen der
+           gesuchte Spieler selbst fehlte.
+        3. Alle Spiele behalten, in denen mindestens ``min_members`` Kader-Spieler zusammen spielten.
+        Nutzt ausschließlich öffentliche Riot-API-Daten (keine hochgeladenen Scrims).
+        """
+        if not self.online:
+            raise RiotAPIError(503, "Scouting braucht einen Riot-API-Key (LOL_API_KEY).")
+        puuid = account["puuid"]
+        progress.update(f"Lade Turnierspiele von {account['gameName']} …", 0, 1)
+        own_ids = self.custom_match_ids(puuid, depth)
+        own = []
+        for i, mid in enumerate(own_ids, 1):
+            progress.update(f"Lade Spiel {i}/{len(own_ids)}", i, len(own_ids))
+            own.append(self.match(mid))
+        own = [m for m in own if not m.private]
+        roster = infer_roster(own, puuid)
+        if not roster:
+            raise RiotAPIError(404, f"{account['gameName']}#{account['tagLine']} hat keine Turnierspiele.")
+        roster_puuids = {r["puuid"] for r in roster}
+        needed = min(min_members, len(roster))
+
+        # Eigene Spiele sind schon geladen; fremde nur abrufen, wenn sie in mehreren Kader-Listen
+        # auftauchen (Toleranz 1, weil ältere Spiele aus einzelnen Listen herausfallen können).
+        occurrences: Counter = Counter()
+        for i, member in enumerate(roster[1:], 1):
+            progress.update(f"Durchsuche Spiele von {member['game_name']} …", i, len(roster) - 1)
+            occurrences.update(set(self.custom_match_ids(member["puuid"], depth)) - set(own_ids))
+        others = {mid for mid, c in occurrences.items() if c >= max(1, needed - 1)}
+        candidates = sorted({m.match_id for m in own} | others, key=_match_sort_key, reverse=True)
+        games: list[tuple[str, int]] = []
+        for i, mid in enumerate(candidates, 1):
+            progress.update(f"Prüfe Spiel {i}/{len(candidates)}", i, len(candidates))
+            match = self.match(mid)
+            if match.private or not match.is_custom:
+                continue
+            side = match_side_for_team(match, roster_puuids, needed)
+            if side is not None:
+                games.append((mid, side))
+
+        # Timelines (Goldkurven, Lane-Differenzen) für die neuesten Spiele
+        recent = [mid for mid, _ in games][:timelines]
+        missing = [mid for mid in recent if mid not in self.store.summarized_matches(recent, SUMMARY_VERSION)]
+        for i, mid in enumerate(missing, 1):
+            progress.update(f"Lade Timeline {i}/{len(missing)}", i, len(missing))
+            try:
+                self.timeline_summary(self.match(mid))
+            except RiotAPIError as exc:
+                log.warning("Timeline für %s nicht verfügbar: %s", mid, exc)
+
+        # Kader-Statistik (Spiele je Spieler) auf Basis aller gefundenen Teamspiele aktualisieren
+        counts: Counter = Counter()
+        for mid, side in games:
+            counts.update(p.puuid for p in self.match(mid).teams[side].players if p.puuid in roster_puuids)
+        for r in roster:
+            r["games"] = counts.get(r["puuid"], r["games"])
+        self.store.put_scout(puuid, account["gameName"], account["tagLine"], roster, games, needed)
+        progress.new_games = len(games)
+        progress.done_message = f"Fertig – {len(games)} Turnierspiele von {len(roster)} Spielern gefunden."
+
+    def scout_records(self, scout: dict) -> list[GameRecord]:
+        return [r for r in self._records([(mid, side, "official", True) for mid, side in scout["games"]])
+                if not r.match.private]
+
+
 def _match_sort_key(match_id: str) -> int:
     try:
         return int(match_id.rsplit("_", 1)[-1])
@@ -303,13 +380,14 @@ def _match_sort_key(match_id: str) -> int:
 
 @dataclass
 class SyncJob:
-    team_id: int
+    key: object
     status: str = "running"         # running | done | error
     message: str = "Starte …"
     done: int = 0
     total: int = 0
     new_games: int = 0
     error: str = ""
+    done_message: str = ""
     started: float = field(default_factory=time.time)
     finished: float | None = None
 
@@ -322,37 +400,40 @@ class SyncJob:
 
 
 class SyncJobs:
-    """Führt Team-Syncs im Hintergrund aus (ein Job pro Team gleichzeitig)."""
+    """Führt Team-Syncs und Scoutings im Hintergrund aus (ein Job je Schlüssel gleichzeitig)."""
 
     def __init__(self, app: PrimeStats):
         self.app = app
-        self._jobs: dict[int, SyncJob] = {}
+        self._jobs: dict[object, SyncJob] = {}
         self._lock = threading.Lock()
 
-    def get(self, team_id: int) -> SyncJob | None:
-        return self._jobs.get(team_id)
+    def get(self, key) -> SyncJob | None:
+        return self._jobs.get(key)
 
     def start(self, team: Team, background: bool = True) -> SyncJob:
+        return self.run(team.id, lambda job: self.app.sync_team(team, job), background)
+
+    def run(self, key, fn, background: bool = True) -> SyncJob:
         with self._lock:
-            job = self._jobs.get(team.id)
+            job = self._jobs.get(key)
             if job and job.status == "running":
                 return job
-            job = self._jobs[team.id] = SyncJob(team.id)
+            job = self._jobs[key] = SyncJob(key)
         if background:
-            threading.Thread(target=self._run, args=(team, job), daemon=True).start()
+            threading.Thread(target=self._run, args=(fn, job), daemon=True).start()
         else:
-            self._run(team, job)
+            self._run(fn, job)
         return job
 
-    def _run(self, team: Team, job: SyncJob) -> None:
+    def _run(self, fn, job: SyncJob) -> None:
         try:
-            self.app.sync_team(team, job)
+            fn(job)
             job.status = "done"
-            job.message = f"Fertig – {job.new_games} neue Spiele gefunden."
+            job.message = job.done_message or f"Fertig – {job.new_games} neue Spiele gefunden."
         except Exception as exc:  # noqa: BLE001 - Fehler dem Nutzer anzeigen
-            log.exception("Sync für Team %s fehlgeschlagen", team.id)
+            log.exception("Job %s fehlgeschlagen", job.key)
             job.status = "error"
             job.error = getattr(exc, "message", None) or str(exc)
-            job.message = "Synchronisation fehlgeschlagen."
+            job.message = "Fehlgeschlagen."
         finally:
             job.finished = time.time()

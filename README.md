@@ -36,10 +36,26 @@ Das Datenbankschema wird beim Start automatisch per Alembic migriert.
 
 Ohne API-Key lässt sich alles mit generierten Beispieldaten ausprobieren (`PRIMESTATS_DEMO=1` in `.env`;
 die Demo-Scrims werden beim Start so importiert, als kämen sie vom Uploader). Im Demo-Modus gibt es das
-Konto `demo` / `demo1234` (verknüpft mit `NLE Polaris#EUW`) und das öffentliche Team „Nordlicht Esports“.
+Konto `demo` / `demo1234` (verknüpft mit `NLE Polaris#EUW`), das öffentliche Team „Nordlicht Esports“ und
+ein Beispiel-Scouting des Gegners „BSK“ (weitere z.B. mit `RHW Anker#EUW`).
 Im Demo-Modus z.B. nach `NLE Polaris#EUW` suchen oder ein Team mit
 `NLE Frostbite#EUW`, `NLE Waldgeist#EUW`, `NLE Polaris#EUW`, `NLE Kompass#EUW`, `NLE Leuchtturm#EUW`
 (und optional `NLE Treibholz#EUW`) anlegen. Alle Namen sind frei erfunden.
+
+## Turnier-Scouting
+
+Unter **Scouting** (oder „Team scouten“ auf einer Spielerseite) reicht ein einziger Spieler des Gegners:
+
+1. Seine Turniercode-Spiele (Prime League) werden geladen; wer oft genug mit ihm im selben Team stand
+   (mind. 2 Spiele bzw. 20 % seiner Spiele), gilt als Kader.
+2. Die Turnierspiele aller Kader-Spieler werden ebenfalls durchsucht – so tauchen auch Spiele auf, in denen
+   der gesuchte Spieler selbst gefehlt hat.
+3. Alle Spiele mit mindestens *N* (Standard 4) Kader-Spielern im selben Team bilden den Report: Winrate je
+   Seite, Picks & Bans, Bans gegen das Team, Champion-Pools, Objectives, Goldverlauf und Spielliste.
+
+Scouting ist für alle offen (auch ohne Konto), nutzt nur öffentliche Riot-API-Daten – hochgeladene Scrims
+fließen nie ein – und braucht deshalb einen `LOL_API_KEY`. Ergebnisse werden gespeichert und sind über
+„Zuletzt gescoutet“ bzw. ihre URL erneut abrufbar; „Neu scouten“ aktualisiert sie.
 
 ## Konten und Riot-Verknüpfung
 
@@ -60,13 +76,18 @@ Was Konten und Verknüpfungen steuern:
 | | Anonym | Angemeldet | Riot-Account im Kader |
 |---|---|---|---|
 | Turniercode-Spiele (Riot-API) suchen/ansehen | ✓ | ✓ | ✓ |
-| Hochgeladene Scrims ansehen | – | nur eigene (mitgespielt) | + Scrims des Teams |
-| Öffentliche Teams ansehen | ✓ | ✓ | ✓ |
+| Turnier-Scouting | ✓ | ✓ | ✓ |
+| Hochgeladene Scrims ansehen | – | – | nur Scrims der eigenen Teams |
+| Öffentliche Teams ansehen (ohne Scrims) | ✓ | ✓ | ✓ |
 | Private Teams ansehen | – | nur selbst erstellte | ✓ |
 | Team anlegen | – | ✓ | ✓ |
 | Team bearbeiten, synchronisieren, Spiele labeln | – | Ersteller | ✓ |
 | Team löschen | – | Ersteller | – |
 | Scrims hochladen | – | – | eigene Spiele (Uploader) |
+
+Scrims sieht ausschließlich, wessen verknüpfter Riot-Account im Kader eines Teams steht, dem das Spiel
+zugeordnet ist – auch bei öffentlichen Teams, für Team-Ersteller ohne eigenen Account im Kader und im
+Scouting nicht. So kann niemand ein Team aus fremden Riot-IDs anlegen, um deren Scrims zu sehen.
 
 Passwörter werden mit scrypt gehasht, Sessions laufen über ein `HttpOnly`-Cookie (`SameSite=Lax`, bei HTTPS
 `Secure`); ändernde Anfragen brauchen zusätzlich den Header `X-Requested-With: PrimeStats` (CSRF-Schutz).
@@ -190,6 +211,7 @@ backend/
     lcu.py                League-Client-Format → match-v5 (für hochgeladene Scrims)
     accounts_api.py       Konten, Anmeldung, Riot-Verknüpfung, Uploader-Endpunkte
     access.py             Sichtbarkeit und Berechtigungen
+    scout_api.py          Turnier-Scouting (Kader aus einem Spieler ableiten)
     auth.py               Passwort-Hashing (scrypt), Tokens, Verknüpfungscodes
     services.py           Spielersuche, Caching, Team-Sync (Hintergrund-Jobs)
     matches.py            match-v5 → Datenobjekte (inkl. Rollenerkennung für Custom Lobbys)
@@ -204,7 +226,7 @@ uploader/
 frontend/
   src/
     api/                  Fetch-Client, TypeScript-Typen, TanStack-Query-Hooks
-    pages/                Start, Spieler, Analyse, Scoreboard, Teams, Team-Formular, Team-Dashboard, Uploader, Login, Konto
+    pages/                Start, Spieler, Analyse, Scoreboard, Teams, Team-Formular, Team-Dashboard, Scouting, Uploader, Login, Konto
     components/           UI-Bausteine, Charts (Chart.js), Team-Dashboard-Komponenten
 ```
 
@@ -227,5 +249,7 @@ frontend/
 | DELETE | `/api/me/riot/{puuid}` | Verknüpfung lösen |
 | POST | `/api/uploader/status`, `/api/uploader/link` | Uploader: Verknüpfung prüfen / per Code herstellen |
 | POST | `/api/uploader/known`, `/api/uploader/games` | Uploader: bekannte Match-IDs abfragen / Spiele hochladen |
+| POST | `/api/scout` | Scouting ab einem Spieler starten (`riot_id`, `min_members`) |
+| GET | `/api/scout`, `/api/scout/{puuid}`, `/api/scout/{puuid}/status` | Letzte Scoutings, Report (mit Filtern), Fortschritt |
 
 Die vollständige, interaktive Doku gibt es unter `/docs` (OpenAPI).

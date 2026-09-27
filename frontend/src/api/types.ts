@@ -111,6 +111,8 @@ export interface Team {
   public: boolean;
   can_edit: boolean;
   can_delete: boolean;
+  /** Scrims sind nur für Spieler im Kader sichtbar */
+  can_see_scrims: boolean;
 }
 
 export interface TeamInput {
@@ -282,3 +284,29 @@ export interface RiotLink {
 export interface Me { user: User | null; riot_accounts: RiotLink[] }
 
 export interface LinkCode { code: string; expires_at: string }
+
+export interface RosterPlayer { puuid: string; game_name: string; tag_line: string; games: number; position: string }
+
+export interface ScoutSummary {
+  puuid: string;
+  game_name: string;
+  tag_line: string;
+  team_tag: string;
+  games: number;
+  roster: RosterPlayer[];
+  updated_at: string;
+}
+
+export interface ScoutReport {
+  player: { puuid: string; game_name: string; tag_line: string };
+  team_tag: string;
+  roster: RosterPlayer[];
+  min_members: number;
+  updated_at: string;
+  filters: Filters;
+  report: Report;
+  history: HistoryRow[];
+  patches: string[];
+  opponents: string[];
+  job: SyncJob | null;
+}

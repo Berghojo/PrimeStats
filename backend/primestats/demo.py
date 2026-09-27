@@ -115,7 +115,7 @@ class DemoSource:
             code = f"EUW04demo-{week:04d}-{rng.randrange(16 ** 8):08x}"
             for game in range(2):
                 self._game(monday + timedelta(days=6, hours=18, minutes=70 * game),
-                           self._lineup(roster, sub_chance=0.1), names, strength, code, us_blue=game == 0)
+                           self._lineup(roster, sub_chance=0.3), names, strength, code, us_blue=game == 0)
             # Scrims unter der Woche
             for day in rng.sample([0, 1, 2, 3], k=rng.choice([1, 2])):
                 tag, names, strength = rng.choice(OPPONENTS)
@@ -446,3 +446,6 @@ def setup_demo_account(service) -> None:
     members, _ = service.resolve_members(entries)
     team_id = store.create_team(name, tag, 4, members, owner_id=user.id, public=True)
     service.jobs.start(store.get_team(team_id), background=False)
+    # Beispiel-Scouting eines Gegners
+    rival = service.account("BSK Skalde#EUW")
+    service.jobs.run(("scout", rival["puuid"]), lambda job: service.scout(rival, job), background=False)

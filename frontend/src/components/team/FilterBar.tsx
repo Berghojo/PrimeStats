@@ -7,18 +7,20 @@ interface Props {
   opponents: string[];
   onChange: (next: Partial<Filters>) => void;
   onReset: () => void;
+  /** Scouting/ohne Scrims: Spieltyp-Filter ergibt keinen Sinn */
+  hideLabel?: boolean;
 }
 
-export function FilterBar({ filters, patches, opponents, onChange, onReset }: Props) {
+export function FilterBar({ filters, patches, opponents, onChange, onReset, hideLabel }: Props) {
   const { meta } = useGameData();
   return (
     <div className="card filters">
-      <label className="field">Spieltyp
+      {!hideLabel && <label className="field">Spieltyp
         <select value={filters.label} onChange={(e) => onChange({ label: e.target.value as Filters["label"] })}>
           <option value="all">Alle</option>
           {Object.entries(meta?.labels ?? {}).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
         </select>
-      </label>
+      </label>}
       <label className="field">Seite
         <select value={filters.side} onChange={(e) => onChange({ side: e.target.value as Filters["side"] })}>
           <option value="all">Beide</option>

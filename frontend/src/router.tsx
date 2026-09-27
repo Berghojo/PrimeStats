@@ -8,6 +8,8 @@ import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { MatchPage } from "./pages/MatchPage";
 import { PlayerPage } from "./pages/PlayerPage";
+import { ScoutPage } from "./pages/ScoutPage";
+import { ScoutReportPage } from "./pages/ScoutReportPage";
 import { TeamFormPage } from "./pages/TeamFormPage";
 import { TeamPage } from "./pages/TeamPage";
 import { TeamsPage } from "./pages/TeamsPage";
@@ -34,6 +36,8 @@ export const routes = [
       { path: "teams/new", element: <TeamFormPage /> },
       { path: "teams/:teamId", element: <TeamPage /> },
       { path: "teams/:teamId/edit", element: <TeamFormPage /> },
+      { path: "scout", element: <ScoutPage /> },
+      { path: "scout/:puuid", element: <ScoutReportPage /> },
       { path: "uploader", element: <UploaderPage /> },
       { path: "login", element: <LoginPage /> },
       { path: "account", element: <AccountPage /> },
