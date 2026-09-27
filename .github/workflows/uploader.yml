@@ -2,6 +2,8 @@ name: Uploader (Windows-EXE)
 
 on:
   push:
+    # Nur "tags" allein würde Branch-Pushes ignorieren – daher beides angeben
+    branches: ["**"]
     paths: ["uploader/**", ".github/workflows/uploader.yml"]
     tags: ["uploader-v*"]
   workflow_dispatch:
