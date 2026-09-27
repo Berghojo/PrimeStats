@@ -85,3 +85,17 @@ class TeamGameRow(Base):
     side: Mapped[int] = mapped_column(SmallInteger)            # teamId des Teams (100/200)
     label: Mapped[str] = mapped_column(String(20), default="")  # '', 'official', 'scrim'
     included: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+# ------------------------------------------------------------ LCU-Importe
+class RawImport(Base):
+    """Originaldaten aus dem League Client – erlaubt spätere Neukonvertierung."""
+
+    __tablename__ = "raw_imports"
+
+    match_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    source: Mapped[str] = mapped_column(String(20))
+    game: Mapped[dict] = mapped_column(JSONB)
+    timeline: Mapped[dict | None] = mapped_column(JSONB)
+    uploader: Mapped[str] = mapped_column(Text, default="")
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

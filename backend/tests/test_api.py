@@ -101,13 +101,3 @@ def test_team_validation(client):
     assert _create_team(client, min_members=9).status_code == 422
 
 
-def test_without_source_returns_503(store, tmp_path):
-    from fastapi.testclient import TestClient
-
-    from primestats.app import create_app
-    from primestats.config import Settings
-    app = create_app(Settings(demo=False, api_key=None, ddragon_fetch=False, cache_dir=tmp_path,
-                              auto_migrate=False), store=store)
-    with TestClient(app) as client:
-        assert client.get("/api/meta").json()["configured"] is False
-        assert client.get("/api/teams").status_code == 503

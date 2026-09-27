@@ -74,8 +74,9 @@ export function TeamPage() {
         <Empty>
           <h2>Noch keine Spiele</h2>
           <p>
-            Starte die Synchronisation: PrimeStats lädt die Custom-Game-Historie aller Mitglieder und übernimmt alle Spiele,
-            in denen mindestens {team.min_members} von ihnen im selben Team standen.
+            Starte die Synchronisation: PrimeStats übernimmt alle Spiele, in denen mindestens {team.min_members} Mitglieder
+            im selben Team standen – Prime-League-Spiele (Turniercode) über die Riot-API und Scrims, die jemand aus dem Team
+            per <Link to="/uploader">Uploader</Link> hochgeladen hat.
           </p>
         </Empty>
       ) : (

@@ -9,6 +9,7 @@ import { PlayerPage } from "./pages/PlayerPage";
 import { TeamFormPage } from "./pages/TeamFormPage";
 import { TeamPage } from "./pages/TeamPage";
 import { TeamsPage } from "./pages/TeamsPage";
+import { UploaderPage } from "./pages/UploaderPage";
 
 const NotFound = () => (
   <Empty>
@@ -31,6 +32,7 @@ export const routes = [
       { path: "teams/new", element: <TeamFormPage /> },
       { path: "teams/:teamId", element: <TeamPage /> },
       { path: "teams/:teamId/edit", element: <TeamFormPage /> },
+      { path: "uploader", element: <UploaderPage /> },
       { path: "*", element: <NotFound /> },
     ],
   },

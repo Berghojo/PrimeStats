@@ -8,17 +8,46 @@ import time
 from collections import Counter
 from dataclasses import dataclass, field
 
+from . import lcu
 from .matches import MatchSummary, parse_match
-from .riot import MatchSource, RiotAPIError, split_riot_id
+from .riot import MatchSource, NotFound, RiotAPIError, split_riot_id
 from .store import Member, Store, Team
 from .team_stats import GameRecord, default_label, match_side_for_team
 from .timeline import SUMMARY_VERSION, summarize_timeline
 
 log = logging.getLogger(__name__)
 
-#: Abfragen für Custom Games: queue=0 (Custom-Lobbys inkl. Turniercode-Spiele) und type=tourney
-CUSTOM_QUERIES = ({"queue": 0}, {"type": "tourney"})
+#: Die Riot-API liefert Custom Games nur, wenn sie per Turniercode erstellt wurden (type=tourney).
+#: Normale Custom-Lobbys (Scrims) kommen ausschließlich über den LCU-Uploader herein.
+CUSTOM_QUERIES = ({"type": "tourney"},)
 PARSE_CACHE_SIZE = 4096
+
+
+class OfflineSource:
+    """Platzhalter ohne Riot-API-Key: nur importierte Spiele sind verfügbar."""
+
+    online = False
+
+    def _fail(self, *_args, **_kwargs):
+        raise RiotAPIError(503, "Kein Riot-API-Key konfiguriert – nur hochgeladene Spiele sind verfügbar.")
+
+    def account(self, riot_id: str) -> dict:
+        name, tag = split_riot_id(riot_id)
+        raise NotFound(404, f"Spieler {name}#{tag} ist in keinem hochgeladenen Spiel enthalten "
+                            "(ohne Riot-API-Key sind nur hochgeladene Spieler bekannt).")
+
+    match_ids = _fail
+    match = _fail
+    timeline = _fail
+
+
+@dataclass
+class ImportResult:
+    imported: list[str] = field(default_factory=list)
+    updated: list[str] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    assigned: dict[str, int] = field(default_factory=dict)
 
 
 class PrimeStats:
@@ -26,6 +55,7 @@ class PrimeStats:
         self.store = store
         self.source = source
         self.sync_match_count = sync_match_count
+        self.online = getattr(source, "online", True)
         self.jobs = SyncJobs(self)
         self._parsed: dict[str, MatchSummary] = {}
         self._parsed_lock = threading.Lock()
@@ -77,7 +107,10 @@ class PrimeStats:
         return summary
 
     def custom_match_ids(self, puuid: str, count: int) -> list[str]:
+        """Turniercode-Spiele laut Riot-API (leer ohne API-Key)."""
         ids: list[str] = []
+        if not self.online:
+            return ids
         for query in CUSTOM_QUERIES:
             for mid in self.source.match_ids(puuid, count, **query):
                 if mid not in ids:
@@ -88,7 +121,9 @@ class PrimeStats:
     # -------------------------------------------------------------- player
     def player_games(self, riot_id: str, count: int = 20) -> tuple[dict, list[MatchSummary]]:
         account = self.account(riot_id)
-        ids = self.custom_match_ids(account["puuid"], count)[:count]
+        ids = set(self.custom_match_ids(account["puuid"], count))
+        ids |= set(self.store.matches_with_players({account["puuid"]}))  # hochgeladene Scrims
+        ids = sorted(ids, key=_match_sort_key, reverse=True)[:count]
         games = []
         for mid in ids:
             match = self.match(mid)
@@ -144,26 +179,28 @@ class PrimeStats:
         puuids = team.puuids
         min_members = min(team.min_members, max(len(puuids), 1))
 
-        # 1) Match-IDs aller Mitglieder sammeln; Kandidaten = IDs, die bei genug Mitgliedern auftauchen
-        progress.update("Lade Spiellisten der Mitglieder …", 0, len(team.members))
-        occurrences: Counter = Counter()
-        for i, member in enumerate(team.members, 1):
-            occurrences.update(set(self.custom_match_ids(member.puuid, self.sync_match_count)))
-            progress.update(f"Spielliste von {member.game_name} geladen", i, len(team.members))
         known = {tg.match_id for tg in self.store.team_games(team.id)}
-        candidates = [mid for mid, c in occurrences.items() if c >= min_members and mid not in known]
-        candidates.sort(key=_match_sort_key, reverse=True)
 
-        # 2) Matchdetails laden und prüfen, ob die Spieler im selben Team waren
-        found: list[tuple[str, int, str]] = []
-        for i, mid in enumerate(candidates, 1):
-            progress.update(f"Prüfe Spiel {i}/{len(candidates)}", i, len(candidates))
-            match = self.match(mid)
-            if not match.is_custom:
-                continue
-            side = match_side_for_team(match, puuids, min_members)
-            if side is not None:
-                found.append((mid, side, default_label(match)))
+        # 0) Bereits gespeicherte Spiele (z.B. per Uploader hochgeladene Scrims) zuordnen
+        progress.update("Prüfe gespeicherte Spiele …", 0, 1)
+        stored = [mid for mid in self.store.matches_with_players(puuids) if mid not in known]
+        found = self._team_matches(stored, puuids, min_members)
+
+        # 1) Turniercode-Spiele aller Mitglieder über die Riot-API; Kandidaten = IDs, die bei genug
+        #    Mitgliedern auftauchen
+        tourney: set[str] = set()
+        if self.online:
+            occurrences: Counter = Counter()
+            for i, member in enumerate(team.members, 1):
+                progress.update(f"Lade Spielliste von {member.game_name} …", i - 1, len(team.members))
+                occurrences.update(set(self.custom_match_ids(member.puuid, self.sync_match_count)))
+            tourney = {mid for mid, c in occurrences.items() if c >= min_members}
+            candidates = sorted(tourney - known - set(stored), key=_match_sort_key, reverse=True)
+
+            # 2) Matchdetails laden und prüfen, ob die Spieler im selben Team waren
+            for i, mid in enumerate(candidates, 1):
+                progress.update(f"Prüfe Spiel {i}/{len(candidates)}", i, len(candidates))
+                found += self._team_matches([mid], puuids, min_members, official=True)
         progress.new_games = self.store.add_team_games(team.id, found)
 
         # 3) Timelines für alle Teamspiele (fehlende nachladen)
@@ -173,10 +210,82 @@ class PrimeStats:
         for i, tg in enumerate(missing, 1):
             progress.update(f"Lade Timeline {i}/{len(missing)}", i, len(missing))
             try:
-                self.timeline_summary(self.match(tg.match_id))
+                self.timeline_summary(self.match(tg.match_id), fetch=self.online)
             except RiotAPIError as exc:  # Timeline optional – Spiel bleibt trotzdem erhalten
                 log.warning("Timeline für %s nicht verfügbar: %s", tg.match_id, exc)
         self.store.mark_synced(team.id)
+
+
+    def _team_matches(self, match_ids: list[str], puuids: set[str], min_members: int,
+                      official: bool = False) -> list[tuple[str, int, str]]:
+        found = []
+        for mid in match_ids:
+            match = self.match(mid)
+            if not match.is_custom:
+                continue
+            side = match_side_for_team(match, puuids, min_members)
+            if side is not None:
+                found.append((mid, side, "official" if official else default_label(match)))
+        return found
+
+    # ------------------------------------------------------------- imports
+    def known_matches(self, match_ids: list[str]) -> set[str]:
+        return self.store.existing_matches(match_ids)
+
+    def import_lcu(self, items: list[dict], uploader: str = "") -> ImportResult:
+        """Importiert Spiele aus dem League Client (Format der LCU-API).
+
+        Bereits vorhandene Matches (z.B. über die Riot-API geladene Turnierspiele) werden nicht
+        überschrieben; fehlende Timelines werden aber ergänzt.
+        """
+        result = ImportResult()
+        existing = self.store.existing_matches([lcu.match_id(i["game"]) for i in items if "gameId" in i.get("game", {})])
+        new_ids: list[str] = []
+        for item in items:
+            game, raw_timeline = item.get("game") or {}, item.get("timeline")
+            try:
+                converted = lcu.convert_game(game)
+                mid = converted["metadata"]["matchId"]
+                timeline = lcu.convert_timeline(raw_timeline, converted) if raw_timeline else None
+            except (lcu.LcuFormatError, KeyError, TypeError) as exc:
+                result.errors.append(f"{game.get('gameId', '?')}: {exc}")
+                continue
+            if converted["info"]["gameType"] != "CUSTOM_GAME" and converted["info"]["queueId"] != 0:
+                result.skipped.append(mid)
+                continue
+            self.store.put_raw_import(mid, "lcu", game, raw_timeline, uploader)
+            if mid in existing:
+                if timeline and self.store.get_timeline(mid) is None:
+                    self.store.put_timeline(mid, timeline)
+                    result.updated.append(mid)
+                else:
+                    result.skipped.append(mid)
+                continue
+            self.store.put_match(mid, converted)
+            if timeline:
+                self.store.put_timeline(mid, timeline)
+            for acc in lcu.accounts(converted):
+                self.store.put_account(f"{acc['gameName']}#{acc['tagLine']}", acc)
+            result.imported.append(mid)
+            new_ids.append(mid)
+        result.assigned = self.assign_to_teams(new_ids + result.updated)
+        return result
+
+    def assign_to_teams(self, match_ids: list[str]) -> dict[str, int]:
+        """Ordnet (neu importierte) Spiele allen passenden Teams zu und berechnet Timelines."""
+        assigned: dict[str, int] = {}
+        if not match_ids:
+            return assigned
+        for team in self.store.list_teams():
+            min_members = min(team.min_members, max(len(team.puuids), 1))
+            found = self._team_matches(match_ids, team.puuids, min_members)
+            added = self.store.add_team_games(team.id, found)
+            if added:
+                assigned[team.name] = added
+        for mid in match_ids:
+            if self.store.get_timeline(mid) is not None:
+                self.timeline_summary(self.match(mid), fetch=False)
+        return assigned
 
 
 def _match_sort_key(match_id: str) -> int:

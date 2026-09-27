@@ -15,7 +15,7 @@ from .api import router
 from .config import Settings
 from .ddragon import DataDragon
 from .riot import MatchSource, NotFound, RiotAPIError, RiotClient
-from .services import PrimeStats
+from .services import OfflineSource, PrimeStats
 from .store import Store
 
 log = logging.getLogger(__name__)
@@ -38,9 +38,13 @@ def create_app(settings: Settings | None = None, *, source: MatchSource | None =
                 src = DemoSource()
             elif settings.api_key:
                 src = RiotClient(settings.api_key, region=settings.region)
-        app.state.service = PrimeStats(app.state.store, src, settings.sync_match_count) if src else None
-        if app.state.service is None:
-            log.warning("Kein LOL_API_KEY gesetzt – die API antwortet mit 503 (Demo: PRIMESTATS_DEMO=1).")
+            else:
+                log.warning("Kein LOL_API_KEY gesetzt – nur hochgeladene Spiele (LCU-Uploader) sind verfügbar.")
+                src = OfflineSource()
+        app.state.service = PrimeStats(app.state.store, src, settings.sync_match_count)
+        if settings.demo and source is None:
+            from .demo import import_demo_scrims
+            import_demo_scrims(app.state.service, src)
         yield
         if store is None:
             app.state.store.engine.dispose()

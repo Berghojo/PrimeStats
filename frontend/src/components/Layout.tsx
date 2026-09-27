@@ -47,6 +47,7 @@ export function Layout() {
           <nav className="nav">
             <NavLink to="/" className={() => (pathname === "/" || pathname.startsWith("/player") ? "active" : "")}>Spielersuche</NavLink>
             <NavLink to="/teams">Teams</NavLink>
+            <NavLink to="/uploader">Scrims hochladen</NavLink>
           </nav>
           {meta?.demo && <span className="badge official" title="Es werden generierte Beispieldaten verwendet">Demo-Modus</span>}
           {pathname !== "/" && <PlayerSearch />}
@@ -54,9 +55,10 @@ export function Layout() {
       </header>
       <main className="container stack">
         {meta && !meta.configured && (
-          <div className="flash error">
-            Kein Riot-API-Key konfiguriert. Setze <code>LOL_API_KEY</code> im Backend oder starte mit{" "}
-            <code>PRIMESTATS_DEMO=1</code>, um Beispieldaten zu sehen.
+          <div className="flash">
+            Kein Riot-API-Key konfiguriert – PrimeStats zeigt nur Spiele, die per{" "}
+            <NavLink to="/uploader">Uploader</NavLink> aus dem League Client hochgeladen wurden. Für Prime-League-Spiele
+            (Turniercode) im Backend <code>LOL_API_KEY</code> setzen.
           </div>
         )}
         <Outlet />

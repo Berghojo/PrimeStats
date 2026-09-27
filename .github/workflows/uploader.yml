@@ -1,0 +1,31 @@
+name: Uploader (Windows-EXE)
+
+on:
+  push:
+    paths: ["uploader/**", ".github/workflows/uploader.yml"]
+    tags: ["uploader-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyinstaller -r uploader/requirements.txt
+      - run: pyinstaller --onefile --name PrimeStats-Uploader --distpath dist uploader/primestats_uploader.py
+      - run: dist/PrimeStats-Uploader.exe --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PrimeStats-Uploader
+          path: dist/PrimeStats-Uploader.exe
+      - name: Release (bei Tag uploader-v*)
+        if: startsWith(github.ref, 'refs/tags/uploader-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/PrimeStats-Uploader.exe

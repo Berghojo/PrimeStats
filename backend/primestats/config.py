@@ -43,6 +43,10 @@ class Settings:
     sync_match_count: int = 100
     #: Gebautes React-Frontend, das vom Backend mit ausgeliefert wird (optional)
     frontend_dist: Path | None = None
+    #: Token für den LCU-Uploader (leer = Uploads deaktiviert)
+    upload_token: str = ""
+    #: Wo sich Spieler den Uploader herunterladen können (wird im Frontend verlinkt)
+    uploader_url: str = "https://github.com/Berghojo/PrimeStats/releases/latest"
     cors_origins: list[str] = field(default_factory=list)
 
     @classmethod
@@ -60,5 +64,7 @@ class Settings:
             ddragon_language=os.getenv("DDRAGON_LANGUAGE", "de_DE"),
             sync_match_count=int(os.getenv("SYNC_MATCH_COUNT", "100")),
             frontend_dist=Path(dist) if dist else (default_dist if default_dist.exists() else None),
+            upload_token=os.getenv("UPLOAD_TOKEN", ""),
+            uploader_url=os.getenv("UPLOADER_URL", "https://github.com/Berghojo/PrimeStats/releases/latest"),
             cors_origins=[o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()],
         )

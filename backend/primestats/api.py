@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from .ddragon import DataDragon
 from .matches import POSITION_LABELS
-from .schemas import (AccountOut, AnalysisOut, ChampionOut, Filters, HistoryRow, MatchOut, MetaOut,
-                      PlayerGamesOut, SyncJobOut, TeamGameUpdate, TeamIn, TeamOut, TeamReportOut)
+from .schemas import (AccountOut, AnalysisOut, ChampionOut, Filters, HistoryRow, ImportIn, ImportOut,
+                      KnownIn, KnownOut, MatchOut, MetaOut, PlayerGamesOut, SyncJobOut, TeamGameUpdate,
+                      TeamIn, TeamOut, TeamReportOut)
 from .services import PrimeStats
 from .store import Team
 from .team_stats import LABELS, build_report, filter_records, history_rows, opponents, patches
@@ -21,14 +23,27 @@ MAX_ANALYSIS_GAMES = 30
 
 
 def get_service(request: Request) -> PrimeStats:
-    service = request.app.state.service
-    if service is None:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
-                            "Kein Riot-API-Key konfiguriert. Setze LOL_API_KEY oder PRIMESTATS_DEMO=1.")
-    return service
+    return request.app.state.service
 
 
 Service = Annotated[PrimeStats, Depends(get_service)]
+
+
+def require_upload_token(request: Request) -> str:
+    """Prüft den Bearer-Token des Uploaders; liefert einen Uploader-Namen für die Protokollierung."""
+    expected = request.app.state.settings.upload_token
+    if not expected:
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "Uploads sind auf diesem Server deaktiviert (UPLOAD_TOKEN nicht gesetzt).")
+    header = request.headers.get("Authorization", "")
+    token = header.removeprefix("Bearer ").strip()
+    if not secrets.compare_digest(token.encode(), expected.encode()):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Ungültiger Upload-Token.",
+                            headers={"WWW-Authenticate": "Bearer"})
+    return request.headers.get("X-Uploader", "")[:100]
+
+
+Uploader = Annotated[str, Depends(require_upload_token)]
 
 
 def _team_or_404(service: PrimeStats, team_id: int) -> Team:
@@ -45,7 +60,9 @@ def meta(request: Request) -> MetaOut:
     champions = {c.key: ChampionOut(id=c.id, name=c.name) for c in ddragon.all()}
     return MetaOut(
         demo=request.app.state.settings.demo,
-        configured=request.app.state.service is not None,
+        configured=request.app.state.service.online,
+        uploads_enabled=bool(request.app.state.settings.upload_token),
+        uploader_url=request.app.state.settings.uploader_url,
         ddragon_version=ddragon.version,
         champions=champions,
         positions=POSITION_LABELS,
@@ -97,7 +114,7 @@ def analysis(service: Service, m: Annotated[list[str], Query(min_length=1)],
 def _resolve(service: PrimeStats, body: TeamIn):
     members, errors = service.resolve_members([(m.riot_id, m.role) for m in body.members])
     if errors or not members:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+        raise HTTPException(422,
                             {"message": "Spieler konnten nicht gefunden werden.",
                              "errors": errors or ["Mindestens ein Spieler ist Pflicht."]})
     return members
@@ -175,3 +192,16 @@ def update_team_game(team_id: int, match_id: str, body: TeamGameUpdate, service:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Spiel gehört nicht zu diesem Team.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+
+
+# --------------------------------------------------------- LCU-Uploader
+@router.post("/import/known", response_model=KnownOut)
+def import_known(body: KnownIn, service: Service, _: Uploader):
+    """Welche der Match-IDs sind bereits gespeichert? (Der Uploader lädt nur den Rest hoch.)"""
+    return KnownOut(known=sorted(service.known_matches(body.match_ids)))
+
+
+@router.post("/import/lcu", response_model=ImportOut)
+def import_lcu(body: ImportIn, service: Service, uploader: Uploader):
+    result = service.import_lcu([item.model_dump() for item in body.games], uploader=uploader)
+    return ImportOut(**result.__dict__)

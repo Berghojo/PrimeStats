@@ -13,11 +13,12 @@ from datetime import datetime, timezone
 from typing import Iterator
 
 from sqlalchemy import create_engine, delete, select, update
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import array, insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from .db import Account, Match, TeamGameRow, TeamMemberRow, TeamRow, Timeline, TimelineSummary
+from .db import (Account, Match, RawImport, TeamGameRow, TeamMemberRow, TeamRow, Timeline,
+                 TimelineSummary)
 
 
 @dataclass
@@ -137,6 +138,33 @@ class Store:
             rows = s.execute(select(TimelineSummary.match_id, TimelineSummary.data).where(
                 TimelineSummary.match_id.in_(match_ids), TimelineSummary.version == version))
             return {mid: data for mid, data in rows}
+
+    def existing_matches(self, match_ids: list[str]) -> set[str]:
+        if not match_ids:
+            return set()
+        with self.session() as s:
+            return set(s.scalars(select(Match.match_id).where(Match.match_id.in_(match_ids))))
+
+    def matches_with_players(self, puuids: set[str]) -> list[str]:
+        """Gespeicherte Matches, an denen mindestens einer der Spieler teilgenommen hat."""
+        if not puuids:
+            return []
+        participants = Match.data["metadata"]["participants"]
+        with self.session() as s:
+            return list(s.scalars(select(Match.match_id).where(participants.has_any(array(sorted(puuids))))))
+
+    def put_raw_import(self, match_id: str, source: str, game: dict, timeline: dict | None,
+                       uploader: str = "") -> None:
+        values = {"match_id": match_id, "source": source, "game": game, "timeline": timeline,
+                  "uploader": uploader}
+        stmt = insert(RawImport).values(**values).on_conflict_do_update(
+            index_elements=[RawImport.match_id], set_={k: v for k, v in values.items() if k != "match_id"})
+        with self.session() as s:
+            s.execute(stmt)
+
+    def raw_imports(self) -> list[tuple[str, dict, dict | None]]:
+        with self.session() as s:
+            return [tuple(r) for r in s.execute(select(RawImport.match_id, RawImport.game, RawImport.timeline))]
 
     def summarized_matches(self, match_ids: list[str], version: int) -> set[str]:
         if not match_ids:

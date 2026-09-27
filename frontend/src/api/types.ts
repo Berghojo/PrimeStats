@@ -7,7 +7,10 @@ export interface Champion { id: string; name: string }
 
 export interface Meta {
   demo: boolean;
+  /** Riot-API verfügbar – sonst nur hochgeladene Spiele */
   configured: boolean;
+  uploads_enabled: boolean;
+  uploader_url: string;
   ddragon_version: string;
   champions: Record<string, Champion>;
   positions: Record<string, string>;

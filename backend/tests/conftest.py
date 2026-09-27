@@ -58,6 +58,14 @@ def service(store, demo_source):
 
 
 @pytest.fixture
+def imported(service, demo_source):
+    """Demo-Scrims so importieren, als hätte sie der LCU-Uploader hochgeladen."""
+    from primestats.demo import import_demo_scrims
+    import_demo_scrims(service, demo_source)
+    return service
+
+
+@pytest.fixture
 def demo_team(service):
     name, tag, entries = demo_team_entries()
     members, errors = service.resolve_members(entries)
@@ -67,7 +75,7 @@ def demo_team(service):
 
 
 @pytest.fixture
-def synced_team(service, demo_team):
+def synced_team(imported, service, demo_team):
     job = service.jobs.start(demo_team, background=False)
     assert job.status == "done", job.error
     return demo_team
@@ -75,11 +83,28 @@ def synced_team(service, demo_team):
 
 @pytest.fixture
 def client(store, demo_source, tmp_path):
+    yield from _client(store, demo_source, tmp_path)
+
+
+UPLOAD_TOKEN = "test-token"
+
+
+def _client(store, source, tmp_path, **overrides):
     from fastapi.testclient import TestClient
 
     from primestats.app import create_app
-    settings = Settings(demo=True, ddragon_fetch=False, cache_dir=tmp_path, auto_migrate=False,
-                        database_url=TEST_DATABASE_URL)
-    app = create_app(settings, source=demo_source, store=store)
+    from primestats.demo import import_demo_scrims
+    options = dict(demo=True, ddragon_fetch=False, cache_dir=tmp_path, auto_migrate=False,
+                   database_url=TEST_DATABASE_URL, upload_token=UPLOAD_TOKEN)
+    options.update(overrides)
+    app = create_app(Settings(**options), source=source, store=store)
     with TestClient(app) as client:
+        if isinstance(source, DemoSource):
+            import_demo_scrims(client.app.state.service, source)
         yield client
+
+
+@pytest.fixture
+def offline_client(store, tmp_path):
+    from primestats.services import OfflineSource
+    yield from _client(store, OfflineSource(), tmp_path, demo=False)

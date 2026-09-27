@@ -83,9 +83,8 @@ class DemoSource:
 
     def match_ids(self, puuid: str, count: int = 20, *, queue: int | None = None,
                   type: str | None = None, start: int = 0) -> list[str]:
-        ids = self.by_puuid.get(puuid, [])
-        if type == "tourney":
-            ids = [i for i in ids if self.matches[i]["info"].get("tournamentCode")]
+        # Wie die echte Riot-API: Custom Games gibt es nur mit Turniercode
+        ids = [i for i in self.by_puuid.get(puuid, []) if self.matches[i]["info"].get("tournamentCode")]
         return ids[start:start + count]
 
     def match(self, match_id: str) -> dict:
@@ -369,3 +368,62 @@ class DemoSource:
 def demo_team_entries() -> tuple[str, str, list[tuple[str, str]]]:
     name, tag, roster = DEMO_TEAM
     return name, tag, [(f"{n}#EUW", pos) for n, pos in roster]
+
+
+# ------------------------------------------------------------------ LCU
+_LANE_ROLE = {"TOP": ("TOP", "SOLO"), "JUNGLE": ("JUNGLE", "NONE"), "MIDDLE": ("MIDDLE", "SOLO"),
+              "BOTTOM": ("BOTTOM", "DUO_CARRY"), "UTILITY": ("BOTTOM", "DUO_SUPPORT")}
+
+
+def to_lcu(match: dict, timeline: dict | None = None) -> dict:
+    """Wandelt ein v5-Match (+Timeline) ins Format der League-Client-API um.
+
+    Dient dem Demo-Modus und den Tests als Nachbildung dessen, was der Uploader aus dem
+    Client liest (Struktur wie match-v4: participantIdentities, stats, "Win"/"Fail").
+    """
+    info = match["info"]
+    participants, identities = [], []
+    for p in info["participants"]:
+        lane, role = _LANE_ROLE[p["teamPosition"]]
+        stats = {k: v for k, v in p.items() if k not in {
+            "participantId", "puuid", "riotIdGameName", "riotIdTagline", "championId", "championName",
+            "teamId", "teamPosition", "individualPosition", "summoner1Id", "summoner2Id"}}
+        participants.append({"participantId": p["participantId"], "teamId": p["teamId"],
+                             "championId": p["championId"], "spell1Id": p["summoner1Id"],
+                             "spell2Id": p["summoner2Id"], "stats": stats,
+                             "timeline": {"lane": lane, "role": role}})
+        identities.append({"participantId": p["participantId"],
+                           "player": {"puuid": p["puuid"], "gameName": p["riotIdGameName"],
+                                      "tagLine": p["riotIdTagline"], "summonerName": p["riotIdGameName"],
+                                      "platformId": info["platformId"]}})
+    teams = []
+    for t in info["teams"]:
+        o = t["objectives"]
+        teams.append({
+            "teamId": t["teamId"], "win": "Win" if t["win"] else "Fail", "bans": t["bans"],
+            "firstBlood": o["champion"]["first"], "firstTower": o["tower"]["first"],
+            "firstInhibitor": o["inhibitor"]["first"], "firstDargon": o["dragon"]["first"],
+            "firstBaron": o["baron"]["first"], "firstRiftHerald": o["riftHerald"]["first"],
+            "towerKills": o["tower"]["kills"], "inhibitorKills": o["inhibitor"]["kills"],
+            "dragonKills": o["dragon"]["kills"], "baronKills": o["baron"]["kills"],
+            "riftHeraldKills": o["riftHerald"]["kills"], "hordeKills": o["horde"]["kills"],
+        })
+    game = {
+        "gameId": int(match["metadata"]["matchId"].split("_")[1]), "platformId": info["platformId"],
+        "gameCreation": info["gameCreation"], "gameDuration": info["gameDuration"],
+        "gameMode": info["gameMode"], "gameType": info["gameType"], "gameVersion": info["gameVersion"],
+        "mapId": info["mapId"], "queueId": info["queueId"], "seasonId": 15,
+        "participants": participants, "participantIdentities": identities, "teams": teams,
+    }
+    lcu_timeline = None
+    if timeline:
+        lcu_timeline = {"frameInterval": timeline["info"]["frameInterval"], "frames": timeline["info"]["frames"]}
+    return {"game": game, "timeline": lcu_timeline}
+
+
+def import_demo_scrims(service, source: "DemoSource") -> None:
+    """Demo: Scrims ohne Turniercode so importieren, als hätte sie der Uploader hochgeladen."""
+    items = [to_lcu(m, source.timelines.get(mid)) for mid, m in source.matches.items()
+             if not m["info"].get("tournamentCode")]
+    for i in range(0, len(items), 25):
+        service.import_lcu(items[i:i + 25], uploader="demo")

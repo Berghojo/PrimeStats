@@ -22,7 +22,10 @@ class ChampionOut(BaseModel):
 
 class MetaOut(BaseModel):
     demo: bool
+    #: Riot-API verfügbar (sonst nur hochgeladene Spiele)
     configured: bool
+    uploads_enabled: bool
+    uploader_url: str
     ddragon_version: str
     champions: dict[int, ChampionOut]
     positions: dict[str, str]
@@ -346,3 +349,31 @@ class TeamReportOut(BaseModel):
     patches: list[str]
     opponents: list[str]
     job: SyncJobOut | None
+
+
+# ------------------------------------------------------------ LCU-Import
+class KnownIn(BaseModel):
+    match_ids: list[str] = Field(max_length=2000)
+
+
+class KnownOut(BaseModel):
+    known: list[str]
+
+
+class LcuGame(BaseModel):
+    """Ein Spiel wie vom League Client geliefert (``/lol-match-history/v1/games/{id}``)."""
+
+    game: dict
+    timeline: dict | None = None
+
+
+class ImportIn(BaseModel):
+    games: list[LcuGame] = Field(max_length=50)
+
+
+class ImportOut(BaseModel):
+    imported: list[str]
+    updated: list[str]
+    skipped: list[str]
+    errors: list[str]
+    assigned: dict[str, int]

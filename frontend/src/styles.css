@@ -259,3 +259,4 @@ table.data tr.selected td { background: rgba(124, 92, 255, .07); }
 .search .input[aria-invalid="true"] { border-color: var(--loss); }
 .field .spinner { display: inline-block; width: 12px; height: 12px; vertical-align: middle; }
 code { background: var(--surface-2); padding: .05rem .35rem; border-radius: 4px; }
+.steps { margin: 0; padding-left: 1.2rem; display: grid; gap: .6rem; }

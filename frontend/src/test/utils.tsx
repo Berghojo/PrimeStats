@@ -8,6 +8,8 @@ import type { Meta } from "../api/types";
 export const META: Meta = {
   demo: true,
   configured: true,
+  uploads_enabled: true,
+  uploader_url: "https://example.org/uploader",
   ddragon_version: "15.13.1",
   champions: { "266": { id: "Aatrox", name: "Aatrox" }, "62": { id: "MonkeyKing", name: "Wukong" } },
   positions: { TOP: "Top", JUNGLE: "Jungle", MIDDLE: "Mid", BOTTOM: "ADC", UTILITY: "Support" },
