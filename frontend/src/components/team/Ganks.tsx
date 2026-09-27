@@ -1,28 +1,23 @@
 import { useMemo, useState } from "react";
 
 import type { DeathEvent, DeathKind, PlayerReport } from "../../api/types";
-import { dt, duration } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
-import { MapBase, SIZE, Slider, px, py } from "./Jungle";
+import { DEATH_RGB, Heat, MapBase, SIZE, Slider } from "./Jungle";
 import { InfoTip } from "../InfoTip";
 
-const KINDS: { key: DeathKind; label: string; color: string; hint: string }[] = [
-  { key: "gank", label: "Gank", color: "#ffc23d", hint: "gegnerischer Jungler beteiligt" },
-  { key: "roam", label: "Roam", color: "#c084fc", hint: "Laner einer anderen Lane beteiligt (bei Junglern: irgendein Laner)" },
-  { key: "gank_roam", label: "Gank + Roam", color: "#ff7a45", hint: "Jungler und Laner einer anderen Lane" },
-  { key: "lane", label: "Lane", color: "#4c8dff", hint: "nur die direkten Lane-Gegner" },
-  { key: "duel", label: "Jungle 1v1", color: "#5ff2de", hint: "Jungler nur gegen den gegnerischen Jungler" },
-  { key: "other", label: "Sonstige", color: "#8b93a5", hint: "ohne gegnerischen Champion (Turm, Minions)" },
+const KINDS: { key: DeathKind; label: string; hint: string }[] = [
+  { key: "gank", label: "Gank", hint: "gegnerischer Jungler beteiligt" },
+  { key: "roam", label: "Roam", hint: "Laner einer anderen Lane beteiligt (bei Junglern: irgendein Laner)" },
+  { key: "gank_roam", label: "Gank + Roam", hint: "Jungler und Laner einer anderen Lane" },
+  { key: "lane", label: "Lane", hint: "nur die direkten Lane-Gegner" },
+  { key: "duel", label: "Jungle 1v1", hint: "Jungler nur gegen den gegnerischen Jungler" },
+  { key: "other", label: "Sonstige", hint: "ohne gegnerischen Champion (Turm, Minions)" },
 ];
-const COLOR = Object.fromEntries(KINDS.map((k) => [k.key, k.color])) as Record<DeathKind, string>;
-const LABEL = Object.fromEntries(KINDS.map((k) => [k.key, k.label])) as Record<DeathKind, string>;
 const ORDER = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
-
-const mmss = (t: number) => duration(t);
 
 /** Tode der eigenen Spieler nach Ursache: Ganks und Roams gegen Laner, Roams gegen den Jungler. */
 export function GankCard({ deaths, players }: { deaths: DeathEvent[]; players: PlayerReport[] }) {
-  const { position, champion } = useGameData();
+  const { position } = useGameData();
   const members = useMemo(
     () => players.filter((p) => p.member).sort((a, b) => ORDER.indexOf(a.position) - ORDER.indexOf(b.position)),
     [players],
@@ -31,7 +26,8 @@ export function GankCard({ deaths, players }: { deaths: DeathEvent[]; players: P
   const [from, setFrom] = useState(0);
   const [to, setTo] = useState(15);
   const [hidden, setHidden] = useState<Set<DeathKind>>(new Set(["other"]));
-  const [hover, setHover] = useState<DeathEvent | null>(null);
+  const [radius, setRadius] = useState(32);
+  const [intensity, setIntensity] = useState(1);
   const lastMinute = Math.max(15, Math.ceil(Math.max(0, ...deaths.map((d) => d.t)) / 60));
 
   const inWindow = deaths.filter((d) => d.t >= from * 60 && d.t <= to * 60);
@@ -103,35 +99,24 @@ export function GankCard({ deaths, players }: { deaths: DeathEvent[]; players: P
           <div className="chips">
             {KINDS.map((k) => (
               <button type="button" key={k.key} title={k.hint} aria-pressed={!hidden.has(k.key)}
-                className={`chip${hidden.has(k.key) ? "" : " on"}`} style={{ "--chip-color": k.color } as React.CSSProperties}
+                className={`chip${hidden.has(k.key) ? "" : " on"}`}
                 onClick={() => toggleKind(k.key)}>
                 <span className="dot" />{k.label}
               </button>
             ))}
           </div>
+          <div className="sliders">
+            <Slider label="Punktgröße" value={radius} min={12} max={64} onChange={setRadius} format={(v) => `${v} px`} />
+            <Slider label="Intensität" value={intensity} min={0.25} max={2} step={0.05} onChange={setIntensity}
+              format={(v) => `${Math.round(v * 100)} %`} />
+          </div>
           <div className="map">
-            <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer" onMouseLeave={() => setHover(null)}>
-              <MapBase />
-              {shown.map((d, i) => (
-                <g key={i} onMouseEnter={() => setHover(d)} style={{ cursor: "pointer" }}>
-                  <circle cx={px(d.x)} cy={py(d.y)} r={12} fill="transparent" />
-                  <circle cx={px(d.x)} cy={py(d.y)} r={hover === d ? 8 : 5.5} fill={COLOR[d.kind]}
-                    stroke="#07090d" strokeWidth={2} opacity={hover && hover !== d ? 0.35 : 0.95} />
-                </g>
-              ))}
-            </svg>
+            <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer"><MapBase /></svg>
+            <Heat points={shown} rgb={DEATH_RGB} radius={radius} intensity={intensity} />
           </div>
           <div className="muted small" aria-live="polite">
-            {hover ? (
-              <>
-                <b>{hover.name}</b> ({champion(hover.champion_id).name}) · {mmss(hover.t)} · {LABEL[hover.kind]} ·{" "}
-                {dt(hover.date)} · {hover.win ? "Sieg" : "Niederlage"}
-                <br />
-                Beteiligt: {hover.by.length
-                  ? hover.by.map((b) => `${position(b.position)} ${champion(b.champion_id).name}${b.killer ? " (Kill)" : ""}`).join(", ")
-                  : "kein Champion"}
-              </>
-            ) : <>{shown.length} Tode im Zeitraum Minute {from}–{Math.min(to, lastMinute)}. Punkt überfahren für Details.</>}
+            {shown.length} Tode im Zeitraum Minute {from}–{Math.min(to, lastMinute)}
+            {who ? ` · ${members.find((p) => p.puuid === who)?.name}` : ""}.
           </div>
         </div>
         <div className="table-wrap">

@@ -102,7 +102,7 @@ export function MapBase(_: { walls?: boolean }) {
 }
 
 /** Heatmap: Punkte aufsummieren (Alpha), dann einfarbig einfärben – hell = häufig. */
-function Heat({ points, rgb, radius = 32, intensity = 1 }: {
+export function Heat({ points, rgb, radius = 32, intensity = 1 }: {
   points: { x: number; y: number }[];
   rgb: [number, number, number];
   /** Größe eines Punkts in Pixeln (bei 512 px Kartenbreite) */
@@ -158,7 +158,7 @@ export function Slider({ label, value, min, max, step = 1, format, onChange }: {
   );
 }
 const KILL_RGB: [number, number, number] = [0, 220, 192];
-const DEATH_RGB: [number, number, number] = [255, 77, 94];
+export const DEATH_RGB: [number, number, number] = [255, 77, 94];
 
 function Segmented<T extends string | number>({ value, options, onChange, label }: {
   value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string;
