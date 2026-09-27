@@ -17,7 +17,7 @@ function storedStat() {
 }
 
 /** Minutenwerte je Spieler: Statistik wählen, Spieler ein-/ausblenden. */
-export function TimelineChart({ data }: { data: Analysis }) {
+export function TimelineChart({ data: raw, teamOnly = false }: { data: Analysis; teamOnly?: boolean }) {
   const { position } = useGameData();
   const [stat, setStat] = useState(storedStat);
   const [active, setActive] = useState<Set<string> | null>(null);
@@ -30,6 +30,11 @@ export function TimelineChart({ data }: { data: Analysis }) {
     }
   }, [stat]);
 
+  // teamOnly: nur die eigenen Spieler (Fokus), keine Gegner
+  const data = useMemo(
+    () => (teamOnly ? { ...raw, players: raw.players.filter((p) => p.focus) } : raw),
+    [raw, teamOnly],
+  );
   const colors = useMemo(
     () => Object.fromEntries(data.players.map((p, i) => [p.puuid, PALETTE[i % PALETTE.length]])),
     [data],
@@ -39,7 +44,7 @@ export function TimelineChart({ data }: { data: Analysis }) {
   const known = new Set(data.players.map((p) => p.puuid));
   const current = active
     ? new Set([...active].filter((p) => known.has(p)))
-    : new Set((focused.length ? focused : data.players.slice(0, 5)).map((p) => p.puuid));
+    : new Set((teamOnly ? data.players : focused.length ? focused : data.players.slice(0, 5)).map((p) => p.puuid));
   const statKey = data.series[stat] ? stat : "gold";
   const statLabel = data.stats.find((s) => s.key === statKey)?.label ?? statKey;
   const series = data.players
@@ -59,7 +64,7 @@ export function TimelineChart({ data }: { data: Analysis }) {
           </select>
         </label>
         <div className="row push">
-          <button className="btn small" type="button" onClick={() => setChips("focus")}>Fokus</button>
+          {!teamOnly && <button className="btn small" type="button" onClick={() => setChips("focus")}>Fokus</button>}
           <button className="btn small" type="button" onClick={() => setChips("all")}>Alle</button>
           <button className="btn small" type="button" onClick={() => setChips("none")}>Keine</button>
         </div>
@@ -98,7 +103,7 @@ export function InlineTimeline({ ids, focus }: { ids: string[]; focus?: string[]
         <div>
           <h2>Zeitverlauf</h2>
           <div className="sub">
-            Minutenwerte je Spieler, gemittelt über die in der Spieletabelle markierten Spiele
+            Minutenwerte der Teamspieler, gemittelt über die in der Spieletabelle markierten Spiele
             {data ? ` (${data.matches.length})` : ""}.
           </div>
         </div>
@@ -110,10 +115,10 @@ export function InlineTimeline({ ids, focus }: { ids: string[]; focus?: string[]
         <ErrorBox error={error} />
       ) : isPending ? (
         <p className="muted">Lade Timelines …</p>
-      ) : data.players.length === 0 ? (
+      ) : !data.players.some((p) => p.focus) ? (
         <p className="muted">Für die markierten Spiele sind keine Timeline-Daten verfügbar.</p>
       ) : (
-        <TimelineChart data={data} />
+        <TimelineChart data={data} teamOnly />
       )}
     </section>
   );
