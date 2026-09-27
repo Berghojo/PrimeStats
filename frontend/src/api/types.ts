@@ -337,7 +337,10 @@ export interface HistoryRow {
   label: Label;
   included: boolean;
   tournament: boolean;
+  /** passt zu den Filtern */
   selected: boolean;
+  /** im Spiele-Tab abgewählt */
+  excluded: boolean;
 }
 
 export interface Filters {
@@ -345,6 +348,8 @@ export interface Filters {
   side: "all" | Side;
   patch: string;
   last: number;
+  /** im Spiele-Tab abgewählte Spiele (zählen nicht in die Statistik) */
+  exclude: string[];
 }
 
 export interface TeamReport {
@@ -415,6 +420,7 @@ export interface PlayerFilters {
   last: number;
   champion: number;
   role: string;
+  exclude: string[];
 }
 
 export interface PlayerBucket { key: string; games: number; wins: number; winrate: number; kills: number; deaths: number; assists: number; kda: number }
@@ -424,9 +430,16 @@ export interface PlayerChampion {
   kda: number; cspm: number; dpm: number; positions: string[];
 }
 
+export interface GameParticipant {
+  puuid: string; name: string; tag: string; team_id: number; position: string; champion_id: number;
+  kills: number; deaths: number; assists: number;
+}
+
 export interface PlayerGame {
   match_id: string; date: string; queue: QueueKey; champion_id: number; position: string; win: boolean;
   kills: number; deaths: number; assists: number; cs: number; duration: number; gd15: number | null;
+  csd15: number | null; patch: string; side: Side; level: number; gold: number; damage: number; vision: number;
+  kp: number | null; items: number[]; spells: number[]; participants: GameParticipant[]; excluded: boolean;
 }
 
 export interface PlayerStatsReport {

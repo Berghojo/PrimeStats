@@ -6,7 +6,8 @@ import { MinuteLineChart, ResultBarChart } from "../charts";
 import { Empty } from "../ui";
 import { FilterBar } from "./FilterBar";
 import { InlineTimeline } from "../TimelineChart";
-import { GamesTable, useGameSelection } from "./GamesTable";
+import { Tabs, useTab } from "../Tabs";
+import { GamesTable } from "./GamesTable";
 import { ObjectivesCard, OverviewKpis } from "./Overview";
 import { PlayersTable } from "./PlayersTable";
 import { ChampionTable } from "./ChampionTable";
@@ -16,7 +17,7 @@ import { type ReportKind, PANELS, defaultPanels } from "./panels";
 import { ChampionPools, DraftCards } from "./Pools";
 import { InfoTip } from "../InfoTip";
 
-const DEFAULT_FILTERS: Filters = { label: "all", side: "all", patch: "", last: 0 };
+const DEFAULT_FILTERS: Omit<Filters, "exclude"> = { label: "all", side: "all", patch: "", last: 0 };
 
 /** Filter stehen in der URL (teilbar, Zurück-Button funktioniert). */
 export function useUrlFilters(): [Filters, (next: Partial<Filters>) => void, () => void] {
@@ -26,8 +27,9 @@ export function useUrlFilters(): [Filters, (next: Partial<Filters>) => void, () 
     side: (params.get("side") ?? "all") as Filters["side"],
     patch: params.get("patch") ?? "",
     last: Number(params.get("last") ?? 0),
+    exclude: params.getAll("x"),
   };
-  const keys = Object.keys(DEFAULT_FILTERS) as (keyof Filters)[];
+  const keys = Object.keys(DEFAULT_FILTERS) as (keyof typeof DEFAULT_FILTERS)[];
   const set = (next: Partial<Filters>) => {
     const merged = { ...filters, ...next };
     const out = new URLSearchParams(params);  // andere Parameter (z.B. Spielerauswahl) bleiben erhalten
@@ -35,11 +37,14 @@ export function useUrlFilters(): [Filters, (next: Partial<Filters>) => void, () 
       out.delete(k);
       if (merged[k] !== DEFAULT_FILTERS[k]) out.set(k, String(merged[k]));
     });
+    out.delete("x");
+    merged.exclude.forEach((id) => out.append("x", id));
     setParams(out, { replace: true });
   };
   const reset = () => {
     const out = new URLSearchParams(params);
     keys.forEach((k) => out.delete(k));
+    out.delete("x");
     setParams(out, { replace: true });
   };
   return [filters, set, reset];
@@ -62,11 +67,16 @@ interface Props {
 export function ReportBody({
   data, refreshing, kind = "team", panels, teamId, editable = false, hideLabelFilter, noTimelineHint, focus,
 }: Props) {
-  const [, setFilters, resetFilters] = useUrlFilters();
+  const [filters, setFilters, resetFilters] = useUrlFilters();
+  const [tab, setTab] = useTab<"overview" | "games">("overview");
   const { report, history } = data;
   const ov = report.overview;
-  const selection = useGameSelection(history);
-  const visible = panels ?? defaultPanels(kind);
+  const excluded = new Set(filters.exclude);
+  const setExcluded = (next: Set<string>) => setFilters({ exclude: [...next] });
+  // Spiele der Übersicht: passen zu den Filtern und sind im Spiele-Tab nicht abgewählt
+  const statGames = history.filter((g) => g.selected && !excluded.has(g.match_id)).map((g) => g.match_id);
+  const shownGames = history.filter((g) => g.selected).length;
+  const visible = (panels ?? defaultPanels(kind)).filter((k) => k !== "games");
   const empty = ov.games === 0;
 
   const render = (key: string) => {
@@ -133,12 +143,8 @@ export function ReportBody({
           </section>
         ) : null;
       case "timeline":
-        return kind === "scout" ? <InlineTimeline ids={[...selection[0]]} focus={focus} /> : null;
-      case "games":
-        return (
-          <GamesTable teamId={teamId} history={history} editable={editable} focus={focus} showOpponent={teamId !== undefined}
-            inlineTimeline={kind === "scout" && visible.includes("timeline")} selection={selection} />
-        );
+        // Zeitverlauf über die (bis zu 20 neuesten) Spiele der Übersicht
+        return kind === "scout" ? <InlineTimeline ids={statGames.slice(0, 20)} focus={focus} /> : null;
       default:
         return null;
     }
@@ -157,7 +163,24 @@ export function ReportBody({
     <>
       <FilterBar filters={data.filters} patches={data.patches} hideLabel={hideLabelFilter}
         onChange={setFilters} onReset={resetFilters} />
+      <Tabs value={tab} onChange={setTab} tabs={[
+        { value: "overview", label: "Übersicht" },
+        { value: "games", label: <>Spiele <span className="tab-count">{excluded.size ? `${statGames.length}/${shownGames}` : shownGames}</span></> },
+      ]} />
+      {tab === "games" ? (
+        <div className={refreshing ? "stack refreshing" : "stack"}>
+          <GamesTable teamId={teamId} history={history} editable={editable} focus={focus} showOpponent={teamId !== undefined}
+            inlineTimeline={kind === "scout"} excluded={excluded} onExcludedChange={setExcluded} />
+        </div>
+      ) : (
       <div className={refreshing ? "stack refreshing" : "stack"}>
+        {excluded.size > 0 && (
+          <div className="flash small">
+            {excluded.size} Spiel{excluded.size > 1 ? "e" : ""} im Spiele-Tab abgewählt – die Übersicht zeigt {statGames.length}{" "}
+            von {shownGames}.{" "}
+            <button type="button" className="btn small" onClick={() => setExcluded(new Set())}>Alle wieder einbeziehen</button>
+          </div>
+        )}
         {empty && <Empty>Keine Spiele für diese Filter.</Empty>}
         {rows.map((row) =>
           row.length === 2 && !empty
@@ -166,6 +189,7 @@ export function ReportBody({
         )}
         {!visible.length && <Empty>Alle Panels sind ausgeblendet – über „Ansicht anpassen“ wieder einblenden.</Empty>}
       </div>
+      )}
     </>
   );
 }

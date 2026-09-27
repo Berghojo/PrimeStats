@@ -60,3 +60,47 @@ def test_scrims_only_for_roster_members(client, demo_source):
 def test_unknown_player_and_offline(client, offline_client):
     assert client.get("/api/players/Niemand/XYZ/report").status_code == 404
     assert offline_client.post("/api/players/NLE Polaris/EUW/sync").status_code in (503, 404)
+
+
+def test_excluded_games_leave_list_but_not_stats(client):
+    assert _sync(client)["status"] == "done"
+    url = "/api/players/NLE Polaris/EUW/report"
+    full = client.get(url, params={"queue": ["solo"]}).json()["report"]
+    drop = [g["match_id"] for g in full["history"][:3]]
+    less = client.get(url, params={"queue": ["solo"], "exclude": drop}).json()["report"]
+    assert len(less["history"]) == len(full["history"])                    # Liste bleibt vollständig
+    assert [g["match_id"] for g in less["history"] if g["excluded"]] == drop
+    assert less["overview"]["games"] == full["overview"]["games"] - 3        # Statistik ohne die drei
+    game = full["history"][0]
+    assert len(game["participants"]) == 10 and game["items"] and game["patch"] and game["gold"] > 0
+
+
+def test_team_and_scout_reports_respect_exclude(client, demo_source):
+    register(client, "teamowner")
+    team = {"name": "NLE", "tag": "NLE", "min_members": 4, "public": True,
+            "members": [{"riot_id": f"NLE {n}#EUW"} for n in ("Frostbite", "Waldgeist", "Polaris", "Kompass", "Leuchtturm")]}
+    team_id = client.post("/api/teams", json=team).json()["id"]
+    client.post(f"/api/teams/{team_id}/sync")
+    for _ in range(200):
+        job = client.get(f"/api/teams/{team_id}/sync").json()
+        if job and job["status"] != "running":
+            break
+        time.sleep(0.05)
+    url = f"/api/teams/{team_id}/report"
+    full = client.get(url).json()
+    drop = [h["match_id"] for h in full["history"] if h["selected"]][:2]
+    assert len(drop) == 2
+    if drop:
+        less = client.get(url, params={"exclude": drop}).json()
+        assert less["report"]["overview"]["games"] == full["report"]["overview"]["games"] - len(drop)
+        assert {h["match_id"] for h in less["history"] if h["excluded"]} == set(drop)
+    resp = client.post("/api/scout", json={"riot_ids": ["BSK Skalde#EUW"]}).json()
+    for _ in range(200):
+        job = client.get(f"/api/scout/{resp['key']}/status").json()
+        if job and job["status"] != "running":
+            break
+        time.sleep(0.05)
+    scout = client.get(f"/api/scout/{resp['key']}").json()
+    one = scout["history"][0]["match_id"]
+    fewer = client.get(f"/api/scout/{resp['key']}", params={"exclude": [one]}).json()
+    assert fewer["report"]["overview"]["games"] == scout["report"]["overview"]["games"] - 1

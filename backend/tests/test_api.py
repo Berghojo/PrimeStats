@@ -96,7 +96,7 @@ def test_team_lifecycle(client, demo_source):
     assert all(row["selected"] for row in report["history"])
 
     filtered = client.get(f"/api/teams/{tid}/report", params={"label": "official", "side": "blue", "last": 3}).json()
-    assert filtered["filters"] == {"label": "official", "side": "blue", "patch": "", "last": 3}
+    assert filtered["filters"] == {"label": "official", "side": "blue", "patch": "", "last": 3, "exclude": []}
     assert filtered["report"]["overview"]["games"] <= 3
 
     mid = report["history"][0]["match_id"]

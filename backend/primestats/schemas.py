@@ -469,6 +469,8 @@ class HistoryRow(BaseModel):
     included: bool
     tournament: bool
     selected: bool
+    #: im Spiele-Tab abgewählt
+    excluded: bool = False
 
 
 class Filters(BaseModel):
@@ -476,6 +478,8 @@ class Filters(BaseModel):
     side: str = "all"
     patch: str = ""
     last: int = 0
+    #: im Spiele-Tab abgewählte Spiele – zählen nicht in die Statistik
+    exclude: list[str] = Field(default_factory=list, max_length=500)
 
 
 class ScoutFilters(Filters):
@@ -700,6 +704,8 @@ class PlayerFilters(BaseModel):
     last: int = 0
     champion: int = 0
     role: str = ""
+    #: im Spiele-Tab abgewählte Spiele – zählen nicht in die Statistik
+    exclude: list[str] = Field(default_factory=list, max_length=500)
 
 
 class PlayerOverview(BaseModel):
@@ -748,6 +754,18 @@ class PlayerChampion(BaseModel):
     positions: list[str]
 
 
+class GameParticipant(BaseModel):
+    puuid: str
+    name: str
+    tag: str
+    team_id: int
+    position: str
+    champion_id: int
+    kills: int
+    deaths: int
+    assists: int
+
+
 class PlayerGame(BaseModel):
     match_id: str
     date: datetime
@@ -761,6 +779,18 @@ class PlayerGame(BaseModel):
     cs: int
     duration: int
     gd15: float | None
+    patch: str = ""
+    side: Literal["blue", "red"] = "blue"
+    level: int = 0
+    gold: int = 0
+    damage: int = 0
+    vision: int = 0
+    kp: float | None = None
+    items: list[int] = []
+    spells: list[int] = []
+    csd15: float | None = None
+    participants: list[GameParticipant] = []
+    excluded: bool = False
 
 
 class PlayerStatsReport(BaseModel):

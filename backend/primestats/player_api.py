@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from .deps import CurrentViewer, RateLimit, Service, client_ip
-from .player_stats import build_player_report, filter_player_records
+from .player_stats import build_player_report, filter_player_records, player_history
 from .riot import NotFound
 from .schemas import PlayerFilters, PlayerReportOut, PlayerStatsReport, ScoutPlayer, SyncJobOut
 from .team_stats import patches
@@ -53,16 +53,19 @@ def player_report(game_name: str, tag_line: str, service: Service, viewer: Curre
     account = _account(service, game_name, tag_line)
     puuid = account["puuid"]
     records = service.player_records(puuid, lambda m: viewer.can_view_match(m, service.store))
-    selected = filter_player_records(records, puuid, queues=set(filters.queue), patch=filters.patch,
-                                     last=filters.last, champion=filters.champion, role=filters.role)
+    in_filter = filter_player_records(records, puuid, queues=set(filters.queue), patch=filters.patch,
+                                      last=filters.last, champion=filters.champion, role=filters.role)
+    excluded = set(filters.exclude)
+    selected = [r for r in in_filter if r.match.match_id not in excluded]
+    stats = build_player_report(puuid, selected)
+    stats["history"] = player_history(puuid, in_filter, excluded)
     champs = Counter(p.champion_id for r in records if (p := r.match.player(puuid)))
     roles = Counter(p.position for r in records if (p := r.match.player(puuid)) and p.position)
     job = service.jobs.get(_job_key(puuid))
     return PlayerReportOut(
         account=ScoutPlayer(puuid=puuid, game_name=account["gameName"], tag_line=account["tagLine"]),
         filters=filters,
-        report=PlayerStatsReport(**{k: v for k, v in build_player_report(puuid, selected).items()
-                                    if k not in ("puuid", "name", "tag")}),
+        report=PlayerStatsReport(**{k: v for k, v in stats.items() if k not in ("puuid", "name", "tag")}),
         queue_counts=dict(Counter(r.label for r in records)),
         patches=patches(records),
         champions=[c for c, _ in champs.most_common()],

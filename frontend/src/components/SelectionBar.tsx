@@ -4,38 +4,36 @@ import { buildQuery } from "../api/client";
 import { InfoTip } from "./InfoTip";
 
 interface Props {
-  selected: Set<string>;
-  onSelect: (mode: "all" | "none" | "filtered") => void;
+  /** gezeigte Spiele mit Ergebnis */
+  games: { id: string; win: boolean }[];
+  excluded: Set<string>;
+  onChange: (excluded: Set<string>) => void;
   focus?: string[];
   team?: number;
-  showFiltered?: boolean;
   /** Zeitverlauf wird direkt auf der Seite angezeigt – kein Wechsel zur Analyse-Seite */
   inline?: boolean;
 }
 
-export function SelectionBar({ selected, onSelect, focus, team, showFiltered, inline }: Props) {
+/** Schnellauswahl, welche Spiele in die Statistik zählen */
+export function SelectionBar({ games, excluded, onChange, focus, team, inline }: Props) {
   const navigate = useNavigate();
-  const analyse = () => navigate(`/analysis${buildQuery({ m: [...selected], focus, team })}`);
+  const included = games.filter((g) => !excluded.has(g.id));
+  const only = (keep: (g: { win: boolean }) => boolean) =>
+    onChange(new Set(games.filter((g) => !keep(g)).map((g) => g.id)));
+  const analyse = () => navigate(`/analysis${buildQuery({ m: included.slice(0, 20).map((g) => g.id), focus, team })}`);
   return (
     <div className="stickybar">
-      {showFiltered && <button type="button" className="btn small" onClick={() => onSelect("filtered")}>Gefilterte</button>}
-      <button type="button" className="btn small" onClick={() => onSelect("all")}>Alle</button>
-      <button type="button" className="btn small" onClick={() => onSelect("none")}>Keine</button>
-      <span className="muted"><b>{selected.size}</b> ausgewählt</span>
-      {inline ? (
-        <span className="push"><InfoTip>Der Zeitverlauf oben aktualisiert sich mit der Auswahl.</InfoTip></span>
-      ) : (
-        <button type="button" className="btn primary push" disabled={selected.size === 0} onClick={analyse}>
+      <span><b>{included.length}</b> von {games.length} in der Statistik</span>
+      <button type="button" className="btn small" onClick={() => onChange(new Set())}>Alle</button>
+      <button type="button" className="btn small" onClick={() => only(() => false)}>Keine</button>
+      <button type="button" className="btn small" onClick={() => only((g) => g.win)}>Nur Siege</button>
+      <button type="button" className="btn small" onClick={() => only((g) => !g.win)}>Nur Niederlagen</button>
+      <InfoTip>Abgewählte Spiele zählen in der Übersicht nicht mit – in Kennzahlen, Tabellen, Karten und Zeitverlauf.</InfoTip>
+      {!inline && team !== undefined && (
+        <button type="button" className="btn primary push" disabled={included.length === 0} onClick={analyse}>
           Zeitverlauf analysieren →
         </button>
       )}
     </div>
   );
-}
-
-export function toggle(set: Set<string>, id: string): Set<string> {
-  const next = new Set(set);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  return next;
 }

@@ -18,7 +18,8 @@ def _avg(values: list) -> float | None:
 
 
 def filter_player_records(records: list[GameRecord], puuid: str, *, queues: set[str] | None = None, patch: str = "",
-                          last: int = 0, champion: int = 0, role: str = "") -> list[GameRecord]:
+                          last: int = 0, champion: int = 0, role: str = "",
+                          exclude: set[str] | None = None) -> list[GameRecord]:
     out = [r for r in records if not queues or r.label in queues]
     if patch:
         out = [r for r in out if r.match.version == patch]
@@ -27,7 +28,38 @@ def filter_player_records(records: list[GameRecord], puuid: str, *, queues: set[
     if role:
         out = [r for r in out if (p := r.match.player(puuid)) and p.position == role]
     out.sort(key=lambda r: r.match.created, reverse=True)
-    return out[:last] if last > 0 else out
+    out = out[:last] if last > 0 else out
+    return [r for r in out if r.match.match_id not in exclude] if exclude else out
+
+
+def history_row(rec: GameRecord, puuid: str) -> dict | None:
+    """Alle Match-Historien-Daten eines Spiels aus Sicht des Spielers."""
+    m, p = rec.match, rec.match.player(puuid)
+    if p is None:
+        return None
+    series = player_series(rec.timeline, m, puuid) if rec.timeline else {}
+    return {
+        "match_id": m.match_id, "date": m.created, "queue": rec.label, "champion_id": p.champion_id,
+        "position": p.position, "win": p.win, "kills": p.kills, "deaths": p.deaths, "assists": p.assists,
+        "cs": p.cs, "duration": m.duration, "gd15": at(series.get("gold_diff"), 15) if series else None,
+        "csd15": at(series.get("cs_diff"), 15) if series else None,
+        "patch": m.version, "side": rec.us.side, "level": p.level, "gold": p.gold, "damage": p.damage,
+        "vision": p.vision_score, "kp": (p.kills + p.assists) / rec.us.kills if rec.us.kills else None,
+        "items": list(p.items), "spells": list(p.spells),
+        "participants": [{"puuid": q.puuid, "name": q.name, "tag": q.tag, "team_id": q.team_id,
+                          "position": q.position, "champion_id": q.champion_id, "kills": q.kills,
+                          "deaths": q.deaths, "assists": q.assists}
+                         for team_id in sorted(m.teams) for q in m.teams[team_id].players],
+    }
+
+
+def player_history(puuid: str, records: list[GameRecord], excluded: set[str]) -> list[dict]:
+    rows = []
+    for rec in sorted(records, key=lambda r: r.match.created, reverse=True):
+        row = history_row(rec, puuid)
+        if row:
+            rows.append({**row, "excluded": rec.match.match_id in excluded})
+    return rows
 
 
 def build_player_report(puuid: str, records: list[GameRecord]) -> dict:

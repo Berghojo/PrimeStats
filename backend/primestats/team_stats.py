@@ -443,7 +443,9 @@ def history_rows(records: list[GameRecord]) -> list[dict]:
 
 
 def filter_records(records: list[GameRecord], *, label: str = "all", side: str = "all",
-                   patch: str = "", last: int = 0) -> list[GameRecord]:
+                   patch: str = "", last: int = 0, exclude: list[str] | None = None) -> list[GameRecord]:
+    """Spiele nach Filtern; ``exclude`` (im Spiele-Tab abgewählt) wird nach „letzte N“ entfernt, damit die
+    Spieleliste beim Abwählen gleich bleibt."""
     out = [r for r in records if r.included]
     if label != "all":
         out = [r for r in out if r.label == label]
@@ -454,6 +456,9 @@ def filter_records(records: list[GameRecord], *, label: str = "all", side: str =
     out.sort(key=lambda r: r.match.created, reverse=True)
     if last > 0:
         out = out[:last]
+    if exclude:
+        skip = set(exclude)
+        out = [r for r in out if r.match.match_id not in skip]
     return out
 
 

@@ -15,6 +15,6 @@ describe("panels", () => {
   });
 
   it("keeps order, drops unknown and duplicate keys", () => {
-    expect(cleanPanels(["games", "jungle", "evil", "overview", "games"], "scout")).toEqual(["games", "overview"]);
+    expect(cleanPanels(["champions", "jungle", "evil", "overview", "champions", "games"], "scout")).toEqual(["champions", "overview"]);
   });
 });

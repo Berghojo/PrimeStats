@@ -7,7 +7,7 @@ import type { HistoryRow, Label } from "../../api/types";
 import { dt, duration, signed, tone } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 import { ChampIcon } from "../ChampIcon";
-import { SelectionBar, toggle } from "../SelectionBar";
+import { SelectionBar } from "../SelectionBar";
 import { ResultBadge, SideBadge } from "../ui";
 
 interface Props {
@@ -20,18 +20,9 @@ interface Props {
   showOpponent?: boolean;
   /** Zeitverlauf wird auf derselben Seite angezeigt (kein Wechsel zur Analyse-Seite) */
   inlineTimeline?: boolean;
-  /** Auswahl von außen (für den eingebetteten Zeitverlauf) */
-  selection?: [Set<string>, (next: Set<string> | ((s: Set<string>) => Set<string>)) => void];
-}
-
-/** Für die Analyse markierte Spiele; startet mit den (bis zu 10) neuesten gefilterten Spielen. */
-export function useGameSelection(history: HistoryRow[]) {
-  const initial = () => new Set(history.filter((r) => r.selected).slice(0, 10).map((r) => r.match_id));
-  const [selected, setSelected] = useState<Set<string>>(initial);
-  const filterKey = history.map((r) => `${r.match_id}:${r.selected}`).join(",");
-  // Auswahl zurücksetzen, sobald sich die Filter (und damit die markierten Spiele) ändern
-  useEffect(() => setSelected(initial()), [filterKey]);
-  return [selected, setSelected] as [Set<string>, typeof setSelected];
+  /** abgewählte Spiele (zählen nicht in die Statistik) */
+  excluded: Set<string>;
+  onExcludedChange: (excluded: Set<string>) => void;
 }
 
 function OpponentInput({ value, onSave }: { value: string; onSave: (v: string) => void }) {
@@ -50,83 +41,110 @@ function OpponentInput({ value, onSave }: { value: string; onSave: (v: string) =
   );
 }
 
-export function GamesTable({ teamId, history, editable, focus, showOpponent = false, inlineTimeline = false, selection }: Props) {
-  const { meta, label } = useGameData();
+export function GamesTable({
+  teamId, history, editable, focus, showOpponent = false, inlineTimeline = false, excluded, onExcludedChange,
+}: Props) {
+  const { meta, label, champion } = useGameData();
   const updateGame = useUpdateTeamGame(teamId ?? 0);
-  const own = useGameSelection(history);
-  const [selected, setSelected] = selection ?? own;
+  // gezeigt werden die Spiele, die zu den Filtern passen; die Häkchen steuern, was davon in die Statistik zählt
+  const shown = history.filter((g) => g.selected);
+  const hiddenByFilter = history.length - shown.length;
+  const toggle = (id: string) => {
+    const next = new Set(excluded);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onExcludedChange(next);
+  };
+  const picks = (players: HistoryRow["us"]["players"]) => (
+    <span className="champ-row">
+      {players.map((p) => (
+        <span key={p.puuid} title={`${p.name} – ${champion(p.champion_id).name} (${p.kills}/${p.deaths}/${p.assists})`}>
+          <ChampIcon id={p.champion_id} size="sm" />
+        </span>
+      ))}
+    </span>
+  );
 
   return (
     <section className="card">
       <h2>
         Spiele
         <InfoTip>
-          Alle gefundenen Teamspiele. Ausgeschlossene Spiele fließen nicht in die Statistik ein; das Label steuert den
-          Spieltyp-Filter. Markierte Spiele fließen in den Zeitverlauf ein.
+          Spiele, die zu den Filtern passen{hiddenByFilter ? ` (${hiddenByFilter} weitere ausgefiltert)` : ""}. Häkchen = zählt
+          in die Übersicht; abgewählte Spiele fallen dort aus Kennzahlen, Tabellen, Karten und Zeitverlauf heraus.
+          {editable && " „✕“ schließt ein Spiel dauerhaft für alle aus; das Label steuert den Spieltyp-Filter."}
         </InfoTip>
       </h2>
       <div className="table-wrap">
-        <table className="data">
+        <table className="data games-table">
           <thead>
             <tr>
-              <th /><th className="left">Datum</th><th className="left">Ergebnis</th>{showOpponent && <th className="left">Gegner</th>}
-              <th className="left">Unsere Picks</th><th className="left">Gegnerische Picks</th><th>K–T</th><th>Gold Δ</th>
-              <th>GD@15</th><th>Dauer</th><th className="left">Typ</th><th />
+              <th title="In der Statistik" /><th className="left">Datum</th><th className="left">Ergebnis</th>
+              {showOpponent && <th className="left">Gegner</th>}
+              <th className="left">Unsere Picks</th><th className="left">Gegnerische Picks</th><th>Kills</th>
+              <th>Gold Δ</th><th>GD@15</th><th title="Türme">Türme</th><th title="Drachen">Drachen</th>
+              <th title="Barone">Baron</th><th>Dauer</th><th>Patch</th><th className="left">Typ</th>{editable && <th />}
             </tr>
           </thead>
           <tbody>
-            {history.map((g) => (
-              <tr key={g.match_id} className={[g.included ? "" : "dim", selected.has(g.match_id) ? "selected" : ""].join(" ")}>
-                <td>
-                  <input type="checkbox" checked={selected.has(g.match_id)} aria-label="Für Analyse auswählen"
-                    onChange={() => setSelected((s) => toggle(s, g.match_id))} />
-                </td>
-                <td className="left nowrap"><Link to={`/match/${g.match_id}${teamId ? `?team=${teamId}` : ""}`}>{dt(g.date)}</Link></td>
-                <td className="left nowrap"><ResultBadge win={g.win} /> <SideBadge side={g.side} /></td>
-                {showOpponent && (
-                  <td className="left">
-                    {editable
-                      ? <OpponentInput value={g.opponent} onSave={(opponent) => updateGame.mutate({ matchId: g.match_id, opponent })} />
-                      : g.opponent || "–"}
+            {shown.map((g) => {
+              const on = !excluded.has(g.match_id);
+              return (
+                <tr key={g.match_id} className={[g.included ? "" : "dim", on ? "" : "off"].join(" ")}>
+                  <td>
+                    <input type="checkbox" checked={on} aria-label="In der Statistik" onChange={() => toggle(g.match_id)} />
                   </td>
-                )}
-                <td className="left"><span className="champ-row">{g.us.players.map((p) => <ChampIcon key={p.puuid} id={p.champion_id} size="sm" />)}</span></td>
-                <td className="left"><span className="champ-row">{g.them.players.map((p) => <ChampIcon key={p.puuid} id={p.champion_id} size="sm" />)}</span></td>
-                <td>{g.us.kills}–{g.them.kills}</td>
-                <td className={tone(g.gold_diff)}>{signed(g.gold_diff)}</td>
-                <td className={tone(g.gd15)}>{signed(g.gd15)}</td>
-                <td>{duration(g.duration)}</td>
-                <td className="left nowrap">
-                  {editable ? (
-                    <select value={g.label} aria-label="Spieltyp"
-                      onChange={(e) => updateGame.mutate({ matchId: g.match_id, label: e.target.value as Label })}>
-                      {Object.entries(meta?.labels ?? {}).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
-                    </select>
-                  ) : label(g.label)}{" "}
-                  {g.tournament && <span className="badge official" title="Spiel mit Turniercode">TC</span>}
-                </td>
-                <td>
-                  {editable && (
-                    <button type="button" className="btn small"
-                      title={g.included ? "Aus der Statistik ausschließen" : "Wieder in die Statistik aufnehmen"}
-                      onClick={() => updateGame.mutate({ matchId: g.match_id, included: !g.included })}>
-                      {g.included ? "✕" : "＋"}
-                    </button>
+                  <td className="left nowrap"><Link to={`/match/${g.match_id}${teamId ? `?team=${teamId}` : ""}`}>{dt(g.date)}</Link></td>
+                  <td className="left nowrap"><ResultBadge win={g.win} /> <SideBadge side={g.side} /></td>
+                  {showOpponent && (
+                    <td className="left">
+                      {editable
+                        ? <OpponentInput value={g.opponent} onSave={(opponent) => updateGame.mutate({ matchId: g.match_id, opponent })} />
+                        : g.opponent || "–"}
+                    </td>
                   )}
-                </td>
-              </tr>
-            ))}
+                  <td className="left">{picks(g.us.players)}</td>
+                  <td className="left">{picks(g.them.players)}</td>
+                  <td>{g.us.kills}–{g.them.kills}</td>
+                  <td className={tone(g.gold_diff)}>{signed(g.gold_diff)}</td>
+                  <td className={tone(g.gd15)}>{signed(g.gd15)}</td>
+                  <td>{g.us.towers}–{g.them.towers}</td>
+                  <td>{g.us.dragons}–{g.them.dragons}</td>
+                  <td>{g.us.barons}–{g.them.barons}</td>
+                  <td>{duration(g.duration)}</td>
+                  <td>{g.patch}</td>
+                  <td className="left nowrap">
+                    {editable ? (
+                      <select value={g.label} aria-label="Spieltyp"
+                        onChange={(e) => updateGame.mutate({ matchId: g.match_id, label: e.target.value as Label })}>
+                        {Object.entries(meta?.labels ?? {}).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
+                      </select>
+                    ) : label(g.label)}{" "}
+                    {g.tournament && <span className="badge official" title="Spiel mit Turniercode">TC</span>}
+                  </td>
+                  {editable && (
+                    <td>
+                      <button type="button" className="btn small"
+                        title={g.included ? "Für alle dauerhaft aus der Statistik ausschließen" : "Wieder aufnehmen"}
+                        onClick={() => updateGame.mutate({ matchId: g.match_id, included: !g.included })}>
+                        {g.included ? "✕" : "＋"}
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+            {!shown.length && <tr><td className="left muted" colSpan={16}>Keine Spiele für diese Filter.</td></tr>}
           </tbody>
         </table>
       </div>
       <SelectionBar
-        selected={selected}
+        games={shown.map((g) => ({ id: g.match_id, win: g.win }))}
+        excluded={excluded}
+        onChange={onExcludedChange}
         team={teamId}
         focus={focus}
-        showFiltered
         inline={inlineTimeline}
-        onSelect={(mode) =>
-          setSelected(new Set(mode === "none" ? [] : history.filter((r) => mode === "all" || r.selected).map((r) => r.match_id)))}
       />
     </section>
   );

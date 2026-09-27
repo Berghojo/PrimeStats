@@ -161,8 +161,10 @@ def team_report(team_id: int, service: Service, viewer: CurrentViewer, filters: 
     if not viewer.can_see_scrims(team):
         records = [r for r in records if not r.match.private]
     selected = filter_records(records, **filters.model_dump())
-    selected_ids = {r.match.match_id for r in selected}
-    history = [HistoryRow(**row, selected=row["match_id"] in selected_ids) for row in history_rows(records)]
+    in_filter = {r.match.match_id for r in filter_records(records, **filters.model_dump(exclude={"exclude"}))}
+    excluded = set(filters.exclude)
+    history = [HistoryRow(**row, selected=row["match_id"] in in_filter, excluded=row["match_id"] in excluded)
+               for row in history_rows(records)]
     job = service.jobs.get(team_id)
     return TeamReportOut(
         team=TeamOut.of(team, viewer),

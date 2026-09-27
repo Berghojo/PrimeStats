@@ -82,7 +82,7 @@ def scout_report(key: str, service: Service, params: Annotated[ScoutFilters, Que
     scout = service.store.get_scout(key)
     if scout is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Dieses Scouting gibt es (noch) nicht.")
-    filters = Filters(**params.model_dump(include={"label", "side", "patch", "last"}))
+    filters = Filters(**params.model_dump(include={"label", "side", "patch", "last", "exclude"}))
     if filters.label not in {"all", *LABELS}:
         filters.label = "all"
     roster = scout["roster"]
@@ -95,7 +95,8 @@ def scout_report(key: str, service: Service, params: Annotated[ScoutFilters, Que
     focus = list(dict.fromkeys(p for p in params.focus if p in in_roster))
     records = with_players(service.scout_records(scout), focus, match)
     selected = filter_records(records, **filters.model_dump())
-    selected_ids = {r.match.match_id for r in selected}
+    selected_ids = {r.match.match_id for r in filter_records(records, **filters.model_dump(exclude={"exclude"}))}
+    excluded = set(filters.exclude)
     job = service.jobs.get(_job_key(key))
     return ScoutReportOut(
         key=key,
@@ -107,7 +108,8 @@ def scout_report(key: str, service: Service, params: Annotated[ScoutFilters, Que
         focus=focus,
         match=match,
         report=build_report(team, selected),
-        history=[HistoryRow(**row, selected=row["match_id"] in selected_ids) for row in history_rows(records)],
+        history=[HistoryRow(**row, selected=row["match_id"] in selected_ids, excluded=row["match_id"] in excluded)
+                 for row in history_rows(records)],
         patches=patches(records),
         job=SyncJobOut.model_validate(job) if job else None,
     )

@@ -548,3 +548,51 @@ table.data.fights td:first-child { min-width: 150px; }
 .tower.red { fill: #ff4d5e; }
 .segmented.multi button.off { opacity: .55; }
 .segmented.multi button[disabled] { opacity: .35; cursor: not-allowed; }
+
+/* ---------- Seiten-Tabs ---------- */
+.page-tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--border); }
+.page-tabs button {
+  background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; padding: .55rem 1rem;
+  color: var(--muted); cursor: pointer; font: 700 1rem/1.2 var(--display); text-transform: uppercase; letter-spacing: .06em;
+}
+.page-tabs button:hover { color: var(--text); }
+.page-tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+.tab-count { color: var(--muted); font-size: .8em; margin-left: .25rem; }
+[data-style="analytics"] .page-tabs button { font: 500 .9rem/1.2 var(--font); text-transform: none; letter-spacing: 0; }
+table.data tr.off td { opacity: .45; }
+.games-table td { vertical-align: middle; }
+
+/* ---------- Match-Historie (Spieler) ---------- */
+.item-icon { display: inline-block; width: 24px; height: 24px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; vertical-align: middle; }
+.item-icon img { width: 100%; height: 100%; display: block; }
+.item-icon.spell { width: 20px; height: 20px; }
+.mh-list { display: grid; gap: .45rem; }
+.mh-game {
+  display: grid; grid-template-columns: 22px 120px 150px 110px 1fr 180px 230px; gap: .9rem; align-items: center;
+  background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border);
+  border-radius: var(--radius); padding: .55rem .8rem;
+}
+.mh-game.win { border-left-color: var(--win); background: linear-gradient(90deg, rgba(47, 212, 138, .06), var(--surface) 35%); }
+.mh-game.loss { border-left-color: var(--loss); background: linear-gradient(90deg, rgba(255, 77, 94, .06), var(--surface) 35%); }
+.mh-game.off { opacity: .45; }
+.mh-meta { display: grid; gap: .1rem; font-size: .8rem; color: var(--muted); }
+.mh-meta b { color: var(--text); font-size: .85rem; }
+.mh-champ { display: flex; align-items: center; gap: .45rem; }
+.mh-spells { display: grid; gap: 2px; }
+.mh-kda { display: grid; gap: .05rem; }
+.mh-kda .big { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mh-stats { display: grid; grid-template-columns: repeat(3, auto); gap: .1rem .9rem; font-size: .8rem; color: var(--muted); }
+.mh-stats b { color: var(--text); font-variant-numeric: tabular-nums; }
+.mh-items { display: flex; flex-wrap: wrap; gap: 2px; }
+.mh-teams { display: grid; grid-template-columns: 1fr 1fr; gap: .1rem .6rem; font-size: .74rem; }
+.mh-teams .p { display: flex; align-items: center; gap: .25rem; min-width: 0; }
+.mh-teams .p a, .mh-teams .p span.n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.mh-teams .p.me span.n, .mh-teams .p.me a { color: var(--text); font-weight: 700; }
+@media (max-width: 1200px) {
+  .mh-game { grid-template-columns: 22px 110px 140px 100px 1fr; }
+  .mh-items, .mh-teams { grid-column: 2 / -1; }
+}
+@media (max-width: 700px) {
+  .mh-game { grid-template-columns: 22px 1fr 1fr; }
+  .mh-meta, .mh-stats, .mh-items, .mh-teams { grid-column: 2 / -1; }
+}
