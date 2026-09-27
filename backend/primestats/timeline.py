@@ -8,7 +8,7 @@ from collections import defaultdict
 from .matches import MatchSummary
 
 #: Bei Änderungen am Format der Zusammenfassung erhöhen -> Cache wird neu berechnet
-SUMMARY_VERSION = 3
+SUMMARY_VERSION = 4
 
 RAW_SERIES = ("gold", "current_gold", "xp", "level", "cs", "jcs", "dmg", "dmg_taken", "kills", "deaths", "assists")
 
@@ -98,6 +98,14 @@ def summarize_timeline(timeline: dict, match: MatchSummary) -> dict:
                           "killer": e.get("killerId", 0), "victim": e.get("victimId", 0),
                           "assists": list(e.get("assistingParticipantIds") or [])})
 
+    # zerstörte Türme (für Dives: stand der Turm des Opfers noch?)
+    towers = []
+    for e in events:
+        pos = e.get("position") or {}
+        if e.get("type") == "BUILDING_KILL" and e.get("buildingType") == "TOWER_BUILDING" and "x" in pos:
+            towers.append({"t": round(e.get("timestamp", 0) / 1000), "team": e.get("teamId", 0),
+                           "x": int(pos["x"]), "y": int(pos["y"])})
+
     objectives = []
     first_blood = None
     for e in events:
@@ -113,7 +121,7 @@ def summarize_timeline(timeline: dict, match: MatchSummary) -> dict:
                 first_blood = {"t": round(e.get("timestamp", 0) / 60000, 2),
                                "team": 200 if victim_team == 100 else 100}
     return {"minutes": len(frames), "players": players, "objectives": objectives, "first_blood": first_blood,
-            "kills": kills}
+            "kills": kills, "towers": towers}
 
 
 def at(series: list | None, minute: int):

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from .matches import POSITIONS, MatchSummary
 from .store import Team
+from .fights import base_kind, classify_kills
 from .timeline import MONSTERS, at, average_series, player_series, team_series
 
 LABELS = {"official": "Prime League", "scrim": "Scrim", "": "Ohne Label"}
@@ -137,26 +138,9 @@ def _jungle(rec: GameRecord, players: dict, paths: list, events: list) -> None:
             events.append({**base, "type": kind, "t": k["t"], "x": k["x"], "y": k["y"]})
 
 
-def _lane(position: str) -> str:
-    return {"TOP": "top", "MIDDLE": "mid", "BOTTOM": "bot", "UTILITY": "bot", "JUNGLE": "jungle"}.get(position, "")
-
-
 def death_kind(victim_position: str, enemy_positions: list[str]) -> str:
-    """Einordnung eines Todes nach den beteiligten Gegnern.
-
-    Laner: "gank" (gegnerischer Jungler dabei), "roam" (Laner einer anderen Lane dabei), "gank_roam"
-    (beides) oder "lane" (nur die direkten Lane-Gegner). Jungler: "roam" (ein gegnerischer Laner dabei)
-    oder "duel" (nur der gegnerische Jungler). Ohne beteiligte Champions (Turm, Minions …): "other".
-    """
-    lanes = [_lane(p) for p in enemy_positions]
-    if not [lane for lane in lanes if lane]:
-        return "other"
-    own = _lane(victim_position)
-    if own == "jungle":
-        return "roam" if any(lane not in ("jungle", "") for lane in lanes) else "duel"
-    gank = "jungle" in lanes
-    roam = any(lane not in ("jungle", "", own) for lane in lanes)
-    return "gank_roam" if gank and roam else "gank" if gank else "roam" if roam else "lane"
+    """Gank/Roam/1v1 nach den beteiligten Rollen (siehe fights.base_kind)."""
+    return base_kind(victim_position, enemy_positions)
 
 
 def _deaths(rec: GameRecord, out: list) -> None:
@@ -164,7 +148,8 @@ def _deaths(rec: GameRecord, out: list) -> None:
     tl, match = rec.timeline, rec.match
     by_pid = {p.participant_id: p for p in match.participants}
     ours = {p.participant_id for p in rec.us.players}
-    for k in (tl or {}).get("kills", []):
+    kinds = classify_kills(match, tl or {})
+    for k, kind in zip((tl or {}).get("kills", []), kinds):
         victim = by_pid.get(k["victim"])
         if victim is None or victim.participant_id not in ours:
             continue
@@ -174,7 +159,7 @@ def _deaths(rec: GameRecord, out: list) -> None:
             "match_id": match.match_id, "date": match.created, "win": rec.win, "side": rec.us.side,
             "puuid": victim.puuid, "name": victim.name, "position": victim.position,
             "champion_id": victim.champion_id, "t": k["t"], "x": k["x"], "y": k["y"],
-            "kind": death_kind(victim.position, [e.position for e in enemies]),
+            "kind": kind,
             "by": [{"position": e.position, "champion_id": e.champion_id, "name": e.name,
                     "killer": e.participant_id == k["killer"]} for e in enemies],
         })
@@ -186,7 +171,8 @@ def _kills(rec: GameRecord, out: list) -> None:
     tl, match = rec.timeline, rec.match
     by_pid = {p.participant_id: p for p in match.participants}
     ours = {p.participant_id for p in rec.us.players}
-    for k in (tl or {}).get("kills", []):
+    kinds = classify_kills(match, tl or {})
+    for k, kind in zip((tl or {}).get("kills", []), kinds):
         victim = by_pid.get(k["victim"])
         if victim is None or victim.participant_id in ours:
             continue
@@ -196,7 +182,7 @@ def _kills(rec: GameRecord, out: list) -> None:
         out.append({
             "match_id": match.match_id, "date": match.created, "win": rec.win, "side": rec.us.side,
             "t": k["t"], "x": k["x"], "y": k["y"],
-            "kind": death_kind(victim.position, [p.position for p in involved]),
+            "kind": kind,
             "victim": {"position": victim.position, "champion_id": victim.champion_id, "name": victim.name,
                        "killer": False},
             "by": [{"puuid": p.puuid, "position": p.position, "champion_id": p.champion_id, "name": p.name,

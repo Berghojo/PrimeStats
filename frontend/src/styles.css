@@ -541,3 +541,5 @@ path.walls { fill: #1c2a24; stroke: #3d5249; stroke-width: 1.5; stroke-linejoin:
 [data-style="analytics"] .infotip-pop { border-left-width: 1px; }
 .style-toggle { white-space: nowrap; }
 .cell-sub { color: var(--muted); font-size: .74rem; white-space: normal; margin-top: .1rem; }
+table.data.fights th, table.data.fights td { padding-left: .35rem; padding-right: .35rem; }
+table.data.fights td:first-child { min-width: 150px; }

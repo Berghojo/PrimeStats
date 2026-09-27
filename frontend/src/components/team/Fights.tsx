@@ -12,10 +12,19 @@ const KINDS: { key: DeathKind; label: string }[] = [
   { key: "lane", label: "1v1 (Bot: 2v2)" },
   { key: "gank", label: "Gank" },
   { key: "roam", label: "Roam" },
-  { key: "gank_roam", label: "Gank + Roam" },
+  { key: "dive", label: "Dive" },
+  { key: "skirmish", label: "Skirmish" },
+  { key: "teamfight", label: "Teamfight" },
   { key: "duel", label: "Jungle 1v1" },
   { key: "other", label: "Sonstige" },
 ];
+
+/** Regeln der Einordnung (gleich für Kills und Tode) */
+const RULES = "Geprüft wird von oben nach unten, die erste zutreffende Kategorie zählt: Teamfight = Teil einer "
+  + "Kette von mindestens 3 Kills (beider Teams) mit höchstens 20 s und 2 500 Einheiten Abstand · Dive = in "
+  + "Reichweite eines noch stehenden Turms des Opfers · Skirmish = mindestens 3 Angreifer · Gank = Jungler der "
+  + "Angreifer beteiligt · Roam = Laner einer anderen Lane beteiligt · 1v1 = nur die direkten Lane-Gegner (Botlane: "
+  + "Bot + Support, also 2v2) · Jungle 1v1 = Jungler gegen Jungler · Sonstige = ohne Champion (Turm, Minions).";
 const ORDER = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
 const lane = (pos: string) => (pos === "UTILITY" ? "BOTTOM" : pos);
 
@@ -37,19 +46,16 @@ const TEXT: Record<Mode, { title: string; info: string; total: string; top: stri
     total: "Tode",
     top: "Häufigste Täter",
     unit: "Tode",
-    info: "Wo und wodurch die eigenen Spieler sterben. Gank = gegnerischer Jungler beteiligt · Roam = Laner einer "
-      + "anderen Lane beteiligt · 1v1 = nur die direkten Lane-Gegner (auf der Botlane Bot + Support, also 2v2) · beim "
-      + "Jungler: Roam = ein Laner beteiligt, Jungle 1v1 = nur der gegnerische Jungler · Sonstige = ohne Champion (Turm, Minions).",
+    info: "Wo und wodurch die eigenen Spieler sterben. " + RULES + " Ein toter Jungler wird nicht „gegankt“: "
+      + "bei ihm zählt ein beteiligter Laner als Roam.",
   },
   kills: {
     title: "Kills",
     total: "Beteiligt",
     top: "Häufigste Opfer",
     unit: "Kills",
-    info: "Kills des eigenen Teams, gleich eingeteilt aus eigener Sicht: 1v1 = nur die eigenen Lane-Spieler (auf der "
-      + "Botlane Bot + Support, also 2v2) · Gank = eigener Jungler beteiligt · Roam = eigener Laner einer anderen Lane "
-      + "beteiligt · gegen den gegnerischen Jungler: Jungle 1v1 = nur unser Jungler, Roam = mit Lanern. Je Spieler "
-      + "zählen alle Kills, an denen er beteiligt war (Kill oder Assist).",
+    info: "Kills des eigenen Teams, gleich eingeteilt aus eigener Sicht (Angreifer = unser Team). " + RULES
+      + " Je Spieler zählen alle Kills, an denen er beteiligt war (Kill oder Assist).",
   },
 };
 
@@ -154,11 +160,12 @@ export function FightCard({ mode, deaths = [], kills = [], players }: {
 
   const table = (
     <div className="table-wrap">
-      <table className="data">
+      <table className="data fights">
         <thead>
           <tr>
-            <th className="left">Spieler</th><th>{text.total}</th><th>1v1 / 2v2</th><th>Gank</th><th>Roam</th>
-            <th>Gank + Roam</th>
+            <th className="left">Spieler</th><th>{text.total}</th>
+            <th title="1v1, auf der Botlane 2v2 (beim Jungler: Jungle 1v1)">1v1</th><th>Gank</th><th>Roam</th>
+            <th>Dive</th><th title="Skirmish: mindestens 3 Angreifer">Skirm.</th><th title="Teamfight">TF</th>
           </tr>
         </thead>
         <tbody>
@@ -176,7 +183,9 @@ export function FightCard({ mode, deaths = [], kills = [], players }: {
                 {/* ein toter Jungler wird nicht „gegankt“ – dort zählt nur Roam (Laner beteiligt) */}
                 <td>{jungler && mode === "deaths" ? "–" : count("gank")}</td>
                 <td>{count("roam")}</td>
-                <td>{jungler && mode === "deaths" ? "–" : count("gank_roam")}</td>
+                <td>{count("dive")}</td>
+                <td>{count("skirmish")}</td>
+                <td>{count("teamfight")}</td>
               </tr>
             );
           })}

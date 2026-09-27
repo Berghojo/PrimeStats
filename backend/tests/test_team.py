@@ -121,7 +121,7 @@ def test_death_kinds():
     assert death_kind("TOP", ["JUNGLE", "TOP"]) == "gank"
     assert death_kind("MIDDLE", ["UTILITY"]) == "roam"
     assert death_kind("BOTTOM", ["UTILITY", "BOTTOM"]) == "lane"        # Botlane-Duo zählt als eigene Lane
-    assert death_kind("UTILITY", ["MIDDLE", "JUNGLE"]) == "gank_roam"
+    assert death_kind("UTILITY", ["MIDDLE", "JUNGLE"]) == "gank"     # Jungler + Roamer ohne 3. Angreifer
     assert death_kind("JUNGLE", ["JUNGLE"]) == "duel"
     assert death_kind("JUNGLE", ["JUNGLE", "MIDDLE"]) == "roam"
     assert death_kind("TOP", []) == "other"
@@ -133,7 +133,8 @@ def test_report_lists_deaths_of_own_players(service, synced_team, demo_source):
     own = {m.puuid for m in synced_team.members}
     assert deaths and all(d["puuid"] in own for d in deaths)
     kinds = {d["kind"] for d in deaths}
-    assert {"gank", "roam", "lane"} <= kinds
+    assert {"teamfight", "skirmish"} <= kinds and kinds <= {"teamfight", "dive", "skirmish", "gank", "roam", "lane",
+                                                             "duel", "other"}
     for d in deaths[:40]:
         match = service.match(d["match_id"])
         enemy = {p.puuid for p in match.participants if p.team_id != match.player(d["puuid"]).team_id}
@@ -146,7 +147,7 @@ def test_report_lists_kills_of_own_team(service, synced_team):
     records = service.team_records(synced_team)
     kills = build_report(synced_team, records)["kills"]
     own = {m.puuid for m in synced_team.members}
-    assert kills and {"gank", "roam", "lane"} <= {k["kind"] for k in kills}
+    assert kills and {"teamfight", "skirmish"} <= {k["kind"] for k in kills}
     for k in kills[:40]:
         assert k["by"] and all(b["puuid"] for b in k["by"])
         match = service.match(k["match_id"])

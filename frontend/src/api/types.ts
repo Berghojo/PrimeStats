@@ -254,9 +254,10 @@ export interface Report {
   kills: KillEvent[];
 }
 
-/** gank = gegnerischer Jungler beteiligt, roam = Laner einer anderen Lane, lane = nur Lane-Gegner,
- *  duel = Jungler nur gegen Jungler, other = ohne Champion (Turm, Minions) */
-export type DeathKind = "gank" | "roam" | "gank_roam" | "lane" | "duel" | "other";
+/** Einordnung eines Kills (erste zutreffende): teamfight (Kette ≥ 3 Kills), dive (unter stehendem Turm des
+ *  Opfers), skirmish (≥ 3 Angreifer), gank (Jungler beteiligt), roam (Laner einer anderen Lane), lane (nur
+ *  Lane-Gegner, Bot: 2v2), duel (Jungler gegen Jungler), other (ohne Champion) */
+export type DeathKind = "teamfight" | "dive" | "skirmish" | "gank" | "roam" | "lane" | "duel" | "other";
 
 export interface KillEvent {
   match_id: string;
