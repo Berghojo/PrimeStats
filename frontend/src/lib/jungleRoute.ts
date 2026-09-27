@@ -21,6 +21,10 @@ export interface Camp {
 /** Aufschlag (Spieleinheiten) für gegnerische Camps: Invades nur, wenn sie klar auf dem Weg liegen */
 export const INVADE_PENALTY = 2500;
 
+/** Mindestdauer eines Camps nach dem Spawn bzw. zwischen zwei Camps (Sekunden) */
+const MIN_CLEAR = 15;
+const MIN_GAP = 10;
+
 /** CS je geräumtem Camp (Annahme: jedes Camp zählt gleich viel) */
 export const CS_PER_CAMP = 4;
 
@@ -62,6 +66,22 @@ export interface JungleRoute {
   minuteIndex: number[];
   clears: Clear[];
 }
+
+/**
+ * Zeitpunkt (Sekunden), zu dem die Jungle-CS erstmals ``target`` erreichen – linear interpoliert zwischen
+ * den Minutenwerten der Timeline. null, wenn der Wert im Zeitraum nicht erreicht wird.
+ */
+export function timeToCs(jungleCs: number[], target: number): number | null {
+  for (let m = 0; m < jungleCs.length - 1; m++) {
+    const a = jungleCs[m], b = jungleCs[m + 1];
+    if (a >= target) return m * 60;
+    if (b >= target && b > a) return Math.round(m * 60 + ((target - a) / (b - a)) * 60);
+  }
+  return null;
+}
+
+/** Dauer bis zu n geräumten Camps (z.B. 6 = Full Clear) */
+export const clearTime = (jungleCs: number[], camps: number) => timeToCs(jungleCs, camps * CS_PER_CAMP);
 
 /** Camp-Reihenfolge mit kürzestem Weg a -> c1 -> … -> ck -> b (Brute Force, k ist klein) */
 function bestOrder(a: Point, b: Point, candidates: number[], k: number, side?: "blue" | "red"): number[] {
@@ -124,7 +144,10 @@ export function reconstruct(points: (Point | null)[], jungleCs: number[], upTo: 
     });
     const order = k ? bestOrder(prev.p, p, available, Math.min(k, available.length), side) : [];
     order.forEach((i, n) => {
-      const t = Math.round(t0 + ((n + 1) / (order.length + 1)) * (t1 - t0));
+      // Zeitpunkt nach CS-Verlauf: das n-te Camp ist geräumt, wenn die CS um (n+1)·4 gestiegen sind
+      const share = gained > 0 ? Math.min(1, ((n + 1) * CS_PER_CAMP) / gained) : (n + 1) / (order.length + 1);
+      const previous = clears.length ? clears[clears.length - 1].t + MIN_GAP : 0;
+      const t = Math.min(t1, Math.max(Math.round(t0 + share * (t1 - t0)), CAMPS[i].spawn + MIN_CLEAR, previous));
       lastClear.set(i, t);
       clears.push({ camp: CAMPS[i], t, order: clears.length + 1 });
     });

@@ -10,7 +10,8 @@ describe("jungle route from CS", () => {
     const points = [null, camp("b-red"), camp("b-raptors")];
     const { clears, path } = reconstruct(points, [0, 0, 8], 2);
     expect(clears.map((c) => c.camp.key)).toEqual(["b-red", "b-raptors"]);
-    expect(clears.every((c) => c.t > 60 && c.t < 120)).toBe(true);
+    // nach CS-Verlauf läge das erste Camp bei 1:30 – frühestens 15 s nach dem Spawn (1:30) geräumt
+    expect(clears.map((c) => c.t)).toEqual([105, 120]);
     expect(path[0]).toEqual(camp("b-red"));
     expect(path.at(-1)).toEqual(camp("b-raptors"));
   });
@@ -55,5 +56,17 @@ describe("performance", () => {
       expect(r.clears.length).toBeGreaterThan(10);
     }
     expect(performance.now() - start).toBeLessThan(3000);
+  });
+});
+
+describe("first clear timing", async () => {
+  const { clearTime, timeToCs } = await import("./jungleRoute");
+  it("interpolates between minute frames", () => {
+    // 3:00 -> 8 CS, 4:00 -> 20 CS: 16 CS (4 Camps) bei 3:40
+    const cs = [0, 0, 4, 8, 20, 28];
+    expect(timeToCs(cs, 16)).toBe(220);
+    expect(clearTime(cs, 6)).toBe(4 * 60 + 30);   // 24 CS zwischen 20 und 28
+    expect(clearTime(cs, 10)).toBeNull();
+    expect(timeToCs(cs, 0)).toBe(0);
   });
 });

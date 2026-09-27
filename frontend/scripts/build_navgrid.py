@@ -1,6 +1,6 @@
 """Erzeugt src/lib/navgridData.ts (begehbare Fläche von Summoner's Rift) aus einem Kartenbild.
 
-    python scripts/build_navgrid.py <karte.png> --simple --x-left 24.5 --x-right 274 --y-top 23.5 --y-bottom 275
+    python scripts/build_navgrid.py <karte.png> --simple --base-walls --x-left 24.5 --x-right 274 --y-top 23.5 --y-bottom 275
     python scripts/build_navgrid.py <screenshot.jpg> --x-left 152 --x-right 487 --y-top 12 --y-bottom 318
 
 Das Bild ist eine Draufsicht (blau unten links). ``--simple``: schematische Karte, alles Nicht-Dunkle
@@ -22,6 +22,37 @@ from PIL import Image
 
 MX, MY, N = 14870, 14980, 150
 LANE_LOW, LANE_HIGH_X, LANE_HIGH_Y = 1250, 14870 - 1250, 13800
+
+
+#: Rand der Basisfläche (Abstand zur Kartenecke) je Winkel, gemessen an der schematischen Karte
+BASE_EDGE = {10: 5400, 15: 5600, 20: 5450, 25: 5600, 30: 5750, 35: 5850, 40: 5900, 45: 6100, 50: 5900,
+             55: 5850, 60: 5800, 65: 5650, 70: 5500, 75: 5650, 80: 5400}
+#: Lane-Ausgänge der Basis (Winkel von der Ecke aus) und halbe Breite der Lücke in Spieleinheiten
+BASE_EXITS = (12.4, 45.0, 77.6)
+EXIT_HALF_WIDTH = 750
+BASE_WALL = (-550, 150)   # Mauer von Rand-550 bis Rand+150
+
+
+def add_base_walls(soft: np.ndarray) -> None:
+    """Mauer entlang des Basisrands (beide Basen), offen nur an den drei Lanes."""
+    import math
+    angles = sorted(BASE_EDGE)
+    for j in range(N):
+        for i in range(N):
+            x, y = MX * (i + 0.5) / N, MY * (1 - (j + 0.5) / N)
+            for bx, by in ((x, y), (MX - x, MY - y)):          # blaue Basis, rote Basis (gespiegelt)
+                r = math.hypot(bx, by)
+                deg = math.degrees(math.atan2(by, bx))
+                if not angles[0] <= deg <= angles[-1]:
+                    continue
+                lo = max(a for a in angles if a <= deg)
+                hi = min(a for a in angles if a >= deg)
+                edge = BASE_EDGE[lo] if lo == hi else BASE_EDGE[lo] + (BASE_EDGE[hi] - BASE_EDGE[lo]) * (deg - lo) / (hi - lo)
+                if not edge + BASE_WALL[0] <= r <= edge + BASE_WALL[1]:
+                    continue
+                if any(abs(math.radians(deg - ex)) * r < EXIT_HALF_WIDTH for ex in BASE_EXITS):
+                    continue
+                soft[j, i] = 0.0
 
 
 def wall_loops(walk: np.ndarray, tolerance: float = 0.9) -> list[list[int]]:
@@ -101,6 +132,8 @@ def main() -> None:
     ap.add_argument("--y-top", type=float, default=12)
     ap.add_argument("--y-bottom", type=float, default=318)
     ap.add_argument("--simple", action="store_true", help="schematische Karte (dunkel = Wand)")
+    ap.add_argument("--base-walls", action="store_true",
+                    help="Basismauern ergänzen (in schematischen Karten ist die Basis eine einheitliche Fläche)")
     args = ap.parse_args()
 
     a = np.asarray(Image.open(args.image).convert("RGB")).astype(float)
@@ -128,6 +161,8 @@ def main() -> None:
                     for x in range(int(xa), int(np.ceil(xb)) + 1) if 0 <= x < w and 0 <= y < h]
             if vals:
                 soft[j, i] = np.mean(vals)
+    if args.base_walls:
+        add_base_walls(soft)
     mir = soft[::-1, ::-1]
     both = np.where(np.isnan(soft), mir, np.where(np.isnan(mir), soft, (soft + mir) / 2))
     grid = np.nan_to_num(both, nan=0.0) > 0.5
