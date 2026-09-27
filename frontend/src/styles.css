@@ -379,3 +379,18 @@ canvas.map-layer { pointer-events: none; }
 .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 .2rem 0 .6rem; }
 .legend-dot:first-child { margin-left: 0; }
 input[type=range] { accent-color: var(--accent); }
+
+/* ---------- Ansicht anpassen ---------- */
+.view-bar { display: grid; gap: .6rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.view-bar label.field { flex-direction: row; }
+.panel-editor { border: 1px solid var(--border); background: var(--bg); padding: .5rem .75rem; }
+.panel-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .15rem; }
+.panel-list li { display: flex; align-items: center; gap: .5rem; padding: .3rem 0; border-bottom: 1px solid var(--border); }
+.panel-list li:last-child { border-bottom: 0; }
+.panel-list li.off { color: var(--muted); }
+.sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .5rem 1rem; max-width: 512px; }
+.slider { display: grid; gap: .15rem; }
+.slider-head { display: flex; justify-content: space-between; color: var(--muted); font: 700 .85rem/1.2 var(--display);
+  text-transform: uppercase; letter-spacing: .05em; }
+.slider-head b { color: var(--text); font-variant-numeric: tabular-nums; }
+.slider input { width: 100%; }

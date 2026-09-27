@@ -164,6 +164,21 @@ class LinkCode(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class SavedView(Base):
+    """Gespeicherte Ansicht (sichtbare Panels in fester Reihenfolge) eines Kontos."""
+
+    __tablename__ = "saved_views"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    #: wofür die Ansicht gilt (derzeit nur "scout")
+    kind: Mapped[str] = mapped_column(String(16), default="scout")
+    name: Mapped[str] = mapped_column(String(40))
+    panels: Mapped[list] = mapped_column(JSONB)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # --------------------------------------------------------------- Scouting
 class Scout(Base):
     """Ergebnis eines Turnier-Scoutings: Spiele, in denen alle gesuchten Spieler im selben Team standen."""

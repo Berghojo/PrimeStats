@@ -6,7 +6,6 @@ import type { HistoryRow, Label } from "../../api/types";
 import { dt, duration, signed, tone } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 import { ChampIcon } from "../ChampIcon";
-import { InlineTimeline } from "../TimelineChart";
 import { SelectionBar, toggle } from "../SelectionBar";
 import { ResultBadge, SideBadge } from "../ui";
 
@@ -18,8 +17,20 @@ interface Props {
   focus?: string[];
   /** Spalte mit von Hand eingetragenem Gegner (nur eigene Teamansicht) */
   showOpponent?: boolean;
-  /** Zeitverlauf der markierten Spiele direkt über der Tabelle anzeigen (Scouting) */
+  /** Zeitverlauf wird auf derselben Seite angezeigt (kein Wechsel zur Analyse-Seite) */
   inlineTimeline?: boolean;
+  /** Auswahl von außen (für den eingebetteten Zeitverlauf) */
+  selection?: [Set<string>, (next: Set<string> | ((s: Set<string>) => Set<string>)) => void];
+}
+
+/** Für die Analyse markierte Spiele; startet mit den (bis zu 10) neuesten gefilterten Spielen. */
+export function useGameSelection(history: HistoryRow[]) {
+  const initial = () => new Set(history.filter((r) => r.selected).slice(0, 10).map((r) => r.match_id));
+  const [selected, setSelected] = useState<Set<string>>(initial);
+  const filterKey = history.map((r) => `${r.match_id}:${r.selected}`).join(",");
+  // Auswahl zurücksetzen, sobald sich die Filter (und damit die markierten Spiele) ändern
+  useEffect(() => setSelected(initial()), [filterKey]);
+  return [selected, setSelected] as [Set<string>, typeof setSelected];
 }
 
 function OpponentInput({ value, onSave }: { value: string; onSave: (v: string) => void }) {
@@ -38,18 +49,13 @@ function OpponentInput({ value, onSave }: { value: string; onSave: (v: string) =
   );
 }
 
-export function GamesTable({ teamId, history, editable, focus, showOpponent = false, inlineTimeline = false }: Props) {
+export function GamesTable({ teamId, history, editable, focus, showOpponent = false, inlineTimeline = false, selection }: Props) {
   const { meta, label } = useGameData();
   const updateGame = useUpdateTeamGame(teamId ?? 0);
-  const initial = () => new Set(history.filter((r) => r.selected).slice(0, 10).map((r) => r.match_id));
-  const [selected, setSelected] = useState<Set<string>>(initial);
-  const filterKey = history.map((r) => `${r.match_id}:${r.selected}`).join(",");
-  // Auswahl zurücksetzen, sobald sich die Filter (und damit die markierten Spiele) ändern
-  useEffect(() => setSelected(initial()), [filterKey]);
+  const own = useGameSelection(history);
+  const [selected, setSelected] = selection ?? own;
 
   return (
-    <>
-    {inlineTimeline && <InlineTimeline ids={[...selected]} focus={focus} />}
     <section className="card">
       <h2>Spiele</h2>
       <div className="sub">
@@ -119,6 +125,5 @@ export function GamesTable({ teamId, history, editable, focus, showOpponent = fa
           setSelected(new Set(mode === "none" ? [] : history.filter((r) => mode === "all" || r.selected).map((r) => r.match_id)))}
       />
     </section>
-    </>
   );
 }

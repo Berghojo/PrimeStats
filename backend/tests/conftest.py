@@ -14,7 +14,7 @@ NOW = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
 TEST_DATABASE_URL = normalize_database_url(
     os.getenv("TEST_DATABASE_URL", "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/primestats_test"))
 TABLES = ("team_games, team_members, teams, timeline_summaries, timelines, matches, accounts, raw_imports, puuid_aliases, "
-          "link_codes, riot_links, user_sessions, users")
+          "link_codes, riot_links, saved_views, user_sessions, users")
 
 
 @pytest.fixture(scope="session")

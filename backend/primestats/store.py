@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .auth import token_hash
 from .lcu import CLIENT_PUUID_SQL
-from .db import (Account, LinkCode, Match, PuuidAlias, RawImport, RiotLink, Scout, TeamGameRow, TeamMemberRow, TeamRow,
+from .db import (Account, LinkCode, Match, PuuidAlias, RawImport, SavedView, RiotLink, Scout, TeamGameRow, TeamMemberRow, TeamRow,
                  Timeline, TimelineSummary, User, UserSession)
 
 
@@ -58,6 +58,19 @@ class UserAccount:
     id: int
     username: str
     created_at: datetime
+
+
+@dataclass
+class View:
+    id: int
+    kind: str
+    name: str
+    panels: list[str]
+    is_default: bool
+
+
+def _view(row: SavedView) -> View:
+    return View(row.id, row.kind, row.name, list(row.panels), row.is_default)
 
 
 @dataclass
@@ -458,6 +471,43 @@ class Store:
         with self.session() as s:
             return set(s.scalars(select(TeamRow.id).where(TeamRow.owner_id == user_id)))
 
+    # ------------------------------------------------------------ Ansichten
+    def list_views(self, user_id: int, kind: str) -> list[View]:
+        with self.session() as s:
+            rows = s.scalars(select(SavedView).where(SavedView.user_id == user_id, SavedView.kind == kind)
+                             .order_by(SavedView.created_at, SavedView.id))
+            return [_view(r) for r in rows]
+
+    def create_view(self, user_id: int, kind: str, name: str, panels: list[str], is_default: bool) -> View:
+        with self.session() as s:
+            if is_default:
+                s.execute(update(SavedView).where(SavedView.user_id == user_id, SavedView.kind == kind)
+                          .values(is_default=False))
+            row = SavedView(user_id=user_id, kind=kind, name=name, panels=panels, is_default=is_default)
+            s.add(row)
+            s.flush()
+            return _view(row)
+
+    def update_view(self, user_id: int, view_id: int, **changes) -> View | None:
+        """Ändert Name, Panels oder Standard-Markierung (``None`` = unverändert)."""
+        with self.session() as s:
+            row = s.get(SavedView, view_id)
+            if row is None or row.user_id != user_id:
+                return None
+            if changes.get("is_default"):
+                s.execute(update(SavedView).where(SavedView.user_id == user_id, SavedView.kind == row.kind)
+                          .values(is_default=False))
+            for key, value in changes.items():
+                if value is not None:
+                    setattr(row, key, value)
+            s.flush()
+            return _view(row)
+
+    def delete_view(self, user_id: int, view_id: int) -> bool:
+        with self.session() as s:
+            result = s.execute(delete(SavedView).where(SavedView.id == view_id, SavedView.user_id == user_id))
+            return result.rowcount > 0
+
     def roster_team_ids(self, puuids: set[str]) -> set[int]:
         """Teams, in deren Kader einer der Riot-Accounts steht."""
         if not puuids:
@@ -491,3 +541,4 @@ class Store:
             rows = s.scalars(select(Scout).order_by(Scout.updated_at.desc()).limit(limit))
             return [{"key": r.key, "players": r.players, "mode": r.mode, "roster": r.roster, "games": len(r.games),
                      "updated_at": r.updated_at} for r in rows]
+

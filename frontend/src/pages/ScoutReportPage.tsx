@@ -7,6 +7,7 @@ import type { RosterPlayer, ScoutMode } from "../api/types";
 import { useScoutReport, useScoutStatus, useStartScout } from "../api/hooks";
 import { ReportBody, useUrlFilters } from "../components/team/ReportBody";
 import { ErrorBox, Loading, Spinner } from "../components/ui";
+import { usePanels, ViewCustomizer } from "../components/ViewCustomizer";
 import { ago } from "../lib/format";
 import { useGameData } from "../lib/meta";
 import { MODE_TEXT, scoutTitle } from "./ScoutPage";
@@ -85,6 +86,7 @@ export function ScoutReportPage() {
   const [selected, matchParam, setSelection] = useSelection();
   const qc = useQueryClient();
   const report = useScoutReport(key, filters, selected, matchParam);
+  const view = usePanels("scout");
   const status = useScoutStatus(key, true);
   const restart = useStartScout();
   const job = status.data;
@@ -146,8 +148,10 @@ export function ScoutReportPage() {
         {restart.error && <ErrorBox error={restart.error} />}
         <PlayerSelect roster={data.roster} selected={selected.filter((p) => data.roster.some((r) => r.puuid === p))}
           match={matchParam ?? data.match} onChange={setSelection} />
+        <ViewCustomizer kind="scout" {...view} />
       </section>
-      <ReportBody data={data} refreshing={report.isFetching} hideLabelFilter focus={data.roster.map((r) => r.puuid)} inlineTimeline
+      <ReportBody data={data} refreshing={report.isFetching} hideLabelFilter focus={data.roster.map((r) => r.puuid)} kind="scout"
+        panels={view.panels}
         noTimelineHint="Für diese Spiele sind keine Timeline-Daten verfügbar." />
     </>
   );

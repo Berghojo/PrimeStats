@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api } from "./client";
 import type {
-  Analysis, Filters, Label, LinkCode, Match, Me, Meta, ScoutMode, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
+  Analysis, Filters, Label, LinkCode, Match, Me, Meta, SavedView, ScoutMode, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
   Team, TeamInput, TeamReport,
 } from "./types";
 
@@ -152,5 +152,30 @@ export function useStartScout() {
         method: "POST", body: JSON.stringify({ riot_ids: riotIds, mode }),
       }),
     onSuccess: (res) => qc.setQueryData(["scout", res.key, "status"], res.job),
+  });
+}
+
+// ------------------------------------------------------------ Ansichten
+export const useViews = (enabled: boolean) =>
+  useQuery({ queryKey: ["views"], queryFn: () => api<SavedView[]>("/me/views"), enabled });
+
+export function useSaveView() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (view: { id?: number; name?: string; panels?: string[]; is_default?: boolean }) => {
+      const { id, ...body } = view;
+      return id === undefined
+        ? api<SavedView>("/me/views", { method: "POST", body: JSON.stringify(body) })
+        : api<SavedView>(`/me/views/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["views"] }),
+  });
+}
+
+export function useDeleteView() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/me/views/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["views"] }),
   });
 }

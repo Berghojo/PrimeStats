@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from .accounts_api import router as accounts_router
 from .api import router
 from .scout_api import router as scout_router
+from .views_api import router as views_router
 from .config import Settings
 from .ddragon import DataDragon
 from .riot import MatchSource, NotFound, RiotAPIError, RiotClient
@@ -97,6 +98,7 @@ def create_app(settings: Settings | None = None, *, source: MatchSource | None =
     app.include_router(router)
     app.include_router(accounts_router)
     app.include_router(scout_router)
+    app.include_router(views_router)
     if settings.frontend_dist and (settings.frontend_dist / "index.html").exists():
         _mount_frontend(app, settings.frontend_dist)
     return app

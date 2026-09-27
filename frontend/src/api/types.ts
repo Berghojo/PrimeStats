@@ -362,3 +362,6 @@ export interface ScoutReport {
   patches: string[];
   job: SyncJob | null;
 }
+
+/** Gespeicherte Ansicht: sichtbare Panels in dieser Reihenfolge */
+export interface SavedView { id: number; name: string; panels: string[]; is_default: boolean }

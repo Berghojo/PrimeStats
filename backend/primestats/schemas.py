@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from .matches import POSITIONS
 
@@ -615,3 +615,28 @@ class ScoutReportOut(BaseModel):
     history: list[HistoryRow]
     patches: list[str]
     job: SyncJobOut | None
+
+
+# ----------------------------------------------------------------- Ansichten
+PanelKey = Annotated[str, StringConstraints(pattern=r"^[a-z_]{1,32}$")]
+
+
+class ViewIn(BaseModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)]
+    panels: list[PanelKey] = Field(max_length=30)
+    is_default: bool = False
+
+
+class ViewUpdate(BaseModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)] | None = None
+    panels: list[PanelKey] | None = Field(default=None, max_length=30)
+    is_default: bool | None = None
+
+
+class ViewOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    panels: list[str]
+    is_default: bool

@@ -67,7 +67,14 @@ function MapBase() {
 }
 
 /** Heatmap: Punkte aufsummieren (Alpha), dann einfarbig einfärben – hell = häufig. */
-function Heat({ points, rgb }: { points: { x: number; y: number }[]; rgb: [number, number, number] }) {
+function Heat({ points, rgb, radius = 32, intensity = 1 }: {
+  points: { x: number; y: number }[];
+  rgb: [number, number, number];
+  /** Größe eines Punkts in Pixeln (bei 512 px Kartenbreite) */
+  radius?: number;
+  /** Faktor auf die Deckkraft je Punkt */
+  intensity?: number;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -75,8 +82,7 @@ function Heat({ points, rgb }: { points: { x: number; y: number }[]; rgb: [numbe
     if (!canvas || !ctx) return;
     ctx.clearRect(0, 0, SIZE, SIZE);
     if (!points.length) return;
-    const radius = 32;
-    const strength = Math.min(0.45, Math.max(0.1, 2.5 / Math.sqrt(points.length)));
+    const strength = Math.min(0.9, Math.min(0.45, Math.max(0.1, 2.5 / Math.sqrt(points.length))) * intensity);
     for (const p of points) {
       const g = ctx.createRadialGradient(px(p.x), py(p.y), 0, px(p.x), py(p.y), radius);
       g.addColorStop(0, `rgba(0,0,0,${strength})`);
@@ -97,13 +103,25 @@ function Heat({ points, rgb }: { points: { x: number; y: number }[]; rgb: [numbe
       d[i + 3] = Math.min(230, Math.pow(a, 0.75) * 320);
     }
     ctx.putImageData(img, 0, 0);
-  }, [points, rgb]);
+  }, [points, rgb, radius, intensity]);
   return <canvas ref={ref} width={SIZE} height={SIZE} className="map-layer" aria-hidden />;
 }
 
 type View = "heat" | "path";
 type HeatType = "involved" | "death";
-const WINDOWS = [{ label: "0–10 Min", max: 600 }, { label: "0–15 Min", max: 900 }, { label: "Ganzes Spiel", max: Infinity }];
+
+/** Schieberegler mit Beschriftung und aktuellem Wert */
+function Slider({ label, value, min, max, step = 1, format, onChange }: {
+  label: string; value: number; min: number; max: number; step?: number;
+  format?: (v: number) => string; onChange: (v: number) => void;
+}) {
+  return (
+    <label className="slider">
+      <span className="slider-head"><span>{label}</span><b>{format ? format(value) : value}</b></span>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </label>
+  );
+}
 const KILL_RGB: [number, number, number] = [0, 220, 192];
 const DEATH_RGB: [number, number, number] = [255, 77, 94];
 
@@ -122,11 +140,16 @@ function Segmented<T extends string | number>({ value, options, onChange, label 
 
 function HeatView({ events, games }: { events: JungleEvent[]; games: number }) {
   const [type, setType] = useState<HeatType>("involved");
-  const [windowIdx, setWindowIdx] = useState(1);
-  const max = WINDOWS[windowIdx].max;
+  const lastMinute = Math.max(15, Math.ceil(Math.max(0, ...events.map((e) => e.t)) / 60));
+  const [from, setFrom] = useState(0);
+  const [to, setTo] = useState(15);
+  const [radius, setRadius] = useState(32);
+  const [intensity, setIntensity] = useState(1);
+  const upto = Math.min(to, lastMinute);
   const shown = useMemo(
-    () => events.filter((e) => e.t <= max && (type === "death" ? e.type === "death" : e.type !== "death")),
-    [events, max, type],
+    () => events.filter((e) => e.t >= from * 60 && e.t <= upto * 60
+      && (type === "death" ? e.type === "death" : e.type !== "death")),
+    [events, from, upto, type],
   );
   const byZone = useMemo(() => {
     const counts = new Map<string, number>();
@@ -141,18 +164,29 @@ function HeatView({ events, games }: { events: JungleEvent[]; games: number }) {
         <div className="row">
           <Segmented label="Ereignisse" value={type} onChange={setType}
             options={[{ value: "involved", label: "Kills + Assists" }, { value: "death", label: "Tode" }]} />
-          <Segmented label="Zeitraum" value={windowIdx} onChange={setWindowIdx}
-            options={WINDOWS.map((w, i) => ({ value: i, label: w.label }))} />
+        </div>
+        <div className="sliders">
+          <Slider label="Von Minute" value={from} min={0} max={lastMinute} onChange={(v) => {
+            setFrom(v);
+            if (v > upto) setTo(v);
+          }} />
+          <Slider label="Bis Minute" value={upto} min={0} max={lastMinute} onChange={(v) => {
+            setTo(v);
+            if (v < from) setFrom(v);
+          }} />
+          <Slider label="Punktgröße" value={radius} min={12} max={64} onChange={setRadius} format={(v) => `${v} px`} />
+          <Slider label="Intensität" value={intensity} min={0.25} max={2} step={0.05} onChange={setIntensity}
+            format={(v) => `${Math.round(v * 100)} %`} />
         </div>
         <div className="map">
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer"><MapBase /></svg>
-          <Heat points={shown} rgb={type === "death" ? DEATH_RGB : KILL_RGB} />
+          <Heat points={shown} rgb={type === "death" ? DEATH_RGB : KILL_RGB} radius={radius} intensity={intensity} />
         </div>
       </div>
       <div className="stack">
         <div className="kpis">
           <div className="kpi">
-            <div className="label">{type === "death" ? "Tode" : "Kill-Beteiligungen"}</div>
+            <div className="label">{type === "death" ? "Tode" : "Kill-Beteiligungen"} · Min {from}–{upto}</div>
             <div className="value">{shown.length}</div>
             <div className="hint">
               Ø {games ? (shown.length / games).toFixed(1) : "–"} pro Spiel
@@ -204,10 +238,9 @@ function PathView({ paths, maxMinutes }: { paths: JunglePath[]; maxMinutes: numb
         <div className="row">
           <Segmented label="Seite" value={side} onChange={setSide}
             options={[{ value: "all", label: "Beide Seiten" }, { value: "blue", label: "Blau" }, { value: "red", label: "Rot" }]} />
-          <label className="field row" style={{ gap: ".5rem" }}>
-            bis Minute {minutes}
-            <input type="range" min={2} max={maxMinutes} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} />
-          </label>
+        </div>
+        <div className="sliders">
+          <Slider label="Bis Minute" value={minutes} min={2} max={maxMinutes} onChange={setMinutes} />
         </div>
         <div className="map">
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer" onMouseLeave={() => setHover(null)}>
