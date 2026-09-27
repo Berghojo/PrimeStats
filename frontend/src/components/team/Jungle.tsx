@@ -1,4 +1,4 @@
-import { type ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Jungle, JungleEvent, JunglePath, Side } from "../../api/types";
 import { dt, duration } from "../../lib/format";
@@ -20,15 +20,6 @@ const IMG_MAX_Y = 14980;
 export const px = (x: number) => ((x - IMG_MIN) / (IMG_MAX_X - IMG_MIN)) * SIZE;
 export const py = (y: number) => SIZE - ((y - IMG_MIN) / (IMG_MAX_Y - IMG_MIN)) * SIZE;
 
-/** Darstellung der Karte (Wände, Abgleich mit dem echten Kartenbild) – gilt für Heatmap und Pathing. */
-interface MapSettings {
-  walls: boolean;
-  /** Abgleich: echtes Kartenbild voll sichtbar, Wände nur als Umriss */
-  calibrate: boolean;
-  imageOpacity: number;
-  onImage: (state: "ok" | "failed") => void;
-}
-const MapContext = createContext<MapSettings>({ walls: true, calibrate: false, imageOpacity: 0.55, onImage: () => {} });
 
 const SIDE_COLOR: Record<Side, string> = { blue: "#4c8dff", red: "#ff4d5e" };
 
@@ -74,9 +65,8 @@ const LANE_LOW = 1250;
 const LANE_HIGH_X = MAP_W - 1250;
 const LANE_HIGH_Y = MAP_H - 1250;
 
-export function MapBase(_: { walls?: boolean }) {
+export function MapBase() {
   const { mapUrl } = useGameData();
-  const { walls, calibrate, imageOpacity, onImage } = useContext(MapContext);
   const [failed, setFailed] = useState(false);
   return (
     <>
@@ -90,14 +80,9 @@ export function MapBase(_: { walls?: boolean }) {
       <circle cx={px(700)} cy={py(700)} r={30} fill="#16233d" />
       <circle cx={px(MAP_W - 700)} cy={py(MAP_H - 700)} r={30} fill="#3a1820" />
       {mapUrl && !failed && (
-        <image href={mapUrl} width={SIZE} height={SIZE} opacity={imageOpacity}
-          onLoad={() => onImage("ok")}
-          onError={() => {
-            setFailed(true);
-            onImage("failed");
-          }} />
+        <image href={mapUrl} width={SIZE} height={SIZE} opacity={0.55} onError={() => setFailed(true)} />
       )}
-      {(walls || calibrate) && <path className={calibrate ? "walls outline" : "walls"} d={WALL_PATH} fillRule="evenodd" />}
+      <path className="walls" d={WALL_PATH} fillRule="evenodd" />
     </>
   );
 }
@@ -174,7 +159,7 @@ function Segmented<T extends string | number>({ value, options, onChange, label 
   );
 }
 
-function HeatView({ events, games, walls, shared }: { events: JungleEvent[]; games: number; walls: boolean; shared: ReactNode }) {
+function HeatView({ events, games, shared }: { events: JungleEvent[]; games: number; shared: ReactNode }) {
   const [type, setType] = useState<HeatType>("involved");
   const lastMinute = Math.max(15, Math.ceil(Math.max(0, ...events.map((e) => e.t)) / 60));
   const [from, setFrom] = useState(0);
@@ -225,7 +210,7 @@ function HeatView({ events, games, walls, shared }: { events: JungleEvent[]; gam
       )}
       map={(
         <div className="map">
-          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer"><MapBase walls={walls} /></svg>
+          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer"><MapBase /></svg>
           <Heat points={shown} rgb={type === "death" ? DEATH_RGB : KILL_RGB} radius={radius} intensity={intensity} />
         </div>
       )}
@@ -265,29 +250,26 @@ function HeatView({ events, games, walls, shared }: { events: JungleEvent[]; gam
 }
 
 /** Route eines Spiels: mit Jungle-CS über die geräumten Camps, sonst direkt zwischen den Minutenpositionen */
-function buildRoute(p: JunglePath, minutes: number, realistic: boolean) {
+function buildRoute(p: JunglePath, minutes: number) {
   const minutePts = p.points.slice(0, minutes + 1).map((pt, m) => (m >= 1 && pt ? (pt as Point) : null));
-  if (realistic && p.jungle_cs?.length) {
+  if (p.jungle_cs?.length) {
     const r = reconstruct(p.points as (Point | null)[], p.jungle_cs, minutes, 1, true, p.side);
     return { line: r.path, minutePts, clears: r.clears };
   }
   const pts = minutePts.filter((pt): pt is Point => !!pt);
-  return { line: realistic ? interpolate(pts).path : pts, minutePts, clears: [] as Clear[] };
+  return { line: interpolate(pts).path, minutePts, clears: [] as Clear[] };
 }
 
-function PathView({ paths, maxMinutes, walls, shared }: {
-  paths: JunglePath[]; maxMinutes: number; walls: boolean; shared: ReactNode;
-}) {
+function PathView({ paths, maxMinutes, shared }: { paths: JunglePath[]; maxMinutes: number; shared: ReactNode }) {
   const { champion } = useGameData();
   const [minutes, setMinutes] = useState(Math.min(6, maxMinutes));
   const [side, setSide] = useState<"all" | Side>("all");
-  const [realistic, setRealistic] = useState(true);
   const [hover, setHover] = useState<string | null>(null);
   const shown = paths.filter((p) => side === "all" || p.side === side);
   const hovered = shown.find((p) => p.match_id === hover);
   const routes = useMemo(
-    () => new Map(shown.map((p) => [p.match_id, buildRoute(p, minutes, realistic)])),
-    [shown, minutes, realistic],
+    () => new Map(shown.map((p) => [p.match_id, buildRoute(p, minutes)])),
+    [shown, minutes],
   );
   // Startroute unabhängig vom Regler: die ersten drei geräumten Camps (volle Pfadlänge)
   const openings = useMemo(() => {
@@ -333,24 +315,13 @@ function PathView({ paths, maxMinutes, walls, shared }: {
           <RailSection title="Zeitraum">
             <Slider label="Bis Minute" value={minutes} min={2} max={maxMinutes} onChange={setMinutes} />
           </RailSection>
-          <RailSection title="Laufwege" action={(
-            <InfoTip>
-              Aus dem Anstieg der Jungle-CS zwischen zwei Minuten ergibt sich die Zahl der geräumten Camps (4 CS je Camp).
-              Gewählt werden die Camps, die zu der Zeit stehen (Spawn 1:30, Scuttle 3:30, Respawn 2:15 bzw. 5:00 bei den
-              Buffs) und den kürzesten begehbaren Weg zwischen den beiden Positionen ergeben.
-            </InfoTip>
-          )}>
-            <OptionList multi label="Laufwege" selected={new Set(realistic ? ["on"] : [])}
-              onToggle={() => setRealistic((r) => !r)}
-              options={[{ value: "on", label: "Über geräumte Camps" }]} />
-          </RailSection>
           {shared}
         </>
       )}
       map={(
         <div className="map">
             <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer" onMouseLeave={() => setHover(null)}>
-              <MapBase walls={walls} />
+              <MapBase />
               {shown.map((p) => {
                 const r = routes.get(p.match_id)!;
                 const line = r.line.map(([x, y]) => `${px(x)},${py(y)}`).join(" ");
@@ -441,11 +412,6 @@ function PathView({ paths, maxMinutes, walls, shared }: {
 /** Jungle-Auswertung: Gank-Heatmap und Pathing des eigenen Junglers. */
 export function JungleCard({ jungle }: { jungle: Jungle }) {
   const [view, setView] = useState<View>("heat");
-  const [walls, setWalls] = useState(true);
-  const [calibrate, setCalibrate] = useState(false);
-  const [imageOpacity, setImageOpacity] = useState(1);
-  const [image, setImage] = useState<"ok" | "failed" | null>(null);
-  const settings: MapSettings = { walls, calibrate, imageOpacity: calibrate ? imageOpacity : 0.55, onImage: setImage };
   const [off, setOff] = useState<Set<string>>(new Set());
   if (!jungle.players.length) return null;
   const active = (puuid: string) => !off.has(puuid);
@@ -469,23 +435,6 @@ export function JungleCard({ jungle }: { jungle: Jungle }) {
             options={jungle.players.map((p) => ({ value: p.puuid, label: p.name, count: p.games }))} />
         </RailSection>
       )}
-      <RailSection title="Karte" action={(
-        <InfoTip>
-          Kartenabgleich: das echte Kartenbild (Riot Data Dragon) mit den Wänden als gestrichelte Umrisse – so lässt sich
-          prüfen, ob die Wände passen, die PrimeStats für die Laufwege verwendet.
-        </InfoTip>
-      )}>
-        <OptionList multi label="Karte" selected={new Set([walls && "walls", calibrate && "calibrate"].filter(Boolean) as string[])}
-          onToggle={(v) => (v === "walls" ? setWalls((w) => !w) : setCalibrate((c) => !c))}
-          options={[{ value: "walls", label: "Wände" }, { value: "calibrate", label: "Kartenabgleich" }]} />
-        {calibrate && (
-          <Slider label="Kartenbild" value={imageOpacity} min={0} max={1} step={0.05} onChange={setImageOpacity}
-            format={(v) => `${Math.round(v * 100)} %`} />
-        )}
-        {calibrate && image === "failed" && (
-          <p className="muted small" style={{ margin: 0 }}>Kartenbild von Riot nicht erreichbar.</p>
-        )}
-      </RailSection>
     </>
   );
 
@@ -500,18 +449,17 @@ export function JungleCard({ jungle }: { jungle: Jungle }) {
             <b>Heatmap:</b> Orte, an denen der Jungler an Kills beteiligt war bzw. gestorben ist. Frühe Kills auf einer
             Lane sind meist Ganks.
             <br /><br />
-            <b>Pathing:</b> Die Timeline enthält nur eine Position pro Minute (Punkte). Dazwischen zeichnet PrimeStats den
-            kürzesten begehbaren Weg über die Karte – plausibel, aber nicht der exakte Laufweg.
+            <b>Pathing:</b> Die Timeline enthält nur eine Position pro Minute (Punkte). Aus dem Anstieg der Jungle-CS
+            ergibt sich, wie viele Camps dazwischen geräumt wurden (4 CS je Camp); gewählt werden die Camps, die zu der
+            Zeit stehen und den kürzesten begehbaren Weg ergeben. Plausibel, aber nicht der exakte Laufweg.
           </InfoTip>
         </h2>
         <Segmented label="Ansicht" value={view} onChange={setView}
           options={[{ value: "heat", label: "Gank-Heatmap" }, { value: "path", label: "Pathing" }]} />
       </div>
-      <MapContext.Provider value={settings}>
-        {view === "heat"
-          ? <HeatView events={events} games={games} walls={walls} shared={shared} />
-          : <PathView paths={paths} maxMinutes={jungle.path_minutes} walls={walls} shared={shared} />}
-      </MapContext.Provider>
+      {view === "heat"
+        ? <HeatView events={events} games={games} shared={shared} />
+        : <PathView paths={paths} maxMinutes={jungle.path_minutes} shared={shared} />}
     </section>
   );
 }
