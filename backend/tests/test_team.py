@@ -114,3 +114,29 @@ def test_jungle_pathing_and_kill_locations(service, synced_team, demo_source):
                     else "death")
         assert ev["type"] == expected and 0 <= ev["x"] <= 15000
     assert {e["type"] for e in jungle["events"]} == {"kill", "assist", "death"}
+
+
+def test_death_kinds():
+    from primestats.team_stats import death_kind
+    assert death_kind("TOP", ["JUNGLE", "TOP"]) == "gank"
+    assert death_kind("MIDDLE", ["UTILITY"]) == "roam"
+    assert death_kind("BOTTOM", ["UTILITY", "BOTTOM"]) == "lane"        # Botlane-Duo zählt als eigene Lane
+    assert death_kind("UTILITY", ["MIDDLE", "JUNGLE"]) == "gank_roam"
+    assert death_kind("JUNGLE", ["JUNGLE"]) == "duel"
+    assert death_kind("JUNGLE", ["JUNGLE", "MIDDLE"]) == "roam"
+    assert death_kind("TOP", []) == "other"
+
+
+def test_report_lists_deaths_of_own_players(service, synced_team, demo_source):
+    records = service.team_records(synced_team)
+    deaths = build_report(synced_team, records)["deaths"]
+    own = {m.puuid for m in synced_team.members}
+    assert deaths and all(d["puuid"] in own for d in deaths)
+    kinds = {d["kind"] for d in deaths}
+    assert {"gank", "roam", "lane"} <= kinds
+    for d in deaths[:40]:
+        match = service.match(d["match_id"])
+        enemy = {p.puuid for p in match.participants if p.team_id != match.player(d["puuid"]).team_id}
+        assert all(b["position"] for b in d["by"])
+        assert len(d["by"]) == len({b["name"] for b in d["by"]})
+        assert all(p.puuid in enemy for p in match.participants if p.name in {b["name"] for b in d["by"]})

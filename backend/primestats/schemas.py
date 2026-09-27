@@ -383,6 +383,31 @@ class JungleEvent(BaseModel):
     y: int
 
 
+class DeathBy(BaseModel):
+    position: str
+    champion_id: int
+    name: str
+    killer: bool
+
+
+class DeathEvent(BaseModel):
+    """Tod eines eigenen Spielers; ``kind`` siehe team_stats.death_kind."""
+
+    match_id: str
+    date: datetime
+    win: bool
+    side: Literal["blue", "red"]
+    puuid: str
+    name: str
+    position: str
+    champion_id: int
+    t: int
+    x: int
+    y: int
+    kind: Literal["gank", "roam", "gank_roam", "lane", "duel", "other"]
+    by: list[DeathBy]
+
+
 class Jungle(BaseModel):
     players: list[JunglePlayer] = []
     paths: list[JunglePath] = []
@@ -402,6 +427,7 @@ class Report(BaseModel):
     gold_curves: dict[str, Curve]
     trend: list[TrendPoint]
     jungle: Jungle = Jungle()
+    deaths: list[DeathEvent] = []
 
 
 class HistoryRow(BaseModel):

@@ -10,6 +10,7 @@ import { GamesTable, useGameSelection } from "./GamesTable";
 import { ObjectivesCard, OverviewKpis } from "./Overview";
 import { PlayersTable } from "./PlayersTable";
 import { ChampionTable } from "./ChampionTable";
+import { GankCard } from "./Ganks";
 import { JungleCard } from "./Jungle";
 import { type ReportKind, PANELS, defaultPanels } from "./panels";
 import { ChampionPools, DraftCards } from "./Pools";
@@ -106,6 +107,8 @@ export function ReportBody({
         return <DraftCards picks={report.picks} ourBans={report.our_bans} enemyBans={report.enemy_bans} enemyPicks={report.enemy_picks} />;
       case "jungle":
         return kind === "team" && report.jungle ? <JungleCard jungle={report.jungle} /> : null;
+      case "ganks":
+        return report.deaths?.length ? <GankCard deaths={report.deaths} players={report.players} /> : null;
       case "trend":
         return ov.timeline_games > 0 ? (
           <section className="card">

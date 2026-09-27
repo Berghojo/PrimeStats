@@ -8,14 +8,14 @@ import { type Point, WALLS, edges, interpolate } from "../../lib/rift";
 /** Kartengröße in Spielkoordinaten (Summoner's Rift, Ursprung unten links) */
 const MAP_W = 14870;
 const MAP_H = 14980;
-const SIZE = 512;
+export const SIZE = 512;
 /** Bereich, den das offizielle Kartenbild (Data Dragon, map11.png) abdeckt – laut Riot-Doku */
 const IMG_MIN = -120;
 const IMG_MAX_X = 14870;
 const IMG_MAX_Y = 14980;
 
-const px = (x: number) => ((x - IMG_MIN) / (IMG_MAX_X - IMG_MIN)) * SIZE;
-const py = (y: number) => SIZE - ((y - IMG_MIN) / (IMG_MAX_Y - IMG_MIN)) * SIZE;
+export const px = (x: number) => ((x - IMG_MIN) / (IMG_MAX_X - IMG_MIN)) * SIZE;
+export const py = (y: number) => SIZE - ((y - IMG_MIN) / (IMG_MAX_Y - IMG_MIN)) * SIZE;
 
 /** Darstellung der Karte (Wände, Abgleich mit dem echten Kartenbild) – gilt für Heatmap und Pathing. */
 interface MapSettings {
@@ -60,7 +60,7 @@ export function zone(x: number, y: number, side: Side): string {
 const ZONES = ["Toplane", "Midlane", "Botlane", "Fluss", "Eigener Jungle", "Gegnerischer Jungle", "Basis"];
 
 /** Summoner's Rift als schlichte Vektorgrafik – Hintergrund, falls das Kartenbild nicht lädt. */
-function MapBase(_: { walls?: boolean }) {
+export function MapBase(_: { walls?: boolean }) {
   const { mapUrl } = useGameData();
   const { walls, calibrate, imageOpacity, onImage } = useContext(MapContext);
   const [failed, setFailed] = useState(false);
@@ -137,7 +137,7 @@ type View = "heat" | "path";
 type HeatType = "involved" | "death";
 
 /** Schieberegler mit Beschriftung und aktuellem Wert */
-function Slider({ label, value, min, max, step = 1, format, onChange }: {
+export function Slider({ label, value, min, max, step = 1, format, onChange }: {
   label: string; value: number; min: number; max: number; step?: number;
   format?: (v: number) => string; onChange: (v: number) => void;
 }) {

@@ -136,6 +136,49 @@ def _jungle(rec: GameRecord, players: dict, paths: list, events: list) -> None:
             events.append({**base, "type": kind, "t": k["t"], "x": k["x"], "y": k["y"]})
 
 
+def _lane(position: str) -> str:
+    return {"TOP": "top", "MIDDLE": "mid", "BOTTOM": "bot", "UTILITY": "bot", "JUNGLE": "jungle"}.get(position, "")
+
+
+def death_kind(victim_position: str, enemy_positions: list[str]) -> str:
+    """Einordnung eines Todes nach den beteiligten Gegnern.
+
+    Laner: "gank" (gegnerischer Jungler dabei), "roam" (Laner einer anderen Lane dabei), "gank_roam"
+    (beides) oder "lane" (nur die direkten Lane-Gegner). Jungler: "roam" (ein gegnerischer Laner dabei)
+    oder "duel" (nur der gegnerische Jungler). Ohne beteiligte Champions (Turm, Minions …): "other".
+    """
+    lanes = [_lane(p) for p in enemy_positions]
+    if not [lane for lane in lanes if lane]:
+        return "other"
+    own = _lane(victim_position)
+    if own == "jungle":
+        return "roam" if any(lane not in ("jungle", "") for lane in lanes) else "duel"
+    gank = "jungle" in lanes
+    roam = any(lane not in ("jungle", "", own) for lane in lanes)
+    return "gank_roam" if gank and roam else "gank" if gank else "roam" if roam else "lane"
+
+
+def _deaths(rec: GameRecord, out: list) -> None:
+    """Alle Tode der eigenen Spieler mit Ort, Zeit und beteiligten Gegnern (braucht die Timeline)."""
+    tl, match = rec.timeline, rec.match
+    by_pid = {p.participant_id: p for p in match.participants}
+    ours = {p.participant_id for p in rec.us.players}
+    for k in (tl or {}).get("kills", []):
+        victim = by_pid.get(k["victim"])
+        if victim is None or victim.participant_id not in ours:
+            continue
+        enemies = [by_pid[pid] for pid in dict.fromkeys([k["killer"], *k["assists"]])
+                   if pid in by_pid and pid not in ours]
+        out.append({
+            "match_id": match.match_id, "date": match.created, "win": rec.win, "side": rec.us.side,
+            "puuid": victim.puuid, "name": victim.name, "position": victim.position,
+            "champion_id": victim.champion_id, "t": k["t"], "x": k["x"], "y": k["y"],
+            "kind": death_kind(victim.position, [e.position for e in enemies]),
+            "by": [{"position": e.position, "champion_id": e.champion_id, "name": e.name,
+                    "killer": e.participant_id == k["killer"]} for e in enemies],
+        })
+
+
 def build_report(team: Team, records: list[GameRecord]) -> dict:
     """Berechnet alle Kennzahlen für die übergebenen (bereits gefilterten) Spiele."""
     records = sorted(records, key=lambda r: r.match.created)
@@ -154,6 +197,7 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
     jungle_players: dict[str, dict] = {}
     jungle_paths: list[dict] = []
     jungle_events: list[dict] = []
+    deaths: list[dict] = []
 
     ov = Counter()
     durations = {"win": [], "loss": []}
@@ -203,6 +247,7 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
                 if key in monsters and ev["team"] == rec.side:
                     monsters[key]["first_times"].append(ev["t"])
             _jungle(rec, jungle_players, jungle_paths, jungle_events)
+            _deaths(rec, deaths)
 
         trend.append({"match_id": match.match_id, "date": match.created, "win": rec.win,
                       "gd15": gd, "kills": us.kills, "deaths": them.kills})
@@ -348,6 +393,7 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
                      if v["us"] or v["them"]],
         "gold_curves": curves,
         "trend": trend,
+        "deaths": deaths,
         "jungle": {"players": sorted(jungle_players.values(), key=lambda p: -p["games"]),
                    "paths": jungle_paths, "events": jungle_events, "path_minutes": PATH_MINUTES},
     }

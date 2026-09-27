@@ -17,6 +17,7 @@ export const PANELS: PanelDef[] = [
   { key: "pools", label: "Champion-Pools" },
   { key: "draft", label: "Draft" },
   { key: "jungle", label: "Jungle", only: "team" },
+  { key: "ganks", label: "Ganks & Roams" },
   { key: "trend", label: "Formkurve" },
   { key: "timeline", label: "Zeitverlauf", only: "scout" },
   { key: "games", label: "Spiele" },

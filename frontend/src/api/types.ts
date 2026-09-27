@@ -250,6 +250,27 @@ export interface Report {
   gold_curves: Record<"all" | "win" | "loss", Curve>;
   trend: TrendPoint[];
   jungle: Jungle;
+  deaths: DeathEvent[];
+}
+
+/** gank = gegnerischer Jungler beteiligt, roam = Laner einer anderen Lane, lane = nur Lane-Gegner,
+ *  duel = Jungler nur gegen Jungler, other = ohne Champion (Turm, Minions) */
+export type DeathKind = "gank" | "roam" | "gank_roam" | "lane" | "duel" | "other";
+
+export interface DeathEvent {
+  match_id: string;
+  date: string;
+  win: boolean;
+  side: Side;
+  puuid: string;
+  name: string;
+  position: string;
+  champion_id: number;
+  t: number;
+  x: number;
+  y: number;
+  kind: DeathKind;
+  by: { position: string; champion_id: number; name: string; killer: boolean }[];
 }
 
 export interface JunglePath {
