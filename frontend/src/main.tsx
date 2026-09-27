@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 
 import { ApiError } from "./api/client";
+import { applyStyle, storedStyle } from "./lib/style";
 import { router } from "./router";
 import "@fontsource/barlow/400.css";
 import "@fontsource/barlow/500.css";
@@ -15,6 +16,8 @@ import "@fontsource/barlow-condensed/700-italic.css";
 import "@fontsource/barlow-condensed/800.css";
 import "@fontsource/barlow-condensed/800-italic.css";
 import "./styles.css";
+
+applyStyle(storedStyle());
 
 const queryClient = new QueryClient({
   defaultOptions: {

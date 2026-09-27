@@ -4,6 +4,7 @@ import type { DeathEvent, DeathKind, KillEvent, PlayerReport } from "../../api/t
 import { useGameData } from "../../lib/meta";
 import { InfoTip } from "../InfoTip";
 import { DEATH_RGB, Heat, KILL_RGB, MapBase, SIZE, Slider } from "./Jungle";
+import { MapPanel, OptionList, RailSection } from "./MapPanel";
 
 type Mode = "deaths" | "kills";
 
@@ -108,83 +109,99 @@ export function FightCard({ mode, deaths = [], kills = [], players }: {
     return next;
   });
 
+  const kindCounts = new Map<DeathKind, number>();
+  for (const d of inWindow) {
+    if (!who || d.owners.includes(who)) kindCounts.set(d.kind, (kindCounts.get(d.kind) ?? 0) + 1);
+  }
+  const perPlayer = (puuid: string) => inWindow.filter((d) => d.owners.includes(puuid) && !hidden.has(d.kind)).length;
+
+  const rail = (
+    <>
+      <RailSection title="Spieler">
+        <OptionList label="Spieler" selected={who ?? "all"}
+          onToggle={(v) => setWho(v === "all" || v === who ? null : v)}
+          options={[
+            { value: "all", label: "Alle Spieler", count: inWindow.filter((d) => !hidden.has(d.kind)).length },
+            ...members.map((p) => ({
+              value: p.puuid,
+              label: <>{p.name}<span className="muted small">{position(p.position)}</span></>,
+              count: perPlayer(p.puuid),
+            })),
+          ]} />
+      </RailSection>
+      <RailSection title="Kategorie">
+        <OptionList multi label="Kategorie" selected={new Set(KINDS.map((k) => k.key).filter((k) => !hidden.has(k)))}
+          onToggle={toggleKind}
+          options={KINDS.map((k) => ({ value: k.key, label: k.label, count: kindCounts.get(k.key) ?? 0 }))} />
+      </RailSection>
+      <RailSection title="Zeitraum">
+        <Slider label="Von Minute" value={from} min={0} max={lastMinute} onChange={(v) => {
+          setFrom(v);
+          if (v > to) setTo(v);
+        }} />
+        <Slider label="Bis Minute" value={Math.min(to, lastMinute)} min={0} max={lastMinute} onChange={(v) => {
+          setTo(v);
+          if (v < from) setFrom(v);
+        }} />
+      </RailSection>
+      <RailSection title="Darstellung">
+        <Slider label="Punktgröße" value={radius} min={12} max={64} onChange={setRadius} format={(v) => `${v} px`} />
+        <Slider label="Intensität" value={intensity} min={0.25} max={2} step={0.05} onChange={setIntensity}
+          format={(v) => `${Math.round(v * 100)} %`} />
+      </RailSection>
+    </>
+  );
+
+  const table = (
+    <div className="table-wrap">
+      <table className="data">
+        <thead>
+          <tr>
+            <th className="left">Spieler</th><th>{text.total}</th><th>1v1 / 2v2</th><th>Gank</th><th>Roam</th>
+            <th>Gank + Roam</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ p, total, count, top }) => {
+            const jungler = p.position === "JUNGLE";
+            return (
+              <tr key={p.puuid} className={who === p.puuid ? "selected" : ""} style={{ cursor: "pointer" }}
+                onClick={() => setWho(who === p.puuid ? null : p.puuid)}>
+                <td className="left">
+                  {p.name} <span className="muted small">{position(p.position)}</span>
+                  <div className="cell-sub">{text.top}: {top.map(([pos, n]) => `${position(pos)} ${n}×`).join(", ") || "–"}</div>
+                </td>
+                <td>{total} <span className="muted small">Ø {(total / Math.max(1, p.games)).toFixed(1)}</span></td>
+                <td title={jungler ? "Jungle 1v1" : undefined}>{jungler ? count("duel") : count("lane")}</td>
+                {/* ein toter Jungler wird nicht „gegankt“ – dort zählt nur Roam (Laner beteiligt) */}
+                <td>{jungler && mode === "deaths" ? "–" : count("gank")}</td>
+                <td>{count("roam")}</td>
+                <td>{jungler && mode === "deaths" ? "–" : count("gank_roam")}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <section className="card stack">
-      <h2>{text.title}<InfoTip>{text.info}</InfoTip></h2>
-      <div className="jungle-grid">
-        <div className="stack">
-          <div className="chips">
-            <button type="button" className={`chip${who === null ? " on" : ""}`} onClick={() => setWho(null)}>
-              <span className="dot" />Alle Spieler
-            </button>
-            {members.map((p) => (
-              <button type="button" key={p.puuid} className={`chip${who === p.puuid ? " on" : ""}`}
-                aria-pressed={who === p.puuid} onClick={() => setWho(who === p.puuid ? null : p.puuid)}>
-                <span className="dot" />{p.name} <span className="muted small">{position(p.position)}</span>
-              </button>
-            ))}
-          </div>
-          <div className="sliders">
-            <Slider label="Von Minute" value={from} min={0} max={lastMinute} onChange={(v) => {
-              setFrom(v);
-              if (v > to) setTo(v);
-            }} />
-            <Slider label="Bis Minute" value={Math.min(to, lastMinute)} min={0} max={lastMinute} onChange={(v) => {
-              setTo(v);
-              if (v < from) setFrom(v);
-            }} />
-          </div>
-          <div className="chips">
-            {KINDS.map((k) => (
-              <button type="button" key={k.key} aria-pressed={!hidden.has(k.key)}
-                className={`chip${hidden.has(k.key) ? "" : " on"}`} onClick={() => toggleKind(k.key)}>
-                <span className="dot" />{k.label}
-              </button>
-            ))}
-          </div>
-          <div className="sliders">
-            <Slider label="Punktgröße" value={radius} min={12} max={64} onChange={setRadius} format={(v) => `${v} px`} />
-            <Slider label="Intensität" value={intensity} min={0.25} max={2} step={0.05} onChange={setIntensity}
-              format={(v) => `${Math.round(v * 100)} %`} />
-          </div>
+      <div className="panel-head">
+        <h2>{text.title}<InfoTip>{text.info}</InfoTip></h2>
+        <span className="muted small">Minute {from}–{Math.min(to, lastMinute)} · {shown.length} {text.unit}</span>
+      </div>
+      <MapPanel
+        rail={rail}
+        map={(
           <div className="map">
             <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer"><MapBase /></svg>
             <Heat points={shown} rgb={mode === "deaths" ? DEATH_RGB : KILL_RGB} radius={radius} intensity={intensity} />
           </div>
-          <div className="muted small" aria-live="polite">
-            {shown.length} {text.unit} im Zeitraum Minute {from}–{Math.min(to, lastMinute)}
-            {who ? ` · ${members.find((p) => p.puuid === who)?.name}` : ""}.
-          </div>
-        </div>
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th className="left">Spieler</th><th>{text.total}</th><th>1v1 / 2v2</th><th>Gank</th><th>Roam</th>
-                <th>Gank + Roam</th><th className="left">{text.top}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ p, total, count, top }) => {
-                const jungler = p.position === "JUNGLE";
-                return (
-                  <tr key={p.puuid} className={who === p.puuid ? "selected" : ""} style={{ cursor: "pointer" }}
-                    onClick={() => setWho(who === p.puuid ? null : p.puuid)}>
-                    <td className="left">{p.name} <span className="muted small">{position(p.position)}</span></td>
-                    <td>{total} <span className="muted small">Ø {(total / Math.max(1, p.games)).toFixed(1)}</span></td>
-                    <td title={jungler ? "Jungle 1v1" : undefined}>{jungler ? count("duel") : count("lane")}</td>
-                    {/* ein toter Jungler wird nicht „gegankt“ – dort zählt nur Roam (Laner beteiligt) */}
-                    <td>{jungler && mode === "deaths" ? "–" : count("gank")}</td>
-                    <td>{count("roam")}</td>
-                    <td>{jungler && mode === "deaths" ? "–" : count("gank_roam")}</td>
-                    <td className="left small">{top.map(([pos, n]) => `${position(pos)} ${n}×`).join(", ") || "–"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        )}
+        caption={who ? `${members.find((p) => p.puuid === who)?.name}: ${shown.length} ${text.unit}` : undefined}
+        side={table}
+      />
     </section>
   );
 }

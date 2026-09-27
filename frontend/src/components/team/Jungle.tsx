@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Jungle, JungleEvent, JunglePath, Side } from "../../api/types";
 import { dt, duration } from "../../lib/format";
@@ -6,6 +6,7 @@ import { useGameData } from "../../lib/meta";
 import { type Clear, firstFullClear, reconstruct } from "../../lib/jungleRoute";
 import { type Point, interpolate, wallPolygons } from "../../lib/navgrid";
 import { InfoTip } from "../InfoTip";
+import { MapPanel, OptionList, RailSection } from "./MapPanel";
 
 /** Kartengröße in Spielkoordinaten (Summoner's Rift, Ursprung unten links) */
 const MAP_W = 14870;
@@ -173,7 +174,7 @@ function Segmented<T extends string | number>({ value, options, onChange, label 
   );
 }
 
-function HeatView({ events, games, walls }: { events: JungleEvent[]; games: number; walls: boolean }) {
+function HeatView({ events, games, walls, shared }: { events: JungleEvent[]; games: number; walls: boolean; shared: ReactNode }) {
   const [type, setType] = useState<HeatType>("involved");
   const lastMinute = Math.max(15, Math.ceil(Math.max(0, ...events.map((e) => e.t)) / 60));
   const [from, setFrom] = useState(0);
@@ -193,57 +194,73 @@ function HeatView({ events, games, walls }: { events: JungleEvent[]; games: numb
   }, [shown]);
   const kills = shown.filter((e) => e.type === "kill").length;
 
+  const inRange = events.filter((e) => e.t >= from * 60 && e.t <= upto * 60);
   return (
-    <div className="jungle-grid">
-      <div className="stack">
-        <div className="row">
-          <Segmented label="Ereignisse" value={type} onChange={setType}
-            options={[{ value: "involved", label: "Kills + Assists" }, { value: "death", label: "Tode" }]} />
-        </div>
-        <div className="sliders">
-          <Slider label="Von Minute" value={from} min={0} max={lastMinute} onChange={(v) => {
-            setFrom(v);
-            if (v > upto) setTo(v);
-          }} />
-          <Slider label="Bis Minute" value={upto} min={0} max={lastMinute} onChange={(v) => {
-            setTo(v);
-            if (v < from) setFrom(v);
-          }} />
-          <Slider label="Punktgröße" value={radius} min={12} max={64} onChange={setRadius} format={(v) => `${v} px`} />
-          <Slider label="Intensität" value={intensity} min={0.25} max={2} step={0.05} onChange={setIntensity}
-            format={(v) => `${Math.round(v * 100)} %`} />
-        </div>
+    <MapPanel
+      rail={(
+        <>
+          <RailSection title="Ereignisse">
+            <OptionList label="Ereignisse" selected={type} onToggle={setType} options={[
+              { value: "involved", label: "Kills + Assists", count: inRange.filter((e) => e.type !== "death").length },
+              { value: "death", label: "Tode", count: inRange.filter((e) => e.type === "death").length },
+            ]} />
+          </RailSection>
+          <RailSection title="Zeitraum">
+            <Slider label="Von Minute" value={from} min={0} max={lastMinute} onChange={(v) => {
+              setFrom(v);
+              if (v > upto) setTo(v);
+            }} />
+            <Slider label="Bis Minute" value={upto} min={0} max={lastMinute} onChange={(v) => {
+              setTo(v);
+              if (v < from) setFrom(v);
+            }} />
+          </RailSection>
+          <RailSection title="Darstellung">
+            <Slider label="Punktgröße" value={radius} min={12} max={64} onChange={setRadius} format={(v) => `${v} px`} />
+            <Slider label="Intensität" value={intensity} min={0.25} max={2} step={0.05} onChange={setIntensity}
+              format={(v) => `${Math.round(v * 100)} %`} />
+          </RailSection>
+          {shared}
+        </>
+      )}
+      map={(
         <div className="map">
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer"><MapBase walls={walls} /></svg>
           <Heat points={shown} rgb={type === "death" ? DEATH_RGB : KILL_RGB} radius={radius} intensity={intensity} />
         </div>
-      </div>
-      <div className="stack">
-        <div className="kpis">
-          <div className="kpi">
-            <div className="label">{type === "death" ? "Tode" : "Kill-Beteiligungen"} · Min {from}–{upto}</div>
-            <div className="value">{shown.length}</div>
-            <div className="hint">
-              Ø {games ? (shown.length / games).toFixed(1) : "–"} pro Spiel
-              {type === "involved" && ` · ${kills} Kills, ${shown.length - kills} Assists`}
+      )}
+      side={(
+        <>
+          <div className="kpis">
+            <div className="kpi">
+              <div className="label">{type === "death" ? "Tode" : "Kill-Beteiligungen"}</div>
+              <div className="value">{shown.length}</div>
+              <div className="hint">Ø {games ? (shown.length / games).toFixed(1) : "–"} pro Spiel</div>
             </div>
+            {type === "involved" && (
+              <div className="kpi">
+                <div className="label">Kills / Assists</div>
+                <div className="value">{kills} / {shown.length - kills}</div>
+                <div className="hint">Minute {from}–{upto}</div>
+              </div>
+            )}
           </div>
-        </div>
-        <table className="data">
-          <thead><tr><th className="left">Zone</th><th>Anzahl</th><th>Anteil</th></tr></thead>
-          <tbody>
-            {byZone.map((z) => (
-              <tr key={z.zone}>
-                <td className="left">{z.zone}</td>
-                <td>{z.n}</td>
-                <td>{Math.round((z.n / shown.length) * 100)}%</td>
-              </tr>
-            ))}
-            {!byZone.length && <tr><td className="left muted" colSpan={3}>Keine Ereignisse in diesem Zeitraum.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          <table className="data">
+            <thead><tr><th className="left">Zone</th><th>Anzahl</th><th>Anteil</th></tr></thead>
+            <tbody>
+              {byZone.map((z) => (
+                <tr key={z.zone}>
+                  <td className="left">{z.zone}</td>
+                  <td>{z.n}</td>
+                  <td>{Math.round((z.n / shown.length) * 100)}%</td>
+                </tr>
+              ))}
+              {!byZone.length && <tr><td className="left muted" colSpan={3}>Keine Ereignisse in diesem Zeitraum.</td></tr>}
+            </tbody>
+          </table>
+        </>
+      )}
+    />
   );
 }
 
@@ -258,7 +275,9 @@ function buildRoute(p: JunglePath, minutes: number, realistic: boolean) {
   return { line: realistic ? interpolate(pts).path : pts, minutePts, clears: [] as Clear[] };
 }
 
-function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinutes: number; walls: boolean }) {
+function PathView({ paths, maxMinutes, walls, shared }: {
+  paths: JunglePath[]; maxMinutes: number; walls: boolean; shared: ReactNode;
+}) {
   const { champion } = useGameData();
   const [minutes, setMinutes] = useState(Math.min(6, maxMinutes));
   const [side, setSide] = useState<"all" | Side>("all");
@@ -301,59 +320,68 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
   const fmt = (t: number | null) => (t === null ? "–" : duration(Math.round(t)));
 
   return (
-    <div className="jungle-grid">
-      <div className="stack">
-        <div className="row">
-          <Segmented label="Seite" value={side} onChange={setSide}
-            options={[{ value: "all", label: "Beide Seiten" }, { value: "blue", label: "Blau" }, { value: "red", label: "Rot" }]} />
-        </div>
-        <div className="sliders">
-          <Slider label="Bis Minute" value={minutes} min={2} max={maxMinutes} onChange={setMinutes} />
-        </div>
-        <div className="row small">
-          <label className="check">
-            <input type="checkbox" checked={realistic} onChange={(e) => setRealistic(e.target.checked)} />
-            <span>Realistische Laufwege (über die laut CS geräumten Camps)</span>
-          </label>
-          <InfoTip>
-            Aus dem Anstieg der Jungle-CS zwischen zwei Minuten ergibt sich die Zahl der geräumten Camps (4 CS je Camp).
-            Gewählt werden die Camps, die zu der Zeit stehen (Spawn 1:30, Scuttle 3:30, Respawn 2:15 bzw. 5:00 bei den
-            Buffs) und den kürzesten begehbaren Weg zwischen den beiden Positionen ergeben. Eine Schätzung – nicht
-            aufgezeichnet sind nur die Minutenpositionen und die CS.
-          </InfoTip>
-        </div>
+    <MapPanel
+      rail={(
+        <>
+          <RailSection title="Seite">
+            <OptionList label="Seite" selected={side} onToggle={setSide} options={[
+              { value: "all", label: "Beide Seiten", count: paths.length },
+              { value: "blue", label: "Blau", count: paths.filter((p) => p.side === "blue").length },
+              { value: "red", label: "Rot", count: paths.filter((p) => p.side === "red").length },
+            ]} />
+          </RailSection>
+          <RailSection title="Zeitraum">
+            <Slider label="Bis Minute" value={minutes} min={2} max={maxMinutes} onChange={setMinutes} />
+          </RailSection>
+          <RailSection title="Laufwege" action={(
+            <InfoTip>
+              Aus dem Anstieg der Jungle-CS zwischen zwei Minuten ergibt sich die Zahl der geräumten Camps (4 CS je Camp).
+              Gewählt werden die Camps, die zu der Zeit stehen (Spawn 1:30, Scuttle 3:30, Respawn 2:15 bzw. 5:00 bei den
+              Buffs) und den kürzesten begehbaren Weg zwischen den beiden Positionen ergeben.
+            </InfoTip>
+          )}>
+            <OptionList multi label="Laufwege" selected={new Set(realistic ? ["on"] : [])}
+              onToggle={() => setRealistic((r) => !r)}
+              options={[{ value: "on", label: "Über geräumte Camps" }]} />
+          </RailSection>
+          {shared}
+        </>
+      )}
+      map={(
         <div className="map">
-          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer" onMouseLeave={() => setHover(null)}>
-            <MapBase walls={walls} />
-            {shown.map((p) => {
-              const r = routes.get(p.match_id)!;
-              const line = r.line.map(([x, y]) => `${px(x)},${py(y)}`).join(" ");
-              const dim = hover && hover !== p.match_id;
-              const last = r.minutePts.reduce((n, pt, i) => (pt ? i : n), 0);
-              return (
-                <g key={p.match_id} opacity={dim ? 0.12 : hover ? 1 : 0.6} onMouseEnter={() => setHover(p.match_id)}
-                  style={{ cursor: "pointer" }}>
-                  <polyline points={line} fill="none" stroke="transparent" strokeWidth={12} />
-                  <polyline points={line} fill="none"
-                    stroke={SIDE_COLOR[p.side]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-                  {r.clears.map((c) => (
-                    <rect key={`c${c.order}`} x={px(c.camp.pos[0]) - 4} y={py(c.camp.pos[1]) - 4} width={8} height={8}
-                      transform={`rotate(45 ${px(c.camp.pos[0])} ${py(c.camp.pos[1])})`}
-                      className="camp-mark" />
-                  ))}
-                  {r.minutePts.map((pt, i) => pt && (
-                    <circle key={i} cx={px(pt[0])} cy={py(pt[1])} r={i === last ? 5 : 3}
-                      fill={SIDE_COLOR[p.side]} stroke="#07090d" strokeWidth={2} />
-                  ))}
-                  {hover === p.match_id && r.minutePts.map((pt, i) => pt && (
-                    <text key={`t${i}`} x={px(pt[0]) + 7} y={py(pt[1]) - 6} className="map-label">{i}</text>
-                  ))}
-                </g>
-              );
-            })}
-          </svg>
-        </div>
-        <div className="muted small">
+            <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="map-layer" onMouseLeave={() => setHover(null)}>
+              <MapBase walls={walls} />
+              {shown.map((p) => {
+                const r = routes.get(p.match_id)!;
+                const line = r.line.map(([x, y]) => `${px(x)},${py(y)}`).join(" ");
+                const dim = hover && hover !== p.match_id;
+                const last = r.minutePts.reduce((n, pt, i) => (pt ? i : n), 0);
+                return (
+                  <g key={p.match_id} opacity={dim ? 0.12 : hover ? 1 : 0.6} onMouseEnter={() => setHover(p.match_id)}
+                    style={{ cursor: "pointer" }}>
+                    <polyline points={line} fill="none" stroke="transparent" strokeWidth={12} />
+                    <polyline points={line} fill="none"
+                      stroke={SIDE_COLOR[p.side]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                    {r.clears.map((c) => (
+                      <rect key={`c${c.order}`} x={px(c.camp.pos[0]) - 4} y={py(c.camp.pos[1]) - 4} width={8} height={8}
+                        transform={`rotate(45 ${px(c.camp.pos[0])} ${py(c.camp.pos[1])})`}
+                        className="camp-mark" />
+                    ))}
+                    {r.minutePts.map((pt, i) => pt && (
+                      <circle key={i} cx={px(pt[0])} cy={py(pt[1])} r={i === last ? 5 : 3}
+                        fill={SIDE_COLOR[p.side]} stroke="#07090d" strokeWidth={2} />
+                    ))}
+                    {hover === p.match_id && r.minutePts.map((pt, i) => pt && (
+                      <text key={`t${i}`} x={px(pt[0]) + 7} y={py(pt[1]) - 6} className="map-label">{i}</text>
+                    ))}
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+      )}
+      caption={(
+        <>
           {hovered ? (
             <>
               {dt(hovered.date)} · {champion(hovered.champion_id).name} · {hovered.side === "blue" ? "Blau" : "Rot"} ·{" "}
@@ -367,13 +395,15 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
               )}
             </>
           ) : <>Punkte = Position je Minute (Zahl = Minute), Rauten = geräumte Camps. Linie überfahren für Details.</>}
-        </div>
-      </div>
-      <div className="stack">
-        <div className="row small">
-          <span className="legend-dot" style={{ background: SIDE_COLOR.blue }} /> Blaue Seite
-          <span className="legend-dot" style={{ background: SIDE_COLOR.red }} /> Rote Seite
-        </div>
+        
+        </>
+      )}
+      side={(
+        <>
+          <div className="row small">
+            <span className="legend-dot" style={{ background: SIDE_COLOR.blue }} /> Blaue Seite
+            <span className="legend-dot" style={{ background: SIDE_COLOR.red }} /> Rote Seite
+          </div>
         <div className="kpis">
           <div className="kpi">
             <div className="label">
@@ -402,8 +432,9 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
             {!openings.length && <tr><td className="left muted" colSpan={3}>Keine Positionsdaten.</td></tr>}
           </tbody>
         </table>
-      </div>
-    </div>
+        </>
+      )}
+    />
   );
 }
 
@@ -422,74 +453,65 @@ export function JungleCard({ jungle }: { jungle: Jungle }) {
   const paths = jungle.paths.filter((p) => active(p.puuid));
   const games = jungle.players.filter((p) => active(p.puuid)).reduce((n, p) => n + p.games, 0);
 
+  const toggleJungler = (puuid: string) => setOff((s) => {
+    const next = new Set(s);
+    if (next.has(puuid)) next.delete(puuid);
+    else next.add(puuid);
+    return next;
+  });
+  // Abschnitte, die Heatmap und Pathing teilen: Jungler-Auswahl und Kartenoptionen
+  const shared = (
+    <>
+      {jungle.players.length > 1 && (
+        <RailSection title="Jungler">
+          <OptionList multi label="Jungler" selected={new Set(jungle.players.map((p) => p.puuid).filter(active))}
+            onToggle={toggleJungler}
+            options={jungle.players.map((p) => ({ value: p.puuid, label: p.name, count: p.games }))} />
+        </RailSection>
+      )}
+      <RailSection title="Karte" action={(
+        <InfoTip>
+          Kartenabgleich: das echte Kartenbild (Riot Data Dragon) mit den Wänden als gestrichelte Umrisse – so lässt sich
+          prüfen, ob die Wände passen, die PrimeStats für die Laufwege verwendet.
+        </InfoTip>
+      )}>
+        <OptionList multi label="Karte" selected={new Set([walls && "walls", calibrate && "calibrate"].filter(Boolean) as string[])}
+          onToggle={(v) => (v === "walls" ? setWalls((w) => !w) : setCalibrate((c) => !c))}
+          options={[{ value: "walls", label: "Wände" }, { value: "calibrate", label: "Kartenabgleich" }]} />
+        {calibrate && (
+          <Slider label="Kartenbild" value={imageOpacity} min={0} max={1} step={0.05} onChange={setImageOpacity}
+            format={(v) => `${Math.round(v * 100)} %`} />
+        )}
+        {calibrate && image === "failed" && (
+          <p className="muted small" style={{ margin: 0 }}>Kartenbild von Riot nicht erreichbar.</p>
+        )}
+      </RailSection>
+    </>
+  );
+
   return (
     <section className="card stack">
-      <div className="row between">
-        <div>
-          <h2>
-            Jungle
-            <InfoTip>
-              Gank-Heatmap und Pathing des Junglers aus {games} Spielen mit Timeline.
-              <br /><br />
-              <b>Heatmap:</b> Orte, an denen der Jungler an Kills beteiligt war bzw. gestorben ist. Frühe Kills auf einer
-              Lane sind meist Ganks.
-              <br /><br />
-              <b>Pathing:</b> Die Timeline enthält nur eine Position pro Minute (Punkte). Dazwischen zeichnet PrimeStats den
-              kürzesten begehbaren Weg über die Karte – plausibel, aber nicht der exakte Laufweg.
-            </InfoTip>
-          </h2>
-        </div>
+      <div className="panel-head">
+        <h2>
+          Jungle
+          <InfoTip>
+            Gank-Heatmap und Pathing des Junglers aus {games} Spielen mit Timeline.
+            <br /><br />
+            <b>Heatmap:</b> Orte, an denen der Jungler an Kills beteiligt war bzw. gestorben ist. Frühe Kills auf einer
+            Lane sind meist Ganks.
+            <br /><br />
+            <b>Pathing:</b> Die Timeline enthält nur eine Position pro Minute (Punkte). Dazwischen zeichnet PrimeStats den
+            kürzesten begehbaren Weg über die Karte – plausibel, aber nicht der exakte Laufweg.
+          </InfoTip>
+        </h2>
         <Segmented label="Ansicht" value={view} onChange={setView}
           options={[{ value: "heat", label: "Gank-Heatmap" }, { value: "path", label: "Pathing" }]} />
       </div>
-      {jungle.players.length > 1 && (
-        <div className="chips">
-          {jungle.players.map((p) => (
-            <button type="button" key={p.puuid} className={`chip${active(p.puuid) ? " on" : ""}`}
-              aria-pressed={active(p.puuid)}
-              onClick={() => setOff((s) => {
-                const next = new Set(s);
-                if (next.has(p.puuid)) next.delete(p.puuid);
-                else next.add(p.puuid);
-                return next;
-              })}>
-              <span className="dot" />{p.name} <span className="muted small">{p.games}×</span>
-            </button>
-          ))}
-        </div>
-      )}
       <MapContext.Provider value={settings}>
         {view === "heat"
-          ? <HeatView events={events} games={games} walls={walls} />
-          : <PathView paths={paths} maxMinutes={jungle.path_minutes} walls={walls} />}
+          ? <HeatView events={events} games={games} walls={walls} shared={shared} />
+          : <PathView paths={paths} maxMinutes={jungle.path_minutes} walls={walls} shared={shared} />}
       </MapContext.Provider>
-      <div className="row small">
-        <label className="check">
-          <input type="checkbox" checked={walls} onChange={(e) => setWalls(e.target.checked)} />
-          <span>Wände einblenden</span>
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={calibrate} onChange={(e) => setCalibrate(e.target.checked)} />
-          <span>Kartenabgleich: echtes Kartenbild mit Wand-Umrissen</span>
-        </label>
-        <InfoTip>
-          Gestrichelte Umrisse = Wände, wie PrimeStats sie für die Laufwege verwendet (aus einer schematischen Karte
-          erzeugt). Liegen sie neben den echten Wänden, bitte einen Screenshot schicken.
-        </InfoTip>
-      </div>
-      {calibrate && (
-        <div className="stack">
-          <div className="sliders">
-            <Slider label="Kartenbild" value={imageOpacity} min={0} max={1} step={0.05} onChange={setImageOpacity}
-              format={(v) => `${Math.round(v * 100)} %`} />
-          </div>
-          {image === "failed" && (
-            <p className="muted small">
-              Das Kartenbild von Riot (Data Dragon) konnte nicht geladen werden – ohne Internetzugang ist kein Abgleich möglich.
-            </p>
-          )}
-        </div>
-      )}
     </section>
   );
 }

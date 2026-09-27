@@ -413,3 +413,132 @@ path.walls.outline { fill: rgba(255, 194, 61, .12); stroke: #ffc23d; stroke-widt
   font: 400 13px/1.45 var(--font); font-style: normal; text-transform: none; letter-spacing: 0; white-space: normal;
 }
 .camp-mark { fill: #ffc23d; stroke: #07090d; stroke-width: 1.5; }
+
+/* ---------- Karten-Panels: Filter | Karte | Details ---------- */
+.mp { display: grid; grid-template-columns: 200px minmax(300px, 480px) minmax(340px, 1fr); gap: 1.25rem; align-items: start; }
+.mp-side table.data th.wrap, .mp-side table.data td.wrap { white-space: normal; min-width: 110px; max-width: 200px; }
+.mp-rail { display: grid; gap: .9rem; }
+.mp-map { display: grid; gap: .4rem; }
+.mp-side { display: grid; gap: .9rem; min-width: 0; }
+.mp-caption { min-height: 1.2em; }
+@media (max-width: 1180px) {
+  .mp { grid-template-columns: 200px minmax(0, 1fr); }
+  .mp-side { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .mp { grid-template-columns: 1fr; }
+  .mp-map { order: -1; }
+}
+.rail-sec { display: grid; gap: .35rem; }
+.rail-title {
+  display: flex; align-items: center; justify-content: space-between; gap: .4rem;
+  color: var(--muted); font: 700 .78rem/1.2 var(--display); text-transform: uppercase; letter-spacing: .06em;
+  padding-bottom: .25rem; border-bottom: 1px solid var(--border);
+}
+.rail-sec .slider-head { font-size: .78rem; }
+.opt-list { display: grid; gap: 1px; }
+.opt {
+  display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: .5rem; width: 100%;
+  padding: .28rem .4rem; border: 0; background: none; color: var(--muted); text-align: left; cursor: pointer;
+  font: 500 .86rem/1.3 var(--font); border-radius: var(--radius);
+}
+.opt:hover { background: var(--surface-2); color: var(--text); }
+.opt.on { color: var(--text); }
+.opt-box { width: 12px; height: 12px; border: 1.5px solid var(--border); border-radius: 50%; }
+.opt.multi .opt-box { border-radius: 2px; }
+.opt.on .opt-box { background: var(--accent); border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--surface); }
+.opt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opt-label .muted { margin-left: .3rem; }
+.opt-count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .8rem; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.panel-head h2 { margin: 0; }
+
+/* =====================================================================
+   Analyse-Stil (umschaltbar): nüchtern und dicht wie in BI-/Analyse-Tools
+   ===================================================================== */
+:root[data-style="analytics"] {
+  --bg: #0f1115;
+  --bg-2: #13161b;
+  --surface: #171a20;
+  --surface-2: #1f232b;
+  --border: #2a2f39;
+  --text: #e4e7ed;
+  --muted: #8b93a3;
+  --accent: #4f8cff;
+  --accent-rgb: 79, 140, 255;
+  --accent-2: #7eaaff;
+  --accent-ink: #ffffff;
+  --radius: 4px;
+  --shadow: none;
+  --display: var(--font);
+}
+[data-style="analytics"] body { background: var(--bg); font-size: 14px; }
+[data-style="analytics"] h1, [data-style="analytics"] h2, [data-style="analytics"] h3 {
+  font-style: normal; text-transform: none; letter-spacing: 0; font-weight: 600;
+}
+[data-style="analytics"] h1 { font-size: 1.45rem; }
+[data-style="analytics"] h1::after { display: none; }
+[data-style="analytics"] h2 { font-size: .95rem; }
+[data-style="analytics"] .hero h1 { font-size: 1.7rem; }
+[data-style="analytics"] .hero { background: var(--surface); padding: 1.75rem 1.5rem; }
+[data-style="analytics"] .container { padding-top: 1.25rem; }
+[data-style="analytics"] .stack > * + * { margin-top: .9rem; }
+[data-style="analytics"] .grid { gap: .9rem; }
+
+/* Kopfzeile */
+[data-style="analytics"] .topbar { background: var(--bg-2); box-shadow: none; }
+[data-style="analytics"] .topbar .inner { min-height: 48px; }
+[data-style="analytics"] .brand { font: 600 1.05rem/1 var(--font); text-transform: none; letter-spacing: 0; }
+[data-style="analytics"] .brand .logo { clip-path: none; border-radius: 4px; width: 26px; height: 26px; font-size: .75rem; font-style: normal; }
+[data-style="analytics"] .nav a { font: 500 .9rem/1 var(--font); text-transform: none; letter-spacing: 0; }
+[data-style="analytics"] .nav a::after { transform: none; left: .85rem; right: .85rem; height: 2px; opacity: 0; transition: opacity .15s; }
+[data-style="analytics"] .nav a:hover::after, [data-style="analytics"] .nav a.active::after { transform: none; opacity: 1; }
+[data-style="analytics"] .user-link { font: 600 .9rem/1 var(--font); text-transform: none; }
+[data-style="analytics"] .user-link .avatar { clip-path: none; border-radius: 50%; width: 26px; }
+
+/* Panels */
+[data-style="analytics"] .card { background: var(--surface); padding: .9rem 1rem; }
+[data-style="analytics"] .card::before { display: none; }
+[data-style="analytics"] .card > h2, [data-style="analytics"] .panel-head h2 { margin-bottom: .1rem; }
+
+/* Bedienelemente */
+[data-style="analytics"] .btn {
+  clip-path: none; border-radius: var(--radius); font: 500 .85rem/1.2 var(--font); text-transform: none; letter-spacing: 0;
+  padding: .4rem .8rem;
+}
+[data-style="analytics"] .btn.small { clip-path: none; padding: .22rem .55rem; font-size: .8rem; }
+[data-style="analytics"] .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+[data-style="analytics"] .btn.primary:hover { background: var(--accent-2); }
+[data-style="analytics"] .badge { clip-path: none; border-radius: 3px; font: 600 .72rem/1.3 var(--font); letter-spacing: .02em; }
+[data-style="analytics"] label.field { font: 600 .75rem/1.2 var(--font); letter-spacing: .03em; }
+[data-style="analytics"] .segmented { padding: 2px; gap: 2px; border-radius: var(--radius); }
+[data-style="analytics"] .segmented button { font: 500 .82rem/1.2 var(--font); text-transform: none; letter-spacing: 0; padding: .3rem .7rem; border-radius: 3px; }
+[data-style="analytics"] .segmented button.on { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+[data-style="analytics"] .tabs button { font: 500 .9rem/1.2 var(--font); text-transform: none; letter-spacing: 0; }
+[data-style="analytics"] .slider-head { font: 600 .72rem/1.2 var(--font); letter-spacing: .03em; }
+[data-style="analytics"] .rail-title { font: 600 .72rem/1.2 var(--font); letter-spacing: .05em; }
+[data-style="analytics"] .chip { border-radius: 999px; }
+
+/* Kennzahlen: kompakte Kacheln */
+[data-style="analytics"] .kpis { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .5rem; }
+[data-style="analytics"] .kpi { border-left: 1px solid var(--border); background: var(--bg-2); padding: .55rem .7rem; }
+[data-style="analytics"] .kpi .label { font: 500 .72rem/1.2 var(--font); text-transform: none; letter-spacing: 0; }
+[data-style="analytics"] .kpi .value { font: 600 1.35rem/1.25 var(--font); letter-spacing: 0; }
+[data-style="analytics"] .kpi .hint { font-size: .72rem; }
+[data-style="analytics"] .meter { height: 3px; }
+
+/* Tabellen: dicht, Zebra, ruhige Köpfe */
+[data-style="analytics"] table.data { font-size: .82rem; }
+[data-style="analytics"] table.data th, [data-style="analytics"] table.data td { padding: .32rem .5rem; }
+[data-style="analytics"] table.data th { font: 600 .7rem/1.2 var(--font); text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); background: var(--bg-2); }
+[data-style="analytics"] table.data tbody tr:nth-child(even) td { background: rgba(255, 255, 255, .015); }
+[data-style="analytics"] table.data tbody tr:hover td { background: rgba(var(--accent-rgb), .07); }
+
+/* Karten, Spiele, Sonstiges */
+[data-style="analytics"] .versus, [data-style="analytics"] .team-strip { font-family: var(--font); font-style: normal; text-transform: none; }
+[data-style="analytics"] .team-logo { clip-path: none; border-radius: 6px; font: 600 1rem/1 var(--font); color: #fff; }
+[data-style="analytics"] .game { border-radius: var(--radius); }
+[data-style="analytics"] .map { border-radius: var(--radius); }
+[data-style="analytics"] .infotip-pop { border-left-width: 1px; }
+.style-toggle { white-space: nowrap; }
+.cell-sub { color: var(--muted); font-size: .74rem; white-space: normal; margin-top: .1rem; }
