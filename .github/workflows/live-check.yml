@@ -1,0 +1,57 @@
+name: Live-Check (Riot-API)
+
+# Manuell starten (Actions → Live-Check → Run workflow) mit einem Riot-Development-Key.
+# Der Key wird im Log maskiert und nirgends gespeichert. Alternativ Repository-Secret LOL_API_KEY anlegen.
+on:
+  workflow_dispatch:
+    inputs:
+      riot_id:
+        description: "Riot-ID (Name#TAG)"
+        default: "Herr Grey#6781"
+        required: true
+      api_key:
+        description: "Riot-Development-Key (leer = Secret LOL_API_KEY)"
+        required: false
+  push:
+    paths: [".github/workflows/live-check.yml"]
+
+jobs:
+  live-check:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: primestats
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Key maskieren
+        run: |
+          KEY=$(jq -r '.inputs.api_key // empty' "$GITHUB_EVENT_PATH")
+          if [ -n "$KEY" ]; then echo "::add-mask::$KEY"; echo "LOL_API_KEY=$KEY" >> "$GITHUB_ENV"; fi
+        working-directory: .
+      - name: Key aus Secret
+        if: env.LOL_API_KEY == ''
+        run: echo "LOL_API_KEY=${{ secrets.LOL_API_KEY }}" >> "$GITHUB_ENV"
+        working-directory: .
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements.txt
+      - name: Live-Check
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/primestats
+          RIOT_ID: ${{ inputs.riot_id }}
+        run: python scripts/live_check.py "$RIOT_ID"
