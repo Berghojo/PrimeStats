@@ -144,7 +144,7 @@ export function ReportBody({
         ) : null;
       case "timeline":
         // Zeitverlauf über die (bis zu 20 neuesten) Spiele der Übersicht
-        return kind === "scout" ? <InlineTimeline ids={statGames.slice(0, 20)} focus={focus} /> : null;
+        return <InlineTimeline ids={statGames.slice(0, 20)} focus={focus} team={teamId} />;
       default:
         return null;
     }
@@ -170,7 +170,7 @@ export function ReportBody({
       {tab === "games" ? (
         <div className={refreshing ? "stack refreshing" : "stack"}>
           <GamesTable teamId={teamId} history={history} editable={editable} focus={focus} showOpponent={teamId !== undefined}
-            inlineTimeline={kind === "scout"} excluded={excluded} onExcludedChange={setExcluded} />
+            inlineTimeline excluded={excluded} onExcludedChange={setExcluded} />
         </div>
       ) : (
       <div className={refreshing ? "stack refreshing" : "stack"}>

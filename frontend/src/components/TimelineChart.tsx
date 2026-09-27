@@ -95,9 +95,9 @@ export function TimelineChart({ data: raw, teamOnly = false }: { data: Analysis;
 }
 
 /** Zeitverlauf direkt im Report: folgt der Spielauswahl in der Spieletabelle. */
-export function InlineTimeline({ ids, focus }: { ids: string[]; focus?: string[] }) {
+export function InlineTimeline({ ids, focus, team }: { ids: string[]; focus?: string[]; team?: number }) {
   const sorted = useMemo(() => [...ids].sort(), [ids]);
-  const { data, error, isPending, isFetching } = useAnalysis(sorted, focus ?? []);
+  const { data, error, isPending, isFetching } = useAnalysis(sorted, focus ?? [], team);
   return (
     <section className={`card stack${isFetching && data ? " refreshing" : ""}`}>
       <div className="row between">
@@ -105,7 +105,7 @@ export function InlineTimeline({ ids, focus }: { ids: string[]; focus?: string[]
           <h2>
             Zeitverlauf
             <InfoTip>
-              Minutenwerte der Teamspieler, gemittelt über die in der Spieletabelle markierten Spiele
+              Minutenwerte der Teamspieler, gemittelt über die im Spiele-Tab ausgewählten Spiele (höchstens die 20 neuesten)
               {data ? ` (${data.matches.length})` : ""}.
             </InfoTip>
           </h2>
@@ -114,15 +114,15 @@ export function InlineTimeline({ ids, focus }: { ids: string[]; focus?: string[]
       </div>
       {ids.length === 0 ? (
         <p className="muted">
-          Keine Spiele markiert.
-          <InfoTip>Unten in der Spieletabelle Spiele markieren, um ihren Zeitverlauf zu sehen.</InfoTip>
+          Keine Spiele ausgewählt.
+          <InfoTip>Im Spiele-Tab Spiele auswählen, um ihren Zeitverlauf zu sehen.</InfoTip>
         </p>
       ) : error ? (
         <ErrorBox error={error} />
       ) : isPending ? (
         <p className="muted">Lade Timelines …</p>
       ) : !data.players.some((p) => p.focus) ? (
-        <p className="muted">Für die markierten Spiele sind keine Timeline-Daten verfügbar.</p>
+        <p className="muted">Für die ausgewählten Spiele sind keine Timeline-Daten verfügbar.</p>
       ) : (
         <TimelineChart data={data} teamOnly />
       )}

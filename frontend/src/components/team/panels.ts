@@ -20,7 +20,7 @@ export const PANELS: PanelDef[] = [
   { key: "kills", label: "Kills" },
   { key: "deaths", label: "Deaths" },
   { key: "trend", label: "Formkurve" },
-  { key: "timeline", label: "Zeitverlauf", only: "scout" },
+  { key: "timeline", label: "Zeitverlauf" },
 ];
 
 export type ReportKind = "team" | "scout";

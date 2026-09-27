@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { cleanPanels, defaultPanels } from "./panels";
 
 describe("panels", () => {
-  it("jungle only in the team view, timeline only when scouting", () => {
+  it("jungle only in the team view, timeline in both", () => {
     expect(defaultPanels("team")).toContain("jungle");
-    expect(defaultPanels("team")).not.toContain("timeline");
+    expect(defaultPanels("team")).toContain("timeline");
     expect(defaultPanels("scout")).toContain("timeline");
     expect(defaultPanels("scout")).not.toContain("jungle");
   });
