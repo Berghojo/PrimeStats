@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from functools import cached_property
 
 from .matches import POSITIONS, MatchSummary
 from .store import Team
@@ -21,14 +22,26 @@ class GameRecord:
     included: bool = True
     timeline: dict | None = None    # Ergebnis von timeline.summarize_timeline
     opponent: str = ""              # von Hand eingetragener Gegner (eigene Teamansicht)
+    manual_bans: dict | None = None  # von Hand nachgetragene Bans {"us": [...], "them": [...]}
 
-    @property
+    @cached_property
     def us(self):
-        return self.match.teams[self.side]
+        return self._with_bans(self.match.teams[self.side], "us")
+
+    @cached_property
+    def them(self):
+        return self._with_bans(self.match.enemy_of(self.side), "them")
 
     @property
-    def them(self):
-        return self.match.enemy_of(self.side)
+    def bans_missing(self) -> bool:
+        """Spiel ohne Bans (z.B. Custom-Lobby im Blind-Modus) – dann dürfen sie nachgetragen werden."""
+        return not any(t.bans for t in self.match.teams.values())
+
+    def _with_bans(self, team, key: str):
+        # Nachgetragene Bans nur für Spiele ohne eigene Bans; das geteilte MatchSummary bleibt unverändert
+        if self.manual_bans and self.bans_missing:
+            return replace(team, bans=list(self.manual_bans.get(key) or []))
+        return team
 
     @property
     def win(self) -> bool:
@@ -438,6 +451,8 @@ def history_rows(records: list[GameRecord]) -> list[dict]:
             "label": rec.label,
             "included": rec.included,
             "tournament": bool(rec.match.tournament_code),
+            "bans_missing": rec.bans_missing,
+            "bans_manual": bool(rec.manual_bans) and rec.bans_missing,
         })
     return rows
 

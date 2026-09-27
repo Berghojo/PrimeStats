@@ -550,6 +550,10 @@ def import_demo_scrims(service, source: "DemoSource") -> None:
     """Demo: Scrims ohne Turniercode so importieren, als hätte sie der Uploader hochgeladen."""
     items = [to_lcu(m, source.timelines.get(mid)) for mid, m in source.matches.items()
              if not m["info"].get("tournamentCode")]
+    # Jeder dritte Scrim lief als Custom-Lobby im Blind-Modus: keine Bans (lassen sich nachtragen)
+    for item in items[2::3]:
+        for team in item["game"]["teams"]:
+            team["bans"] = []
     for i in range(0, len(items), 25):
         service.import_lcu(items[i:i + 25], uploader="demo")
 

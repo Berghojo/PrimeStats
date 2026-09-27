@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { InfoTip } from "../InfoTip";
 
@@ -8,6 +8,7 @@ import { dt, duration, signed, tone } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 import { ChampIcon } from "../ChampIcon";
 import { SelectionBar } from "../SelectionBar";
+import { BanEditor } from "./BanEditor";
 import { ResultBadge, SideBadge } from "../ui";
 
 interface Props {
@@ -46,6 +47,7 @@ export function GamesTable({
 }: Props) {
   const { meta, label, champion } = useGameData();
   const updateGame = useUpdateTeamGame(teamId ?? 0);
+  const [editBans, setEditBans] = useState<string | null>(null);
   // gezeigt werden die Spiele, die zu den Filtern passen; die Häkchen steuern, was davon in die Statistik zählt
   const shown = history.filter((g) => g.selected);
   const hiddenByFilter = history.length - shown.length;
@@ -65,6 +67,23 @@ export function GamesTable({
     </span>
   );
 
+  const bans = (g: HistoryRow) => {
+    const known = g.us.bans.length > 0 || g.them.bans.length > 0;
+    const icons = (ids: number[]) => ids.map((id) => <ChampIcon key={id} id={id} size="sm" ban />);
+    return (
+      <span className="champ-row" title={g.bans_manual ? "Von Hand nachgetragen" : undefined}>
+        {known ? <>{icons(g.us.bans)}<span className="muted ban-sep">|</span>{icons(g.them.bans)}</> : <span className="muted">–</span>}
+        {g.bans_manual && <span className="badge" title="Von Hand nachgetragen">manuell</span>}
+        {editable && g.bans_missing && (
+          <button type="button" className="btn small" onClick={() => setEditBans(editBans === g.match_id ? null : g.match_id)}>
+            {g.bans_manual ? "Ändern" : "Nachtragen"}
+          </button>
+        )}
+      </span>
+    );
+  };
+  const columns = 16 + (showOpponent ? 1 : 0) + (editable ? 1 : 0);
+
   return (
     <section className="card">
       <h2>
@@ -73,6 +92,7 @@ export function GamesTable({
           Spiele, die zu den Filtern passen{hiddenByFilter ? ` (${hiddenByFilter} weitere ausgefiltert)` : ""}. Häkchen = zählt
           in die Übersicht; abgewählte Spiele fallen dort aus Kennzahlen, Tabellen, Karten und Zeitverlauf heraus.
           {editable && " „✕“ schließt ein Spiel dauerhaft für alle aus; das Label steuert den Spieltyp-Filter."}
+          {editable && " Custom-Lobbys im Blind-Modus speichern keine Bans – die lassen sich in der Bans-Spalte nachtragen."}
         </InfoTip>
       </h2>
       <div className="table-wrap">
@@ -81,7 +101,8 @@ export function GamesTable({
             <tr>
               <th title="In der Statistik" /><th className="left">Datum</th><th className="left">Ergebnis</th>
               {showOpponent && <th className="left">Gegner</th>}
-              <th className="left">Unsere Picks</th><th className="left">Gegnerische Picks</th><th>Kills</th>
+              <th className="left">Unsere Picks</th><th className="left">Gegnerische Picks</th>
+              <th className="left" title="Unsere | gegnerische Bans">Bans</th><th>Kills</th>
               <th>Gold Δ</th><th>GD@15</th><th title="Türme">Türme</th><th title="Drachen">Drachen</th>
               <th title="Barone">Baron</th><th>Dauer</th><th>Patch</th><th className="left">Typ</th>{editable && <th />}
             </tr>
@@ -90,7 +111,8 @@ export function GamesTable({
             {shown.map((g) => {
               const on = !excluded.has(g.match_id);
               return (
-                <tr key={g.match_id} className={[g.included ? "" : "dim", on ? "" : "off"].join(" ")}>
+                <Fragment key={g.match_id}>
+                <tr className={[g.included ? "" : "dim", on ? "" : "off"].join(" ")}>
                   <td>
                     <input type="checkbox" checked={on} aria-label="In der Statistik" onChange={() => toggle(g.match_id)} />
                   </td>
@@ -105,6 +127,7 @@ export function GamesTable({
                   )}
                   <td className="left">{picks(g.us.players)}</td>
                   <td className="left">{picks(g.them.players)}</td>
+                  <td className="left">{bans(g)}</td>
                   <td>{g.us.kills}–{g.them.kills}</td>
                   <td className={tone(g.gold_diff)}>{signed(g.gold_diff)}</td>
                   <td className={tone(g.gd15)}>{signed(g.gd15)}</td>
@@ -132,9 +155,22 @@ export function GamesTable({
                     </td>
                   )}
                 </tr>
+                {editBans === g.match_id && (
+                  <tr className="ban-edit-row">
+                    <td colSpan={columns} className="left">
+                      <BanEditor
+                        initial={{ us: g.bans_manual ? g.us.bans : [], them: g.bans_manual ? g.them.bans : [] }}
+                        busy={updateGame.isPending}
+                        onCancel={() => setEditBans(null)}
+                        onSave={(b) => updateGame.mutate({ matchId: g.match_id, bans: b }, { onSuccess: () => setEditBans(null) })} />
+                      {updateGame.error && <p className="neg small">{updateGame.error.message}</p>}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
-            {!shown.length && <tr><td className="left muted" colSpan={16}>Keine Spiele für diese Filter.</td></tr>}
+            {!shown.length && <tr><td className="left muted" colSpan={columns}>Keine Spiele für diese Filter.</td></tr>}
           </tbody>
         </table>
       </div>

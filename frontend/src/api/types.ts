@@ -341,6 +341,10 @@ export interface HistoryRow {
   selected: boolean;
   /** im Spiele-Tab abgewählt */
   excluded: boolean;
+  /** Spiel ohne Bans (Custom-Lobby im Blind-Modus) – Bans lassen sich nachtragen */
+  bans_missing: boolean;
+  /** Bans wurden von Hand nachgetragen */
+  bans_manual: boolean;
 }
 
 export interface Filters {

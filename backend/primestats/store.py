@@ -106,6 +106,7 @@ class TeamGame:
     label: str
     included: bool
     opponent: str = ""
+    bans: dict | None = None
 
 
 def make_engine(url: str) -> Engine:
@@ -355,7 +356,7 @@ class Store:
         with self.session() as s:
             rows = s.execute(
                 select(TeamGameRow.match_id, TeamGameRow.side, TeamGameRow.label, TeamGameRow.included,
-                       TeamGameRow.opponent)
+                       TeamGameRow.opponent, TeamGameRow.bans)
                 .outerjoin(Match, Match.match_id == TeamGameRow.match_id)
                 .where(TeamGameRow.team_id == team_id)
                 .order_by(Match.game_creation.desc().nulls_last(), TeamGameRow.match_id.desc())
@@ -363,8 +364,11 @@ class Store:
             return [TeamGame(*r) for r in rows]
 
     def update_team_game(self, team_id: int, match_id: str, *, label: str | None = None,
-                         included: bool | None = None, opponent: str | None = None) -> bool:
+                         included: bool | None = None, opponent: str | None = None,
+                         bans: dict | None = None, clear_bans: bool = False) -> bool:
         values: dict = {}
+        if bans is not None or clear_bans:
+            values["bans"] = bans
         if opponent is not None:
             values["opponent"] = opponent
         if label is not None:

@@ -191,7 +191,18 @@ def sync_status(team_id: int, service: Service, viewer: CurrentViewer):
 @router.patch("/teams/{team_id}/games/{match_id}", status_code=status.HTTP_204_NO_CONTENT)
 def update_team_game(team_id: int, match_id: str, body: TeamGameUpdate, service: Service, viewer: CurrentViewer):
     _editable_team(service, viewer, team_id)
+    bans = None
+    if body.bans is not None:
+        if match_id not in {tg.match_id for tg in service.store.team_games(team_id)}:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Spiel gehört nicht zu diesem Team.")
+        if any(t.bans for t in service.match(match_id).teams.values()):
+            raise HTTPException(status.HTTP_409_CONFLICT, "Dieses Spiel hat bereits Bans aus dem Client.")
+        picked = body.bans.us + body.bans.them
+        if len(set(picked)) != len(picked):
+            raise HTTPException(422, "Jeder Champion kann nur einmal gebannt werden.")
+        bans = body.bans.model_dump() if picked else None
     if not service.store.update_team_game(team_id, match_id, label=body.label, included=body.included,
-                                          opponent=body.opponent):
+                                          opponent=body.opponent, bans=bans,
+                                          clear_bans=body.bans is not None and bans is None):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Spiel gehört nicht zu diesem Team.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

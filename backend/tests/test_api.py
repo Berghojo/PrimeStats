@@ -177,3 +177,37 @@ def test_csrf_header_required(client):
     bare = TestClient(client.app)
     resp = bare.post("/api/auth/register", json={"username": "x" * 5, "password": "geheim123"})
     assert resp.status_code == 403
+
+
+def test_manual_bans_for_blind_lobby_scrims(client, demo_source):
+    register(client, "kapitaen")
+    link_riot(client, demo_source.account("NLE Polaris#EUW"))
+    tid = _create_team(client).json()["id"]
+    _wait_for_sync(client, tid)
+    url = f"/api/teams/{tid}/report"
+    history = client.get(url).json()["history"]
+    blind = next(r for r in history if r["bans_missing"])
+    drafted = next(r for r in history if not r["bans_missing"])
+    assert blind["us"]["bans"] == [] and not blind["bans_manual"]
+    before = {b["champion_id"]: b["count"] for b in client.get(url).json()["report"]["our_bans"]}
+
+    game = f"/api/teams/{tid}/games/{blind['match_id']}"
+    assert client.patch(game, json={"bans": {"us": [1, 2], "them": [2]}}).status_code == 422   # doppelt
+    assert client.patch(game, json={"bans": {"us": [1, 2, 3, 4, 5, 6]}}).status_code == 422      # zu viele
+    assert client.patch(f"/api/teams/{tid}/games/{drafted['match_id']}",
+                        json={"bans": {"us": [1]}}).status_code == 409                              # hat schon Bans
+    assert client.patch(game, json={"bans": {"us": [1, 2], "them": [3]}}).status_code == 204
+
+    after = client.get(url).json()
+    row = next(r for r in after["history"] if r["match_id"] == blind["match_id"])
+    assert row["bans_manual"] and row["us"]["bans"] == [1, 2] and row["them"]["bans"] == [3]
+    ours = {b["champion_id"]: b["count"] for b in after["report"]["our_bans"]}
+    if row["included"]:
+        assert ours.get(1, 0) == before.get(1, 0) + 1
+    # Das Spiel selbst (Scoreboard) bleibt unverändert
+    match = client.get(f"/api/matches/{blind['match_id']}").json()
+    assert match["blue"]["bans"] == [] and match["red"]["bans"] == []
+
+    assert client.patch(game, json={"bans": {"us": [], "them": []}}).status_code == 204
+    row = next(r for r in client.get(url).json()["history"] if r["match_id"] == blind["match_id"])
+    assert not row["bans_manual"] and row["us"]["bans"] == []

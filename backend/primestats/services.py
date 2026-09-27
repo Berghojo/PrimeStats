@@ -168,17 +168,18 @@ class PrimeStats:
     def team_records(self, team: Team, with_timeline: bool = True) -> list[GameRecord]:
         """Alle gespeicherten Spiele eines Teams (ohne API-Aufrufe)."""
         games = self.store.team_games(team.id)
-        return self._records([(tg.match_id, tg.side, tg.label, tg.included, tg.opponent) for tg in games],
+        return self._records([(tg.match_id, tg.side, tg.label, tg.included, tg.opponent, tg.bans) for tg in games],
                              with_timeline)
 
-    def _records(self, games: list[tuple[str, int, str, bool, str]], with_timeline: bool = True) -> list[GameRecord]:
+    def _records(self, games: list[tuple], with_timeline: bool = True) -> list[GameRecord]:
+        """``games``: (match_id, side, label, included, opponent[, nachgetragene Bans])"""
         ids = [g[0] for g in games]
         raw = self.store.get_matches([mid for mid in ids if not self._is_parsed(mid)])
         summaries = self.store.get_timeline_summaries(ids, SUMMARY_VERSION) if with_timeline else {}
         # Zusammenfassungen älterer Versionen aus den gespeicherten Timelines neu berechnen
         stale = self.store.timeline_ids([mid for mid in ids if mid not in summaries]) if with_timeline else set()
         records = []
-        for mid, side, label, included, opponent in games:
+        for mid, side, label, included, opponent, *extra in games:
             try:
                 match = self._parse_from(mid, raw.get(mid))
             except RiotAPIError as exc:
@@ -187,7 +188,7 @@ class PrimeStats:
             summary = summaries.get(mid)
             if summary is None and mid in stale:
                 summary = self.timeline_summary(match, fetch=False)
-            records.append(GameRecord(match, side, label, included, summary, opponent))
+            records.append(GameRecord(match, side, label, included, summary, opponent, extra[0] if extra else None))
         return records
 
     def _is_parsed(self, match_id: str) -> bool:

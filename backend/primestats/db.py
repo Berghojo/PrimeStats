@@ -90,6 +90,8 @@ class TeamGameRow(Base):
     included: Mapped[bool] = mapped_column(Boolean, default=True)
     #: Gegner, frei eingetragen vom Team (z.B. für Scrims)
     opponent: Mapped[str] = mapped_column(String(40), default="")
+    #: von Hand nachgetragene Bans {"us": [...], "them": [...]} (Custom-Lobby im Blind-Modus hat keine)
+    bans: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
 class PuuidAlias(Base):

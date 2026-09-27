@@ -192,10 +192,17 @@ class TeamOut(_Attrs):
         return out
 
 
+class ManualBans(BaseModel):
+    us: list[Annotated[int, Field(gt=0, lt=100000)]] = Field(default_factory=list, max_length=5)
+    them: list[Annotated[int, Field(gt=0, lt=100000)]] = Field(default_factory=list, max_length=5)
+
+
 class TeamGameUpdate(BaseModel):
     label: Literal["", "official", "scrim"] | None = None
     included: bool | None = None
     opponent: str | None = Field(default=None, max_length=40)
+    #: Bans nachtragen (nur für Spiele ohne Bans); beide Listen leer = entfernen
+    bans: ManualBans | None = None
 
     @field_validator("opponent")
     @classmethod
@@ -471,6 +478,10 @@ class HistoryRow(BaseModel):
     selected: bool
     #: im Spiele-Tab abgewählt
     excluded: bool = False
+    #: Spiel hat keine Bans (Blind-Lobby) – Bans können nachgetragen werden
+    bans_missing: bool = False
+    #: Bans wurden von Hand nachgetragen
+    bans_manual: bool = False
 
 
 class Filters(BaseModel):
