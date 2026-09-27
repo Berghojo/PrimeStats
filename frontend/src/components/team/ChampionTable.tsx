@@ -4,6 +4,7 @@ import type { ChampionRow } from "../../api/types";
 import { num, pct, tone } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 import { ChampIcon } from "../ChampIcon";
+import { InfoTip } from "../InfoTip";
 
 type Col = {
   key: string;
@@ -64,8 +65,10 @@ export function ChampionTable({ rows }: { rows: ChampionRow[] }) {
     <section className="card">
       <div className="row between">
         <div>
-          <h2>Champion-Picks</h2>
-          <div className="sub">Alle eigenen Picks mit Leistung, dazu Bans beider Seiten. Spalten sind sortierbar.</div>
+          <h2>
+            Champion-Picks
+            <InfoTip>Alle eigenen Picks mit Leistung, dazu Bans beider Seiten. Spalten sind sortierbar.</InfoTip>
+          </h2>
         </div>
         <div className="row">
           <select value={role} onChange={(e) => setRole(e.target.value)} aria-label="Rolle filtern">

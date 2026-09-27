@@ -4,6 +4,7 @@ import type { Jungle, JungleEvent, JunglePath, Side } from "../../api/types";
 import { dt } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 import { type Point, WALLS, edges, interpolate } from "../../lib/rift";
+import { InfoTip } from "../InfoTip";
 
 /** Kartengröße in Spielkoordinaten (Summoner's Rift, Ursprung unten links) */
 const MAP_W = 14870;
@@ -233,9 +234,6 @@ function HeatView({ events, games, walls }: { events: JungleEvent[]; games: numb
             {!byZone.length && <tr><td className="left muted" colSpan={3}>Keine Ereignisse in diesem Zeitraum.</td></tr>}
           </tbody>
         </table>
-        <p className="muted small">
-          Orte, an denen der Jungler an Kills beteiligt war bzw. gestorben ist. Frühe Kills auf einer Lane sind meist Ganks.
-        </p>
       </div>
     </div>
   );
@@ -334,10 +332,6 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
             {!starts.length && <tr><td className="left muted" colSpan={3}>Keine Positionsdaten.</td></tr>}
           </tbody>
         </table>
-        <p className="muted small">
-          Die Timeline enthält nur eine Position pro Minute (Punkte). Dazwischen zeichnet PrimeStats den kürzesten Weg
-          durch ein angenähertes Wegenetz der Karte (Lanes, Jungle-Gänge, Fluss) – plausibel, aber nicht der exakte Laufweg.
-        </p>
       </div>
     </div>
   );
@@ -362,8 +356,18 @@ export function JungleCard({ jungle }: { jungle: Jungle }) {
     <section className="card stack">
       <div className="row between">
         <div>
-          <h2>Jungle</h2>
-          <div className="sub">Gank-Heatmap und Pathing des Junglers aus {games} Spielen mit Timeline.</div>
+          <h2>
+            Jungle
+            <InfoTip>
+              Gank-Heatmap und Pathing des Junglers aus {games} Spielen mit Timeline.
+              <br /><br />
+              <b>Heatmap:</b> Orte, an denen der Jungler an Kills beteiligt war bzw. gestorben ist. Frühe Kills auf einer
+              Lane sind meist Ganks.
+              <br /><br />
+              <b>Pathing:</b> Die Timeline enthält nur eine Position pro Minute (Punkte). Dazwischen zeichnet PrimeStats den
+              kürzesten begehbaren Weg über die Karte – plausibel, aber nicht der exakte Laufweg.
+            </InfoTip>
+          </h2>
         </div>
         <Segmented label="Ansicht" value={view} onChange={setView}
           options={[{ value: "heat", label: "Gank-Heatmap" }, { value: "path", label: "Pathing" }]} />
@@ -398,6 +402,10 @@ export function JungleCard({ jungle }: { jungle: Jungle }) {
           <input type="checkbox" checked={calibrate} onChange={(e) => setCalibrate(e.target.checked)} />
           <span>Kartenabgleich: echtes Kartenbild mit Wand-Umrissen</span>
         </label>
+        <InfoTip>
+          Gestrichelte Umrisse = angenommene Wände, gepunktete Linien („Wegenetz“ im Pathing) = angenommene Wege.
+          Liegen sie neben den echten Wänden, bitte einen Screenshot schicken.
+        </InfoTip>
       </div>
       {calibrate && (
         <div className="stack">
@@ -405,11 +413,11 @@ export function JungleCard({ jungle }: { jungle: Jungle }) {
             <Slider label="Kartenbild" value={imageOpacity} min={0} max={1} step={0.05} onChange={setImageOpacity}
               format={(v) => `${Math.round(v * 100)} %`} />
           </div>
-          <p className="muted small">
-            {image === "failed"
-              ? "Das Kartenbild von Riot (Data Dragon) konnte nicht geladen werden – ohne Internetzugang ist kein Abgleich möglich."
-              : "Gestrichelte Umrisse = angenommene Wände, gepunktete Linien (\u201eWegenetz\u201c im Pathing) = angenommene Wege. Liegen sie neben den echten Wänden, bitte einen Screenshot schicken."}
-          </p>
+          {image === "failed" && (
+            <p className="muted small">
+              Das Kartenbild von Riot (Data Dragon) konnte nicht geladen werden – ohne Internetzugang ist kein Abgleich möglich.
+            </p>
+          )}
         </div>
       )}
     </section>

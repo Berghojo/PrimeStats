@@ -4,6 +4,7 @@ import type { DeathEvent, DeathKind, PlayerReport } from "../../api/types";
 import { dt, duration } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 import { MapBase, SIZE, Slider, px, py } from "./Jungle";
+import { InfoTip } from "../InfoTip";
 
 const KINDS: { key: DeathKind; label: string; color: string; hint: string }[] = [
   { key: "gank", label: "Gank", color: "#ffc23d", hint: "gegnerischer Jungler beteiligt" },
@@ -64,11 +65,17 @@ export function GankCard({ deaths, players }: { deaths: DeathEvent[]; players: P
   return (
     <section className="card stack">
       <div>
-        <h2>Ganks &amp; Roams</h2>
-        <div className="sub">
-          Wo und wodurch die eigenen Spieler sterben: Laner durch Ganks und Roams, Jungler durch roamende Laner.
-          Grundlage sind die an einem Kill beteiligten Gegner laut Timeline.
-        </div>
+        <h2>
+          Ganks &amp; Roams
+          <InfoTip>
+            Wo und wodurch die eigenen Spieler sterben: Laner durch Ganks und Roams, Jungler durch roamende Laner.
+            Grundlage sind die an einem Kill beteiligten Gegner laut Timeline.
+            <br /><br />
+            <b>Gank</b> = gegnerischer Jungler beteiligt · <b>Roam</b> = Laner einer anderen Lane beteiligt (Bot und Support
+            gelten als eine Lane); beim Jungler zählt jeder beteiligte Laner als Roam · <b>Lane / 1v1</b> = nur die direkten
+            Gegner · <b>Sonstige</b> = ohne gegnerischen Champion (Turm, Minions).
+          </InfoTip>
+        </h2>
       </div>
       <div className="jungle-grid">
         <div className="stack">
@@ -153,10 +160,6 @@ export function GankCard({ deaths, players }: { deaths: DeathEvent[]; players: P
               })}
             </tbody>
           </table>
-          <p className="muted small">
-            Gank = gegnerischer Jungler beteiligt · Roam = Laner einer anderen Lane beteiligt (Bot und Support gelten als eine
-            Lane); beim Jungler zählt jeder beteiligte Laner als Roam · Lane / 1v1 = nur die direkten Gegner.
-          </p>
         </div>
       </div>
     </section>

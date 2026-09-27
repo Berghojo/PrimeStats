@@ -1,6 +1,7 @@
 import type { MonsterStat, Overview as OverviewData } from "../../api/types";
 import { duration, num, pct, signed, tone } from "../../lib/format";
 import { Kpi } from "../ui";
+import { InfoTip } from "../InfoTip";
 
 export function OverviewKpis({ ov }: { ov: OverviewData }) {
   return (
@@ -26,8 +27,10 @@ export function OverviewKpis({ ov }: { ov: OverviewData }) {
 export function ObjectivesCard({ monsters, ov }: { monsters: MonsterStat[]; ov: OverviewData }) {
   return (
     <div className="card">
-      <h2>Objectives</h2>
-      <div className="sub">Pro Spiel; Anteil = eigene / alle getöteten Monster.</div>
+      <h2>
+        Objectives
+        <InfoTip>Pro Spiel; Anteil = eigene / alle getöteten Monster.</InfoTip>
+      </h2>
       <div className="table-wrap">
         <table className="data">
           <thead>

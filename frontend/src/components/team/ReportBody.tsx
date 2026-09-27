@@ -14,6 +14,7 @@ import { GankCard } from "./Ganks";
 import { JungleCard } from "./Jungle";
 import { type ReportKind, PANELS, defaultPanels } from "./panels";
 import { ChampionPools, DraftCards } from "./Pools";
+import { InfoTip } from "../InfoTip";
 
 const DEFAULT_FILTERS: Filters = { label: "all", side: "all", patch: "", last: 0 };
 
@@ -76,8 +77,10 @@ export function ReportBody({
       case "gold":
         return (
           <div className="card">
-            <h2>Ø Golddifferenz im Spielverlauf</h2>
-            <div className="sub">Eigenes Team minus Gegner, pro Minute gemittelt.</div>
+            <h2>
+              Ø Golddifferenz im Spielverlauf
+              <InfoTip>Eigenes Team minus Gegner, pro Minute gemittelt.</InfoTip>
+            </h2>
             {ov.timeline_games ? (
               <MinuteLineChart height={260} yTitle="Gold (Team − Gegner)" series={[
                 { label: "Alle Spiele", data: report.gold_curves.all.values, counts: report.gold_curves.all.counts, color: "#00dcc0" },
@@ -92,10 +95,13 @@ export function ReportBody({
       case "players":
         return (
           <section className="card">
-            <h2>Spieler</h2>
-            <div className="sub">
-              Durchschnitt pro Spiel. Lane-Differenzen @15 gegen den direkten Gegner (benötigt Timelines). Spalten sind sortierbar.
-            </div>
+            <h2>
+              Spieler
+              <InfoTip>
+                Durchschnitt pro Spiel. Lane-Differenzen @15 gegen den direkten Gegner (benötigt Timelines). Spalten sind
+                sortierbar.
+              </InfoTip>
+            </h2>
             <PlayersTable players={report.players} />
           </section>
         );
@@ -112,8 +118,10 @@ export function ReportBody({
       case "trend":
         return ov.timeline_games > 0 ? (
           <section className="card">
-            <h2>Formkurve</h2>
-            <div className="sub">Teamgold-Differenz nach 15 Minuten je Spiel (grün = Sieg, rot = Niederlage).</div>
+            <h2>
+              Formkurve
+              <InfoTip>Teamgold-Differenz nach 15 Minuten je Spiel (grün = Sieg, rot = Niederlage).</InfoTip>
+            </h2>
             <ResultBarChart points={report.trend.map((t) => ({
               label: shortDt(t.date),
               value: t.gd15,

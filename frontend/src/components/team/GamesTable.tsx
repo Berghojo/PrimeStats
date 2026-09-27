@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { InfoTip } from "../InfoTip";
 
 import { useUpdateTeamGame } from "../../api/hooks";
 import type { HistoryRow, Label } from "../../api/types";
@@ -57,10 +58,13 @@ export function GamesTable({ teamId, history, editable, focus, showOpponent = fa
 
   return (
     <section className="card">
-      <h2>Spiele</h2>
-      <div className="sub">
-        Alle gefundenen Teamspiele. Ausgeschlossene Spiele fließen nicht in die Statistik ein; das Label steuert den Spieltyp-Filter.
-      </div>
+      <h2>
+        Spiele
+        <InfoTip>
+          Alle gefundenen Teamspiele. Ausgeschlossene Spiele fließen nicht in die Statistik ein; das Label steuert den
+          Spieltyp-Filter. Markierte Spiele fließen in den Zeitverlauf ein.
+        </InfoTip>
+      </h2>
       <div className="table-wrap">
         <table className="data">
           <thead>

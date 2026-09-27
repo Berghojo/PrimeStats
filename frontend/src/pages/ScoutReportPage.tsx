@@ -6,6 +6,7 @@ import { ApiError } from "../api/client";
 import type { RosterPlayer, ScoutMode } from "../api/types";
 import { useScoutReport, useScoutStatus, useStartScout } from "../api/hooks";
 import { ReportBody, useUrlFilters } from "../components/team/ReportBody";
+import { InfoTip } from "../components/InfoTip";
 import { ErrorBox, Loading, Spinner } from "../components/ui";
 import { usePanels, ViewCustomizer } from "../components/ViewCustomizer";
 import { ago } from "../lib/format";
@@ -44,8 +45,12 @@ function PlayerSelect({ roster, selected, match, onChange }: {
     <div className="player-select">
       <div className="row between">
         <div className="muted small">
-          Spieler auswählen (bis zu {MAX_SELECTED}), um die Statistik auf ihre Spiele einzugrenzen
+          Spielerauswahl
           {selected.length > 0 && <> · <b>{selected.length}</b> ausgewählt</>}
+          <InfoTip>
+            Bis zu {MAX_SELECTED} Spieler auswählen, um alle Statistiken auf ihre Spiele einzugrenzen. Bei mehreren:
+            „Mindestens einer“ = Spiele, in denen einer davon mitspielte; „Alle zusammen“ = nur Spiele mit allen.
+          </InfoTip>
         </div>
         {selected.length > 0 && (
           <button type="button" className="btn small" onClick={() => onChange([])}>Auswahl aufheben</button>

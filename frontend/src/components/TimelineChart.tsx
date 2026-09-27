@@ -5,6 +5,7 @@ import type { Analysis } from "../api/types";
 import { useGameData } from "../lib/meta";
 import { MinuteLineChart, PALETTE } from "./charts";
 import { ErrorBox, Spinner } from "./ui";
+import { InfoTip } from "./InfoTip";
 
 const STAT_KEY = "ps-stat";
 
@@ -101,11 +102,13 @@ export function InlineTimeline({ ids, focus }: { ids: string[]; focus?: string[]
     <section className={`card stack${isFetching && data ? " refreshing" : ""}`}>
       <div className="row between">
         <div>
-          <h2>Zeitverlauf</h2>
-          <div className="sub">
-            Minutenwerte der Teamspieler, gemittelt über die in der Spieletabelle markierten Spiele
-            {data ? ` (${data.matches.length})` : ""}.
-          </div>
+          <h2>
+            Zeitverlauf
+            <InfoTip>
+              Minutenwerte der Teamspieler, gemittelt über die in der Spieletabelle markierten Spiele
+              {data ? ` (${data.matches.length})` : ""}.
+            </InfoTip>
+          </h2>
         </div>
         {isFetching && <Spinner />}
       </div>
