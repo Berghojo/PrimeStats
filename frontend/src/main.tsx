@@ -5,6 +5,15 @@ import { RouterProvider } from "react-router-dom";
 
 import { ApiError } from "./api/client";
 import { router } from "./router";
+import "@fontsource/barlow/400.css";
+import "@fontsource/barlow/500.css";
+import "@fontsource/barlow/600.css";
+import "@fontsource/barlow/700.css";
+import "@fontsource/barlow-condensed/600.css";
+import "@fontsource/barlow-condensed/700.css";
+import "@fontsource/barlow-condensed/700-italic.css";
+import "@fontsource/barlow-condensed/800.css";
+import "@fontsource/barlow-condensed/800-italic.css";
 import "./styles.css";
 
 const queryClient = new QueryClient({

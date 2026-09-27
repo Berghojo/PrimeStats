@@ -7,12 +7,13 @@ import { Bar, Line } from "react-chartjs-2";
 import { num } from "../lib/format";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
-ChartJS.defaults.color = "#8d99b3";
-ChartJS.defaults.borderColor = "rgba(38, 49, 80, .6)";
+ChartJS.defaults.color = "#8b93a5";
+ChartJS.defaults.font.family = '"Barlow", system-ui, sans-serif';
+ChartJS.defaults.borderColor = "rgba(37, 43, 56, .7)";
 ChartJS.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 ChartJS.defaults.plugins.legend.labels.boxWidth = 12;
 
-export const PALETTE = ["#7c5cff", "#20d3c2", "#ffb547", "#ff5a6a", "#4c8dff", "#2fd48a", "#f472b6",
+export const PALETTE = ["#00dcc0", "#7c5cff", "#ffb547", "#ff5a6a", "#4c8dff", "#2fd48a", "#f472b6",
   "#a3e635", "#fb923c", "#38bdf8", "#c084fc", "#facc15", "#94a3b8", "#e879f9"];
 
 export interface LineSeries {
@@ -88,7 +89,7 @@ export function ResultBarChart({ points, height = 260 }: { points: BarPoint[]; h
           labels: points.map((p) => p.label),
           datasets: [{
             data: points.map((p) => p.value),
-            backgroundColor: points.map((p) => (p.positive ? "rgba(47, 212, 138, .75)" : "rgba(255, 90, 106, .75)")),
+            backgroundColor: points.map((p) => (p.positive ? "rgba(47, 212, 138, .75)" : "rgba(255, 77, 94, .75)")),
             borderRadius: 4,
           }],
         }}

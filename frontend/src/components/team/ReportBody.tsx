@@ -62,9 +62,9 @@ export function ReportBody({ data, refreshing, teamId, editable = false, hideLab
                 <div className="sub">Eigenes Team minus Gegner, pro Minute gemittelt.</div>
                 {ov.timeline_games ? (
                   <MinuteLineChart height={260} yTitle="Gold (Team − Gegner)" series={[
-                    { label: "Alle Spiele", data: report.gold_curves.all.values, counts: report.gold_curves.all.counts, color: "#7c5cff" },
+                    { label: "Alle Spiele", data: report.gold_curves.all.values, counts: report.gold_curves.all.counts, color: "#00dcc0" },
                     { label: "Siege", data: report.gold_curves.win.values, counts: report.gold_curves.win.counts, color: "#2fd48a", dashed: true },
-                    { label: "Niederlagen", data: report.gold_curves.loss.values, counts: report.gold_curves.loss.counts, color: "#ff5a6a", dashed: true },
+                    { label: "Niederlagen", data: report.gold_curves.loss.values, counts: report.gold_curves.loss.counts, color: "#ff4d5e", dashed: true },
                   ]} />
                 ) : <p className="muted">{noTimelineHint ?? "Keine Timeline-Daten – bitte synchronisieren."}</p>}
               </div>
