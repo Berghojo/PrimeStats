@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .auth import token_hash
 from .lcu import CLIENT_PUUID_SQL
-from .db import (Account, LinkCode, Match, PlayerMatch, PuuidAlias, RawImport, SavedView, RiotLink, Scout, TeamGameRow, TeamMemberRow, TeamRow,
+from .db import (Account, Group, LinkCode, Match, PlayerMatch, PuuidAlias, RawImport, SavedView, RiotLink, Scout, TeamGameRow, TeamMemberRow, TeamRow,
                  Timeline, TimelineSummary, User, UserSession)
 
 
@@ -71,6 +71,19 @@ class View:
 
 def _view(row: SavedView) -> View:
     return View(row.id, row.kind, row.name, list(row.panels), row.is_default)
+
+
+@dataclass
+class GroupData:
+    key: str
+    user_id: int
+    name: str
+    entries: list[dict]
+    updated_at: datetime
+
+
+def _group(row: Group) -> GroupData:
+    return GroupData(row.key, row.user_id, row.name, list(row.entries), row.updated_at)
 
 
 @dataclass
@@ -526,6 +539,48 @@ class Store:
     def delete_view(self, user_id: int, view_id: int) -> bool:
         with self.session() as s:
             result = s.execute(delete(SavedView).where(SavedView.id == view_id, SavedView.user_id == user_id))
+            return result.rowcount > 0
+
+    # ---------------------------------------------------------------- Gruppen
+    def list_groups(self, user_id: int) -> list[GroupData]:
+        with self.session() as s:
+            rows = s.scalars(select(Group).where(Group.user_id == user_id).order_by(Group.updated_at.desc()))
+            return [_group(r) for r in rows]
+
+    def count_groups(self, user_id: int) -> int:
+        with self.session() as s:
+            return s.scalar(select(func.count()).select_from(Group).where(Group.user_id == user_id)) or 0
+
+    def create_group(self, user_id: int, name: str, entries: list[dict]) -> GroupData:
+        with self.session() as s:
+            row = Group(key=secrets.token_urlsafe(12), user_id=user_id, name=name, entries=entries,
+                        updated_at=datetime.now(timezone.utc))
+            s.add(row)
+            s.flush()
+            return _group(row)
+
+    def get_group(self, key: str) -> GroupData | None:
+        with self.session() as s:
+            row = s.get(Group, key)
+            return _group(row) if row else None
+
+    def update_group(self, user_id: int, key: str, name: str | None = None,
+                     entries: list[dict] | None = None) -> GroupData | None:
+        with self.session() as s:
+            row = s.get(Group, key)
+            if row is None or row.user_id != user_id:
+                return None
+            if name is not None:
+                row.name = name
+            if entries is not None:
+                row.entries = entries
+            row.updated_at = datetime.now(timezone.utc)
+            s.flush()
+            return _group(row)
+
+    def delete_group(self, user_id: int, key: str) -> bool:
+        with self.session() as s:
+            result = s.execute(delete(Group).where(Group.key == key, Group.user_id == user_id))
             return result.rowcount > 0
 
     def roster_team_ids(self, puuids: set[str]) -> set[int]:

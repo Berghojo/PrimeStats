@@ -9,6 +9,7 @@ import { ReportBody, useUrlFilters } from "../components/team/ReportBody";
 import { InfoTip } from "../components/InfoTip";
 import { ErrorBox, Loading, Spinner } from "../components/ui";
 import { usePanels, ViewCustomizer } from "../components/ViewCustomizer";
+import { AddToGroup } from "../components/AddToGroup";
 import { ago } from "../lib/format";
 import { useGameData } from "../lib/meta";
 import { MODE_TEXT, scoutTitle } from "./ScoutPage";
@@ -146,9 +147,12 @@ export function ScoutReportPage() {
               <div className="muted small">aktualisiert {ago(data.updated_at)}</div>
             </div>
           </div>
-          {running ? progress : (
-            <button className="btn" type="button" onClick={refresh} disabled={restart.isPending}>⟳ Aktualisieren</button>
-          )}
+          <div className="row">
+            <AddToGroup kind="scout" refId={data.key} />
+            {running ? progress : (
+              <button className="btn" type="button" onClick={refresh} disabled={restart.isPending}>⟳ Aktualisieren</button>
+            )}
+          </div>
         </div>
         {restart.error && <ErrorBox error={restart.error} />}
         <PlayerSelect roster={data.roster} selected={selected.filter((p) => data.roster.some((r) => r.puuid === p))}

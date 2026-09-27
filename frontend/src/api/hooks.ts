@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api } from "./client";
 import type {
-  Analysis, Filters, Label, LinkCode, Match, Me, Meta, PlayerFilters, PlayerReportData, SavedView, ScoutMode, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
+  Analysis, Filters, Group, GroupCompare, GroupEntry, GroupFilters, GroupSummary, Label, LinkCode, Match, Me, Meta, PlayerFilters, PlayerReportData, SavedView, ScoutMode, ScoutPlayer, ScoutReport, ScoutSummary, SyncJob,
   Team, TeamInput, TeamReport,
 } from "./types";
 
@@ -204,5 +204,56 @@ export function useStartPlayerSync(name: string, tag: string) {
   return useMutation({
     mutationFn: () => api<SyncJob>(`${playerPath(name, tag)}/sync`, { method: "POST" }),
     onSuccess: (job) => qc.setQueryData(["player", name, tag, "sync"], job),
+  });
+}
+
+// ---------------------------------------------------------------- Gruppen
+export const useGroups = (enabled = true) =>
+  useQuery({ queryKey: ["groups"], queryFn: () => api<GroupSummary[]>("/groups"), enabled });
+
+export const useGroupCompare = (key: string, filters: Partial<GroupFilters>) =>
+  useQuery({
+    queryKey: ["group", key, "compare", filters],
+    queryFn: () => api<GroupCompare>(`/groups/${encodeURIComponent(key)}/compare`, { query: { ...filters } }),
+    placeholderData: keepPreviousData,
+    retry: false,
+    // solange ein Team noch synchronisiert/gescoutet wird, regelmäßig nachladen
+    refetchInterval: (query) => (query.state.data?.teams.some((t) => t.syncing) ? 3000 : false),
+  });
+
+export function useCreateGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; entries?: GroupEntry[] }) =>
+      api<Group>("/groups", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["groups"] }),
+  });
+}
+
+export function useUpdateGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, ...body }: { key: string; name?: string; entries?: GroupEntry[] }) =>
+      api<Group>(`/groups/${encodeURIComponent(key)}`, { method: "PATCH", body: JSON.stringify(body) }),
+    onSuccess: (group) =>
+      qc.invalidateQueries({ queryKey: ["group", group.key] }).then(() => qc.invalidateQueries({ queryKey: ["groups"] })),
+  });
+}
+
+export function useDeleteGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => api<void>(`/groups/${encodeURIComponent(key)}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["groups"] }),
+  });
+}
+
+export function useAddGroupEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, entry }: { key: string; entry: GroupEntry }) =>
+      api<Group>(`/groups/${encodeURIComponent(key)}/entries`, { method: "POST", body: JSON.stringify(entry) }),
+    onSuccess: (group) =>
+      qc.invalidateQueries({ queryKey: ["group", group.key] }).then(() => qc.invalidateQueries({ queryKey: ["groups"] })),
   });
 }

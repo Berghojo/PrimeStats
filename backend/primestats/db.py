@@ -191,6 +191,21 @@ class PlayerMatch(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class Group(Base):
+    """Gruppe eines Kontos: mehrere Teams/Scoutings, die miteinander verglichen werden."""
+
+    __tablename__ = "groups"
+
+    #: zufälliger Schlüssel (teilbarer Link)
+    key: Mapped[str] = mapped_column(String(24), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(60))
+    #: [{"kind": "team"|"scout", "ref": "<team-id>|<scout-key>", "name": "<optional>"}]
+    entries: Mapped[list] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # --------------------------------------------------------------- Scouting
 class Scout(Base):
     """Ergebnis eines Turnier-Scoutings: Spiele, in denen alle gesuchten Spieler im selben Team standen."""

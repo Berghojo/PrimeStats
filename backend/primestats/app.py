@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from .accounts_api import router as accounts_router
 from .api import router
 from .scout_api import router as scout_router
+from .groups_api import router as groups_router
 from .views_api import router as views_router
 from .player_api import router as player_router
 from .config import Settings
@@ -100,6 +101,7 @@ def create_app(settings: Settings | None = None, *, source: MatchSource | None =
     app.include_router(accounts_router)
     app.include_router(scout_router)
     app.include_router(views_router)
+    app.include_router(groups_router)
     app.include_router(player_router)
     if settings.frontend_dist and (settings.frontend_dist / "index.html").exists():
         _mount_frontend(app, settings.frontend_dist)

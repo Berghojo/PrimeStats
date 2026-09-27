@@ -468,3 +468,47 @@ export interface PlayerReportData {
   last_fetch: string | null;
   job: SyncJob | null;
 }
+
+// ------------------------------------------------------------------ Gruppen
+export type GroupEntryKind = "team" | "scout";
+
+export interface GroupEntry {
+  kind: GroupEntryKind;
+  /** Team-ID bzw. Scouting-Schlüssel */
+  ref: string;
+  /** eigener Anzeigename */
+  name: string;
+}
+
+export interface GroupEntryOut extends GroupEntry {
+  title: string;
+  tag: string;
+  available: boolean;
+}
+
+export interface Group {
+  key: string;
+  name: string;
+  entries: GroupEntryOut[];
+  can_edit: boolean;
+  updated_at: string;
+}
+
+export interface GroupSummary { key: string; name: string; teams: string[]; updated_at: string }
+
+export type GroupFilters = Omit<Filters, "exclude">;
+
+export interface GroupTeamStats {
+  entry: GroupEntryOut;
+  syncing: boolean;
+  overview: Overview | null;
+  monsters: MonsterStat[];
+  players: PlayerReport[];
+}
+
+export interface GroupCompare {
+  group: Group;
+  filters: GroupFilters;
+  patches: string[];
+  teams: GroupTeamStats[];
+}

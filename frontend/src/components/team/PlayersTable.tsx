@@ -16,7 +16,18 @@ type Col = {
 
 const nullLast = (v: number | null) => (v === null ? -Infinity : v);
 
-export function PlayersTable({ players }: { players: PlayerReport[] }) {
+interface TeamColumn {
+  label: string;
+  render: (p: PlayerReport) => React.ReactNode;
+  sort: (p: PlayerReport) => string;
+}
+
+/** `team`: zusätzliche Team-Spalte (Gruppenvergleich); `rowKey` für Spieler, die in mehreren Teams stehen */
+export function PlayersTable({ players, team, rowKey = (p) => p.puuid }: {
+  players: PlayerReport[];
+  team?: TeamColumn;
+  rowKey?: (p: PlayerReport) => string;
+}) {
   const { position } = useGameData();
   const [sort, setSort] = useState<{ key: string; desc: boolean } | null>(null);
 
@@ -28,6 +39,7 @@ export function PlayersTable({ players }: { players: PlayerReport[] }) {
           {!p.member && <> <span className="badge">Aushilfe</span></>}
         </>
       ) },
+    ...(team ? [{ key: "team", label: team.label, left: true, sort: team.sort, render: team.render }] : []),
     { key: "pos", label: "Rolle", sort: (p) => position(p.position), render: (p) => position(p.position) },
     { key: "games", label: "Spiele", sort: (p) => p.games, render: (p) => p.games },
     { key: "wr", label: "WR", sort: (p) => p.winrate, render: (p) => pct(p.winrate) },
@@ -75,7 +87,7 @@ export function PlayersTable({ players }: { players: PlayerReport[] }) {
         </thead>
         <tbody>
           {rows.map((p) => (
-            <tr key={p.puuid} className={p.member ? "" : "dim"}>
+            <tr key={rowKey(p)} className={p.member ? "" : "dim"}>
               {cols.map((c) => (
                 <td key={c.key} className={[c.left && "left", c.className?.(p)].filter(Boolean).join(" ")}>{c.render(p)}</td>
               ))}

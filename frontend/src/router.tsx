@@ -4,6 +4,8 @@ import { Layout } from "./components/Layout";
 import { Empty } from "./components/ui";
 import { AccountPage } from "./pages/AccountPage";
 import { AnalysisPage } from "./pages/AnalysisPage";
+import { GroupPage } from "./pages/GroupPage";
+import { GroupsPage } from "./pages/GroupsPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { MatchPage } from "./pages/MatchPage";
@@ -35,6 +37,8 @@ export const routes = [
       { path: "teams/new", element: <TeamFormPage /> },
       { path: "teams/:teamId", element: <TeamPage /> },
       { path: "teams/:teamId/edit", element: <TeamFormPage /> },
+      { path: "groups", element: <GroupsPage /> },
+      { path: "groups/:key", element: <GroupPage /> },
       { path: "scout", element: <Navigate to="/" replace /> },
       { path: "scout/:key", element: <ScoutReportPage /> },
       { path: "uploader", element: <UploaderPage /> },

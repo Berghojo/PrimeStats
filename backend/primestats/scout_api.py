@@ -30,6 +30,18 @@ def with_players(records: list[GameRecord], puuids: list[str], match: str) -> li
             out.append(r)
     return out
 
+def scout_title(scout: dict) -> str:
+    joiner = " / " if scout["mode"] == "any" else " + "
+    return joiner.join(f"{p['game_name']}#{p['tag_line']}" for p in scout["players"])
+
+
+def scout_team(scout: dict) -> Team:
+    """Pseudo-Team eines Scoutings (Kader = alle Spieler, die in den Spielen mitgespielt haben)."""
+    return Team(id=0, name=scout_title(scout), tag="", min_members=len(scout["players"]),
+                created_at=scout["updated_at"], last_synced=scout["updated_at"],
+                members=[Member(r["puuid"], r["game_name"], r["tag_line"], r["position"]) for r in scout["roster"]])
+
+
 router = APIRouter(prefix="/api/scout")
 scout_limit = RateLimit(limit=20, window=3600)
 
@@ -86,10 +98,7 @@ def scout_report(key: str, service: Service, params: Annotated[ScoutFilters, Que
     if filters.label not in {"all", *LABELS}:
         filters.label = "all"
     roster = scout["roster"]
-    names = " + ".join(f"{p['game_name']}#{p['tag_line']}" for p in scout["players"])
-    team = Team(id=0, name=names, tag="", min_members=len(scout["players"]), created_at=scout["updated_at"],
-                last_synced=scout["updated_at"],
-                members=[Member(r["puuid"], r["game_name"], r["tag_line"], r["position"]) for r in roster])
+    team = scout_team(scout)
     match = params.match or scout["mode"]
     in_roster = {r["puuid"] for r in roster}
     focus = list(dict.fromkeys(p for p in params.focus if p in in_roster))

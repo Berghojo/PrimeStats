@@ -815,3 +815,81 @@ class PlayerReportOut(BaseModel):
     roles: list[str]
     last_fetch: datetime | None
     job: SyncJobOut | None
+
+
+# ------------------------------------------------------------------ Gruppen
+GroupName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+
+
+class GroupEntry(BaseModel):
+    """Ein Team der Gruppe: angelegtes Team (``ref`` = ID) oder Scouting (``ref`` = Schlüssel)."""
+
+    kind: Literal["team", "scout"]
+    ref: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^(\d{1,9}|[0-9a-f]{40})$")]
+    #: eigener Anzeigename (z.B. Teamname eines Scoutings)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] = ""
+
+    @field_validator("ref")
+    @classmethod
+    def _ref_matches_kind(cls, ref: str, info):
+        kind = info.data.get("kind")
+        if (kind == "team") != ref.isdigit():
+            raise ValueError("Team-ID bzw. Scouting-Schlüssel erwartet")
+        return ref
+
+
+class GroupIn(BaseModel):
+    name: GroupName
+    entries: list[GroupEntry] = Field(default_factory=list, max_length=16)
+
+
+class GroupUpdate(BaseModel):
+    name: GroupName | None = None
+    entries: list[GroupEntry] | None = Field(default=None, max_length=16)
+
+
+class GroupEntryOut(GroupEntry):
+    #: Anzeigename (eigener Name, sonst Team- bzw. Spielernamen)
+    title: str
+    tag: str = ""
+    #: False = gelöscht oder für den Betrachter nicht sichtbar
+    available: bool = True
+
+
+class GroupOut(BaseModel):
+    key: str
+    name: str
+    entries: list[GroupEntryOut]
+    can_edit: bool
+    updated_at: datetime
+
+
+class GroupSummary(BaseModel):
+    key: str
+    name: str
+    teams: list[str]
+    updated_at: datetime
+
+
+class GroupFilters(BaseModel):
+    """Filter des Gruppenvergleichs (immer nur Turnierspiele, daher ohne Spieltyp)."""
+
+    side: str = "all"
+    patch: str = ""
+    last: int = Field(default=0, ge=0, le=100)
+
+
+class GroupTeamStats(BaseModel):
+    entry: GroupEntryOut
+    #: Synchronisation bzw. Scouting läuft noch
+    syncing: bool = False
+    overview: Overview | None = None
+    monsters: list[MonsterStat] = []
+    players: list[PlayerReport] = []
+
+
+class GroupCompareOut(BaseModel):
+    group: GroupOut
+    filters: GroupFilters
+    patches: list[str]
+    teams: list[GroupTeamStats]

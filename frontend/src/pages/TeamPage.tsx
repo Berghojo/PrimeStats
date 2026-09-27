@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useTeamReport } from "../api/hooks";
 import { ReportBody, useUrlFilters } from "../components/team/ReportBody";
 import { SyncControl } from "../components/team/SyncControl";
+import { AddToGroup } from "../components/AddToGroup";
 import { Empty, ErrorBox, Loading } from "../components/ui";
 import { useGameData } from "../lib/meta";
 import { InfoTip } from "../components/InfoTip";
@@ -34,12 +35,15 @@ export function TeamPage() {
               </div>
             </div>
           </div>
-          {team.can_edit && (
-            <div className="row">
-              <SyncControl teamId={teamId} initial={data.job} />
-              <Link className="btn" to={`/teams/${teamId}/edit`}>Bearbeiten</Link>
-            </div>
-          )}
+          <div className="row">
+            <AddToGroup kind="team" refId={String(teamId)} />
+            {team.can_edit && (
+              <>
+                <SyncControl teamId={teamId} initial={data.job} />
+                <Link className="btn" to={`/teams/${teamId}/edit`}>Bearbeiten</Link>
+              </>
+            )}
+          </div>
         </div>
         {!team.can_see_scrims && (
           <div className="small" style={{ marginTop: ".5rem" }}>

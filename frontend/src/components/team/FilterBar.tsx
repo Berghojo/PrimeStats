@@ -1,10 +1,10 @@
-import type { Filters } from "../../api/types";
+import type { Filters, GroupFilters } from "../../api/types";
 import { useGameData } from "../../lib/meta";
 
 interface Props {
-  filters: Filters;
+  filters: GroupFilters;
   patches: string[];
-  onChange: (next: Partial<Filters>) => void;
+  onChange: (next: Partial<GroupFilters>) => void;
   onReset: () => void;
   /** Scouting/ohne Scrims: Spieltyp-Filter ergibt keinen Sinn */
   hideLabel?: boolean;
