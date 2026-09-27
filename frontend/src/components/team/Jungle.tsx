@@ -314,8 +314,8 @@ function PathView({ paths, maxMinutes, shared }: { paths: JunglePath[]; maxMinut
           <RailSection title="Seite">
             <OptionList label="Seite" selected={side} onToggle={setSide} options={[
               { value: "all", label: "Beide Seiten", count: paths.length },
-              { value: "blue", label: "Blau", count: paths.filter((p) => p.side === "blue").length },
-              { value: "red", label: "Rot", count: paths.filter((p) => p.side === "red").length },
+              { value: "blue", label: "Blue", count: paths.filter((p) => p.side === "blue").length },
+              { value: "red", label: "Red", count: paths.filter((p) => p.side === "red").length },
             ]} />
           </RailSection>
           <RailSection title="Zeitraum">
@@ -361,7 +361,7 @@ function PathView({ paths, maxMinutes, shared }: { paths: JunglePath[]; maxMinut
         <>
           {hovered ? (
             <>
-              {dt(hovered.date)} · {champion(hovered.champion_id).name} · {hovered.side === "blue" ? "Blau" : "Rot"} ·{" "}
+              {dt(hovered.date)} · {champion(hovered.champion_id).name} · {hovered.side === "blue" ? "Blue" : "Red"} ·{" "}
               {hovered.win ? "Sieg" : "Niederlage"}
               {hovered.jungle_cs?.length > 0 && (
                 <> · {fullClears.get(hovered.match_id) != null
@@ -378,8 +378,8 @@ function PathView({ paths, maxMinutes, shared }: { paths: JunglePath[]; maxMinut
       side={(
         <>
           <div className="row small">
-            <span className="legend-dot" style={{ background: SIDE_COLOR.blue }} /> Blaue Seite
-            <span className="legend-dot" style={{ background: SIDE_COLOR.red }} /> Rote Seite
+            <span className="legend-dot" style={{ background: SIDE_COLOR.blue }} /> Blue Side
+            <span className="legend-dot" style={{ background: SIDE_COLOR.red }} /> Red Side
           </div>
         <div className="kpis">
           <div className="kpi">

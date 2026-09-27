@@ -36,7 +36,7 @@ export function MatchPage() {
       {[match.blue, match.red].map((side) => (
         <section className="card" key={side.team_id}>
           <div className={`team-strip ${side.side}`}>
-            <span>{side.side === "blue" ? "Blaues" : "Rotes"} Team · {side.win ? "Sieg" : "Niederlage"}</span>
+            <span>{side.side === "blue" ? "Blue" : "Red"} Side · {side.win ? "Sieg" : "Niederlage"}</span>
             <span className="nowrap">
               {side.kills} Kills · {side.towers} Türme · {side.dragons} Drachen · {side.barons} Barone · {side.grubs} Grubs
             </span>

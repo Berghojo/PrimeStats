@@ -8,7 +8,7 @@ export const ResultBadge = ({ win }: { win: boolean }) => (
 );
 
 export const SideBadge = ({ side }: { side: Side }) => (
-  <span className={`badge ${side}`}>{side === "blue" ? "Blau" : "Rot"}</span>
+  <span className={`badge ${side}`}>{side === "blue" ? "Blue" : "Red"}</span>
 );
 
 export const TournamentBadge = ({ code }: { code: boolean }) =>

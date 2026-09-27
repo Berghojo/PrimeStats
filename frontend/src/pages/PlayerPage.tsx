@@ -62,7 +62,7 @@ function GameRow({ g, puuid, on, onToggle }: { g: PlayerGame; puuid: string; on:
         <b>{QUEUE_LABEL[g.queue]}</b>
         <span>{dt(g.date)}</span>
         <span>{g.win ? "Sieg" : "Niederlage"} · {duration(g.duration)}</span>
-        <span>Patch {g.patch} · {g.side === "blue" ? "Blau" : "Rot"}</span>
+        <span>Patch {g.patch} · {g.side === "blue" ? "Blue" : "Red"}</span>
       </div>
       <div className="mh-champ">
         <ChampIcon id={g.champion_id} size="lg" />

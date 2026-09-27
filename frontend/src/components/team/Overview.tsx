@@ -8,8 +8,8 @@ export function OverviewKpis({ ov }: { ov: OverviewData }) {
     <section className="kpis">
       <Kpi label="Spiele" value={ov.games} hint={`${ov.wins} S · ${ov.losses} N`} />
       <Kpi label="Winrate" value={pct(ov.winrate)} meter={ov.winrate} />
-      <Kpi label="Blau" value={pct(ov.blue_winrate)} hint={`${ov.blue_wins}/${ov.blue_games} Siege`} meter={ov.blue_winrate} />
-      <Kpi label="Rot" value={pct(ov.red_winrate)} hint={`${ov.red_wins}/${ov.red_games} Siege`} meter={ov.red_winrate} />
+      <Kpi label="Blue" value={pct(ov.blue_winrate)} hint={`${ov.blue_wins}/${ov.blue_games} Siege`} meter={ov.blue_winrate} />
+      <Kpi label="Red" value={pct(ov.red_winrate)} hint={`${ov.red_wins}/${ov.red_games} Siege`} meter={ov.red_winrate} />
       <Kpi label="Ø Spieldauer" value={duration(ov.duration)}
         hint={`Siege ${duration(ov.duration_win)} · Niederl. ${duration(ov.duration_loss)}`} />
       <Kpi label="Ø Kills / Tode" value={`${num(ov.kills)} / ${num(ov.deaths)}`} />

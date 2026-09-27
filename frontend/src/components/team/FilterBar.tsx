@@ -23,8 +23,8 @@ export function FilterBar({ filters, patches, onChange, onReset, hideLabel }: Pr
       <label className="field">Seite
         <select value={filters.side} onChange={(e) => onChange({ side: e.target.value as Filters["side"] })}>
           <option value="all">Beide</option>
-          <option value="blue">Blau</option>
-          <option value="red">Rot</option>
+          <option value="blue">Blue</option>
+          <option value="red">Red</option>
         </select>
       </label>
       <label className="field">Patch
