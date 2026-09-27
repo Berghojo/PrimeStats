@@ -90,3 +90,27 @@ def test_champion_on_several_roles_is_one_row(service, synced_team):
     assert len(rows) == 1
     assert {p["position"] for p in rows[0]["positions"]} == {a.position, b.position}
     assert {p["name"] for p in rows[0]["players"]} == {a.name, b.name}
+
+
+def test_jungle_pathing_and_kill_locations(service, synced_team, demo_source):
+    records = service.team_records(synced_team)
+    jungle = build_report(synced_team, records)["jungle"]
+    with_tl = [r for r in records if r.timeline]
+    assert [p["name"] for p in jungle["players"]] == ["NLE Waldgeist"]
+    assert len(jungle["paths"]) == len(with_tl)
+    path = jungle["paths"][0]
+    assert len(path["points"]) == jungle["path_minutes"] + 1 and all(len(pt) == 2 for pt in path["points"])
+
+    # jedes Ereignis passt zu einem CHAMPION_KILL der Timeline, an dem der Jungler beteiligt war
+    waldgeist = demo_source.account("NLE Waldgeist#EUW")["puuid"]
+    for ev in jungle["events"][:30]:
+        raw = demo_source.timelines[ev["match_id"]]
+        pid = next(p.participant_id for p in service.match(ev["match_id"]).participants if p.puuid == waldgeist)
+        kills = [e for f in raw["info"]["frames"] for e in f["events"] if e["type"] == "CHAMPION_KILL"
+                 and e["position"] == {"x": ev["x"], "y": ev["y"]}]
+        assert kills
+        k = kills[0]
+        expected = ("kill" if k["killerId"] == pid else "assist" if pid in k["assistingParticipantIds"]
+                    else "death")
+        assert ev["type"] == expected and 0 <= ev["x"] <= 15000
+    assert {e["type"] for e in jungle["events"]} == {"kill", "assist", "death"}

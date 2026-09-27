@@ -132,6 +132,13 @@ class Store:
         with self.session() as s:
             return s.scalar(select(Timeline.data).where(Timeline.match_id == match_id))
 
+    def timeline_ids(self, match_ids: list[str]) -> set[str]:
+        """Welche der Spiele haben eine gespeicherte Timeline?"""
+        if not match_ids:
+            return set()
+        with self.session() as s:
+            return set(s.scalars(select(Timeline.match_id).where(Timeline.match_id.in_(match_ids))))
+
     def put_timeline(self, match_id: str, data: dict) -> None:
         stmt = insert(Timeline).values(match_id=match_id, data=data)
         stmt = stmt.on_conflict_do_update(index_elements=[Timeline.match_id], set_={"data": data})

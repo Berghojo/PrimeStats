@@ -60,6 +60,65 @@ def _level(xp: float) -> int:
     return max(i + 1 for i, need in enumerate(XP_LEVELS) if xp >= need)
 
 
+# ------------------------------------------------------------------ Positionen
+#: Camps der blauen Seite (Kartenkoordinaten, Ursprung unten links); die rote Seite ist gespiegelt
+_CAMPS = {"red": (7860, 4110), "krugs": (8400, 2730), "raptors": (6940, 5420), "wolves": (3780, 6500),
+          "blue": (3870, 7900), "gromp": (2110, 8370)}
+_SCUTTLE = {"top": (4400, 9700), "bot": (10450, 5150)}
+_ROUTES = [
+    ["red", "krugs", "raptors", "wolves", "blue", "gromp"],
+    ["blue", "gromp", "wolves", "raptors", "red", "krugs"],
+    ["red", "raptors", "wolves", "blue", "gromp"],
+    ["blue", "wolves", "raptors", "red", "krugs"],
+]
+_LANES = {"TOP": (2300, 12300), "MIDDLE": (7400, 7400), "BOTTOM": (12400, 2300), "UTILITY": (12100, 2700)}
+_MAP = 14820
+
+
+def _mirror(point: tuple[int, int], team_id: int) -> tuple[int, int]:
+    return point if team_id == 100 else (_MAP - point[0], _MAP - point[1])
+
+
+def _clamp(v: float) -> int:
+    return int(max(300, min(_MAP - 300, v)))
+
+
+def demo_position(match_id: str, pid: int, team_id: int, pos: str, minute: int) -> dict:
+    """Plausible Position: Junglers laufen früh ihre Camps ab und ganken dann, alle anderen stehen auf Lane."""
+    rng = random.Random(f"{match_id}:{pid}:{minute}")
+    route_rng = random.Random(f"{match_id}:{pid}")
+    if minute == 0:
+        x, y = _mirror((600, 600), team_id)
+    elif pos == "JUNGLE":
+        route = route_rng.choice(_ROUTES)
+        stops = [_mirror(_CAMPS[c], team_id) for c in route]
+        stops.append(_SCUTTLE[route_rng.choice(["top", "bot"])])
+        gank = route_rng.choice(["TOP", "MIDDLE", "BOTTOM"])
+        step = minute * 2 - 2  # Minute 1: am ersten Camp
+        if step < len(stops):
+            x, y = stops[step]
+        elif minute <= 6:
+            x, y = _LANES[gank]
+        else:  # danach: eigener Jungle, Fluss oder eine Lane
+            target = rng.choice([_mirror(_CAMPS[rng.choice(list(_CAMPS))], team_id), *_SCUTTLE.values(),
+                                 _LANES[rng.choice(["TOP", "MIDDLE", "BOTTOM"])]])
+            x, y = target
+        x, y = x + rng.gauss(0, 350), y + rng.gauss(0, 350)
+    else:
+        lx, ly = _LANES[pos]
+        shift = -700 if team_id == 100 else 700  # Richtung eigener Turm
+        if pos == "TOP":
+            lx, ly = lx + shift * 0.3, ly + shift
+        elif pos in ("BOTTOM", "UTILITY"):
+            lx, ly = lx + shift, ly + shift * 0.3
+        else:
+            lx, ly = lx + shift * 0.7, ly + shift * 0.7
+        if minute > 14 and rng.random() < 0.4:  # Midgame: Gruppieren
+            lx, ly = rng.choice([_LANES["MIDDLE"], *_SCUTTLE.values()])
+        x, y = lx + rng.gauss(0, 700), ly + rng.gauss(0, 700)
+    return {"x": _clamp(x), "y": _clamp(y)}
+
+
 class DemoSource:
     """Erfüllt das MatchSource-Protokoll mit deterministisch generierten Spielen."""
 
@@ -200,6 +259,12 @@ class DemoSource:
             events.append({"type": "CHAMPION_KILL", "timestamp": ts, "killerId": killer[0],
                            "victimId": victim[0], "assistingParticipantIds": helpers})
         events.sort(key=lambda e: e["timestamp"])
+        where = {pid: (team_id, pos) for pid, _, team_id, pos, _ in lineup}
+        for e in events:  # Kill-Ort: dort, wo das Opfer in dieser Minute stand
+            team_id, pos = where[e["victimId"]]
+            spot = demo_position(match_id, e["victimId"], team_id, pos, max(1, round(e["timestamp"] / 60000)))
+            jitter = random.Random(f"{match_id}:{e['timestamp']}")
+            e["position"] = {"x": _clamp(spot["x"] + jitter.gauss(0, 400)), "y": _clamp(spot["y"] + jitter.gauss(0, 400))}
         for e in events:
             kda[e["killerId"]][0] += 1
             kda[e["victimId"]][1] += 1
@@ -282,6 +347,8 @@ class DemoSource:
                                     "totalDamageTaken": int(max(0, dmg * rng.uniform(0.8, 1.4)))},
                     "position": {"x": rng.randint(500, 14000), "y": rng.randint(500, 14000)},
                 }
+                # die zufälligen Werte oben bleiben, damit alle übrigen Demo-Daten gleich bleiben
+                pframes[str(pid)]["position"] = demo_position(match_id, pid, team_id, pos, t)
             frames.append({"timestamp": t * 60000 + (seconds * 1000 if t == minutes else 0),
                            "participantFrames": pframes, "events": []})
         for e in events:

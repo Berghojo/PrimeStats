@@ -355,6 +355,41 @@ class TrendPoint(BaseModel):
     deaths: int
 
 
+class JunglePlayer(BaseModel):
+    puuid: str
+    name: str
+    games: int
+
+
+class JunglePath(BaseModel):
+    match_id: str
+    date: datetime
+    win: bool
+    side: Literal["blue", "red"]
+    puuid: str
+    champion_id: int
+    #: Position je Minute (Kartenkoordinaten 0–15000), None wenn unbekannt
+    points: list[list[int] | None]
+
+
+class JungleEvent(BaseModel):
+    match_id: str
+    win: bool
+    side: Literal["blue", "red"]
+    puuid: str
+    type: Literal["kill", "assist", "death"]
+    t: int   # Sekunden
+    x: int
+    y: int
+
+
+class Jungle(BaseModel):
+    players: list[JunglePlayer] = []
+    paths: list[JunglePath] = []
+    events: list[JungleEvent] = []
+    path_minutes: int = 15
+
+
 class Report(BaseModel):
     overview: Overview
     players: list[PlayerReport]
@@ -366,6 +401,7 @@ class Report(BaseModel):
     monsters: list[MonsterStat]
     gold_curves: dict[str, Curve]
     trend: list[TrendPoint]
+    jungle: Jungle = Jungle()
 
 
 class HistoryRow(BaseModel):

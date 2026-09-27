@@ -9,6 +9,7 @@ import { GamesTable } from "./GamesTable";
 import { ObjectivesCard, OverviewKpis } from "./Overview";
 import { PlayersTable } from "./PlayersTable";
 import { ChampionTable } from "./ChampionTable";
+import { JungleCard } from "./Jungle";
 import { ChampionPools, DraftCards } from "./Pools";
 
 const DEFAULT_FILTERS: Filters = { label: "all", side: "all", patch: "", last: 0 };
@@ -89,6 +90,7 @@ export function ReportBody({ data, refreshing, teamId, editable = false, hideLab
             <ChampionTable rows={report.champion_table} />
             <ChampionPools players={report.players} />
             <DraftCards picks={report.picks} ourBans={report.our_bans} enemyBans={report.enemy_bans} enemyPicks={report.enemy_picks} />
+            {report.jungle && <JungleCard jungle={report.jungle} />}
             {ov.timeline_games > 0 && (
               <section className="card">
                 <h2>Formkurve</h2>

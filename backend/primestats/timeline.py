@@ -8,7 +8,7 @@ from collections import defaultdict
 from .matches import MatchSummary
 
 #: Bei Änderungen am Format der Zusammenfassung erhöhen -> Cache wird neu berechnet
-SUMMARY_VERSION = 1
+SUMMARY_VERSION = 2
 
 RAW_SERIES = ("gold", "current_gold", "xp", "level", "cs", "dmg", "dmg_taken", "kills", "deaths", "assists")
 
@@ -53,7 +53,7 @@ def summarize_timeline(timeline: dict, match: MatchSummary) -> dict:
     players: dict[str, dict] = {}
     for pid, puuid in pid_to_puuid.items():
         players[puuid] = {"pid": pid, "team": team_of.get(pid, 100 if pid <= 5 else 200),
-                          **{k: [] for k in RAW_SERIES}}
+                          **{k: [] for k in RAW_SERIES}, "path": []}
 
     kda = {pid: [0, 0, 0] for pid in pid_to_puuid}
     ev_idx = 0
@@ -86,6 +86,16 @@ def summarize_timeline(timeline: dict, match: MatchSummary) -> dict:
             row["kills"].append(kda[pid][0])
             row["deaths"].append(kda[pid][1])
             row["assists"].append(kda[pid][2])
+            pos = pf.get("position") or {}
+            row["path"].append([int(pos["x"]), int(pos["y"])] if "x" in pos and "y" in pos else None)
+
+    kills = []
+    for e in events:
+        pos = e.get("position") or {}
+        if e.get("type") == "CHAMPION_KILL" and "x" in pos and "y" in pos:
+            kills.append({"t": round(e.get("timestamp", 0) / 1000), "x": int(pos["x"]), "y": int(pos["y"]),
+                          "killer": e.get("killerId", 0), "victim": e.get("victimId", 0),
+                          "assists": list(e.get("assistingParticipantIds") or [])})
 
     objectives = []
     first_blood = None
@@ -101,7 +111,8 @@ def summarize_timeline(timeline: dict, match: MatchSummary) -> dict:
             if victim_team:
                 first_blood = {"t": round(e.get("timestamp", 0) / 60000, 2),
                                "team": 200 if victim_team == 100 else 100}
-    return {"minutes": len(frames), "players": players, "objectives": objectives, "first_blood": first_blood}
+    return {"minutes": len(frames), "players": players, "objectives": objectives, "first_blood": first_blood,
+            "kills": kills}
 
 
 def at(series: list | None, minute: int):

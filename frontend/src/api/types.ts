@@ -249,6 +249,37 @@ export interface Report {
   monsters: MonsterStat[];
   gold_curves: Record<"all" | "win" | "loss", Curve>;
   trend: TrendPoint[];
+  jungle: Jungle;
+}
+
+export interface JunglePath {
+  match_id: string;
+  date: string;
+  win: boolean;
+  side: Side;
+  puuid: string;
+  champion_id: number;
+  /** Position je Minute (Kartenkoordinaten), null wenn unbekannt */
+  points: ([number, number] | null)[];
+}
+
+export interface JungleEvent {
+  match_id: string;
+  win: boolean;
+  side: Side;
+  puuid: string;
+  type: "kill" | "assist" | "death";
+  /** Sekunden */
+  t: number;
+  x: number;
+  y: number;
+}
+
+export interface Jungle {
+  players: { puuid: string; name: string; games: number }[];
+  paths: JunglePath[];
+  events: JungleEvent[];
+  path_minutes: number;
 }
 
 export interface HistoryRow {

@@ -15,6 +15,7 @@ export function useGameData() {
       const c = data?.champions[String(key)];
       return c && data ? `${CDN}/${data.ddragon_version}/img/champion/${c.id}.png` : "";
     },
+    mapUrl: data ? `${CDN}/${data.ddragon_version}/img/map/map11.png` : "",
     position: (p: string) => data?.positions[p] ?? (p || "–"),
     label: (l: string) => data?.labels[l] ?? l,
   };

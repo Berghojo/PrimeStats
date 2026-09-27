@@ -111,6 +111,31 @@ class _PlayerAcc:
         }
 
 
+#: So viele Minuten Pathing werden je Spiel übernommen
+PATH_MINUTES = 15
+
+
+def _jungle(rec: GameRecord, players: dict, paths: list, events: list) -> None:
+    """Pathing und Kill-Beteiligung des eigenen Junglers in einem Spiel (braucht die Timeline)."""
+    tl, us, match = rec.timeline, rec.us, rec.match
+    jungler = next((p for p in us.players if p.position == "JUNGLE"), None)
+    row = tl["players"].get(jungler.puuid) if (jungler and tl) else None
+    if row is None:
+        return
+    pid = row["pid"]
+    acc = players.setdefault(jungler.puuid, {"puuid": jungler.puuid, "name": jungler.name, "games": 0})
+    acc["games"] += 1
+    base = {"match_id": match.match_id, "win": rec.win, "side": us.side, "puuid": jungler.puuid}
+    points = (row.get("path") or [])[:PATH_MINUTES + 1]
+    if any(points):
+        paths.append({**base, "date": match.created, "champion_id": jungler.champion_id, "points": points})
+    for k in tl.get("kills", []):
+        kind = ("kill" if k["killer"] == pid else "assist" if pid in k["assists"]
+                else "death" if k["victim"] == pid else None)
+        if kind:
+            events.append({**base, "type": kind, "t": k["t"], "x": k["x"], "y": k["y"]})
+
+
 def build_report(team: Team, records: list[GameRecord]) -> dict:
     """Berechnet alle Kennzahlen für die übergebenen (bereits gefilterten) Spiele."""
     records = sorted(records, key=lambda r: r.match.created)
@@ -126,6 +151,9 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
     monsters = {key: {"us": 0, "them": 0, "first": 0, "first_times": []} for key in MONSTERS}
     gold_curves: dict[str, list] = {"all": [], "win": [], "loss": []}
     trend = []
+    jungle_players: dict[str, dict] = {}
+    jungle_paths: list[dict] = []
+    jungle_events: list[dict] = []
 
     ov = Counter()
     durations = {"win": [], "loss": []}
@@ -174,6 +202,7 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
             for key, ev in firsts.items():
                 if key in monsters and ev["team"] == rec.side:
                     monsters[key]["first_times"].append(ev["t"])
+            _jungle(rec, jungle_players, jungle_paths, jungle_events)
 
         trend.append({"match_id": match.match_id, "date": match.created, "win": rec.win,
                       "gd15": gd, "kills": us.kills, "deaths": them.kills})
@@ -319,6 +348,8 @@ def build_report(team: Team, records: list[GameRecord]) -> dict:
                      if v["us"] or v["them"]],
         "gold_curves": curves,
         "trend": trend,
+        "jungle": {"players": sorted(jungle_players.values(), key=lambda p: -p["games"]),
+                   "paths": jungle_paths, "events": jungle_events, "path_minutes": PATH_MINUTES},
     }
 
 

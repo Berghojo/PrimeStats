@@ -172,6 +172,8 @@ class PrimeStats:
         ids = [g[0] for g in games]
         raw = self.store.get_matches([mid for mid in ids if not self._is_parsed(mid)])
         summaries = self.store.get_timeline_summaries(ids, SUMMARY_VERSION) if with_timeline else {}
+        # Zusammenfassungen älterer Versionen aus den gespeicherten Timelines neu berechnen
+        stale = self.store.timeline_ids([mid for mid in ids if mid not in summaries]) if with_timeline else set()
         records = []
         for mid, side, label, included, opponent in games:
             try:
@@ -179,7 +181,10 @@ class PrimeStats:
             except RiotAPIError as exc:
                 log.warning("Spiel %s nicht ladbar: %s", mid, exc)
                 continue
-            records.append(GameRecord(match, side, label, included, summaries.get(mid), opponent))
+            summary = summaries.get(mid)
+            if summary is None and mid in stale:
+                summary = self.timeline_summary(match, fetch=False)
+            records.append(GameRecord(match, side, label, included, summary, opponent))
         return records
 
     def _is_parsed(self, match_id: str) -> bool:
