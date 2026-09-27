@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import type { Jungle, JungleEvent, JunglePath, Side } from "../../api/types";
 import { dt, duration } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
-import { type Clear, clearTime, reconstruct } from "../../lib/jungleRoute";
+import { type Clear, firstFullClear, reconstruct } from "../../lib/jungleRoute";
 import { type Point, interpolate, wallPolygons } from "../../lib/navgrid";
 import { InfoTip } from "../InfoTip";
 
@@ -284,14 +284,20 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
   }, [shown, maxMinutes]);
   const hoveredRoute = hovered ? routes.get(hovered.match_id) : undefined;
-  // First-Clear-Tempo: Zeit bis 3 bzw. 6 Camps, zwischen den Minutenwerten interpoliert
+  // Erster Full Clear je Spiel (aus den rekonstruierten Camps, Zeiten interpoliert)
+  const fullClears = useMemo(() => new Map(shown.map((p) => [p.match_id, p.jungle_cs?.length
+    ? firstFullClear(reconstruct(p.points as (Point | null)[], p.jungle_cs, 7, 1, false, p.side).clears, p.side)
+    : null])), [shown]);
   const clearStats = useMemo(() => {
-    const times = (n: number) => shown.map((p) => (p.jungle_cs?.length ? clearTime(p.jungle_cs, n) : null))
-      .filter((t): t is number => t !== null);
-    const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
-    const three = times(3), six = times(6);
-    return { three: avg(three), six: avg(six), fastest: six.length ? Math.min(...six) : null, n: six.length };
-  }, [shown]);
+    const withCs = shown.filter((p) => p.jungle_cs?.length);
+    const times = withCs.map((p) => fullClears.get(p.match_id)).filter((t): t is number => t != null);
+    return {
+      avg: times.length ? times.reduce((a, b) => a + b, 0) / times.length : null,
+      fastest: times.length ? Math.min(...times) : null,
+      share: withCs.length ? times.length / withCs.length : null,
+      n: times.length,
+    };
+  }, [shown, fullClears]);
   const fmt = (t: number | null) => (t === null ? "–" : duration(Math.round(t)));
 
   return (
@@ -353,7 +359,8 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
               {dt(hovered.date)} · {champion(hovered.champion_id).name} · {hovered.side === "blue" ? "Blau" : "Rot"} ·{" "}
               {hovered.win ? "Sieg" : "Niederlage"}
               {hovered.jungle_cs?.length > 0 && (
-                <> · Full Clear {fmt(clearTime(hovered.jungle_cs, 6))}</>
+                <> · {fullClears.get(hovered.match_id) != null
+                  ? <>erster Full Clear {fmt(fullClears.get(hovered.match_id)!)}</> : "kein Full Clear"}</>
               )}
               {!!hoveredRoute?.clears.length && (
                 <><br />Camps: {hoveredRoute.clears.map((c) => `${c.camp.name} (~${duration(c.t)})`).join(" → ")}</>
@@ -369,19 +376,21 @@ function PathView({ paths, maxMinutes, walls }: { paths: JunglePath[]; maxMinute
         </div>
         <div className="kpis">
           <div className="kpi">
-            <div className="label">Ø 3 Camps</div>
-            <div className="value">{fmt(clearStats.three)}</div>
-          </div>
-          <div className="kpi">
             <div className="label">
-              Ø Full Clear
+              Erster Full Clear (Ø)
               <InfoTip>
-                Zeit, bis 6 Camps (24 Jungle-CS) geräumt sind – zwischen den Minutenwerten der Timeline linear
-                interpoliert. Camps spawnen bei 1:30.
+                Ende des allerersten Full Clears: alle 6 eigenen Camps geräumt, bevor ein Camp ein zweites Mal genommen
+                wird, spätestens bis 6:00 (Scuttle und Invades zwischendurch zählen mit). Die Zeit stammt aus dem
+                zwischen den Minutenwerten interpolierten Jungle-CS-Verlauf; Camps spawnen bei 1:30.
               </InfoTip>
             </div>
-            <div className="value">{fmt(clearStats.six)}</div>
-            <div className="hint">schnellster {fmt(clearStats.fastest)} · {clearStats.n} Spiele</div>
+            <div className="value">{fmt(clearStats.avg)}</div>
+            <div className="hint">schnellster {fmt(clearStats.fastest)}</div>
+          </div>
+          <div className="kpi">
+            <div className="label">Full Clear gespielt</div>
+            <div className="value">{clearStats.share === null ? "–" : `${Math.round(clearStats.share * 100)} %`}</div>
+            <div className="hint">{clearStats.n} Spiele · sonst Half Clear / früher Gank</div>
           </div>
         </div>
         <table className="data">

@@ -59,14 +59,38 @@ describe("performance", () => {
   });
 });
 
-describe("first clear timing", async () => {
-  const { clearTime, timeToCs } = await import("./jungleRoute");
-  it("interpolates between minute frames", () => {
-    // 3:00 -> 8 CS, 4:00 -> 20 CS: 16 CS (4 Camps) bei 3:40
+describe("first full clear", async () => {
+  const { timeToCs, firstFullClear } = await import("./jungleRoute");
+  const clear = (key: string, t: number, order: number) => ({ camp: CAMPS.find((c) => c.key === key)!, t, order });
+
+  it("interpolates CS between minute frames", () => {
     const cs = [0, 0, 4, 8, 20, 28];
     expect(timeToCs(cs, 16)).toBe(220);
-    expect(clearTime(cs, 6)).toBe(4 * 60 + 30);   // 24 CS zwischen 20 und 28
-    expect(clearTime(cs, 10)).toBeNull();
-    expect(timeToCs(cs, 0)).toBe(0);
+    expect(timeToCs(cs, 60)).toBeNull();
+  });
+
+  it("is the end of the sixth own camp, scuttle in between is fine", () => {
+    const keys = ["b-red", "b-krugs", "b-raptors", "scuttle-top", "b-wolves", "b-blue", "b-gromp"];
+    const clears = keys.map((k, i) => clear(k, 105 + i * 30, i + 1));
+    expect(firstFullClear(clears, "blue")).toBe(105 + 6 * 30);
+    expect(firstFullClear(clears, "red")).toBeNull();
+  });
+
+  it("half clear into gank or a repeated camp is no full clear", () => {
+    const half = ["b-red", "b-krugs", "b-raptors"].map((k, i) => clear(k, 105 + i * 30, i + 1));
+    expect(firstFullClear(half, "blue")).toBeNull();
+    const repeat = ["b-red", "b-krugs", "b-raptors", "b-red", "b-wolves", "b-blue", "b-gromp"]
+      .map((k, i) => clear(k, 105 + i * 30, i + 1));
+    expect(firstFullClear(repeat, "blue")).toBeNull();
+  });
+
+  it("works on a reconstructed route", () => {
+    const route = ["b-red", "b-krugs", "b-raptors", "b-wolves", "b-blue", "b-gromp"];
+    const pts = [null, camp(route[0]), camp(route[1]), camp(route[3]), camp(route[5])];
+    const { clears } = reconstruct(pts, [0, 0, 8, 16, 24], 4, 1, false, "blue");
+    const t = firstFullClear(clears, "blue");
+    expect(t).not.toBeNull();
+    expect(t!).toBeGreaterThan(180);
+    expect(t!).toBeLessThanOrEqual(240);
   });
 });

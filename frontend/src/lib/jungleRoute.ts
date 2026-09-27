@@ -80,8 +80,25 @@ export function timeToCs(jungleCs: number[], target: number): number | null {
   return null;
 }
 
-/** Dauer bis zu n geräumten Camps (z.B. 6 = Full Clear) */
-export const clearTime = (jungleCs: number[], camps: number) => timeToCs(jungleCs, camps * CS_PER_CAMP);
+/** Spätester Zeitpunkt, bis zu dem der erste Clear als Full Clear zählt (Sekunden) */
+export const FULL_CLEAR_LIMIT = 360;
+
+/**
+ * Ende des allerersten Full Clears: alle 6 eigenen Camps geräumt, bevor irgendein Camp ein zweites Mal
+ * genommen wird (Scuttle und Invades zwischendurch sind erlaubt) und bis 6:00. Sonst null (z.B. Half Clear
+ * mit anschließendem Gank). Die Zeiten der Camps stammen aus dem interpolierten CS-Verlauf.
+ */
+export function firstFullClear(clears: Clear[], side: "blue" | "red"): number | null {
+  const own = new Set<string>();
+  const seen = new Set<string>();
+  for (const c of clears) {
+    if (c.t > FULL_CLEAR_LIMIT || seen.has(c.camp.key)) return null;
+    seen.add(c.camp.key);
+    if (c.camp.side === side) own.add(c.camp.key);
+    if (own.size === 6) return c.t;
+  }
+  return null;
+}
 
 /** Camp-Reihenfolge mit kürzestem Weg a -> c1 -> … -> ck -> b (Brute Force, k ist klein) */
 function bestOrder(a: Point, b: Point, candidates: number[], k: number, side?: "blue" | "red"): number[] {
