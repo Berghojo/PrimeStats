@@ -42,9 +42,11 @@ interface Props {
   hideLabelFilter?: boolean;
   noTimelineHint?: string;
   focus?: string[];
+  /** Zeitverlauf direkt im Report statt auf einer eigenen Seite */
+  inlineTimeline?: boolean;
 }
 
-export function ReportBody({ data, refreshing, teamId, editable = false, hideLabelFilter, noTimelineHint, focus }: Props) {
+export function ReportBody({ data, refreshing, teamId, editable = false, hideLabelFilter, noTimelineHint, focus, inlineTimeline }: Props) {
   const [, setFilters, resetFilters] = useUrlFilters();
   const { report, history } = data;
   const ov = report.overview;
@@ -94,7 +96,8 @@ export function ReportBody({ data, refreshing, teamId, editable = false, hideLab
             )}
           </>
         )}
-        <GamesTable teamId={teamId} history={history} editable={editable} focus={focus} showOpponent={teamId !== undefined} />
+        <GamesTable teamId={teamId} history={history} editable={editable} focus={focus} showOpponent={teamId !== undefined}
+          inlineTimeline={inlineTimeline} />
       </div>
     </>
   );

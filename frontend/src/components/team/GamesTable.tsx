@@ -6,6 +6,7 @@ import type { HistoryRow, Label } from "../../api/types";
 import { dt, duration, signed, tone } from "../../lib/format";
 import { useGameData } from "../../lib/meta";
 import { ChampIcon } from "../ChampIcon";
+import { InlineTimeline } from "../TimelineChart";
 import { SelectionBar, toggle } from "../SelectionBar";
 import { ResultBadge, SideBadge } from "../ui";
 
@@ -17,6 +18,8 @@ interface Props {
   focus?: string[];
   /** Spalte mit von Hand eingetragenem Gegner (nur eigene Teamansicht) */
   showOpponent?: boolean;
+  /** Zeitverlauf der markierten Spiele direkt über der Tabelle anzeigen (Scouting) */
+  inlineTimeline?: boolean;
 }
 
 function OpponentInput({ value, onSave }: { value: string; onSave: (v: string) => void }) {
@@ -35,7 +38,7 @@ function OpponentInput({ value, onSave }: { value: string; onSave: (v: string) =
   );
 }
 
-export function GamesTable({ teamId, history, editable, focus, showOpponent = false }: Props) {
+export function GamesTable({ teamId, history, editable, focus, showOpponent = false, inlineTimeline = false }: Props) {
   const { meta, label } = useGameData();
   const updateGame = useUpdateTeamGame(teamId ?? 0);
   const initial = () => new Set(history.filter((r) => r.selected).slice(0, 10).map((r) => r.match_id));
@@ -45,6 +48,8 @@ export function GamesTable({ teamId, history, editable, focus, showOpponent = fa
   useEffect(() => setSelected(initial()), [filterKey]);
 
   return (
+    <>
+    {inlineTimeline && <InlineTimeline ids={[...selected]} focus={focus} />}
     <section className="card">
       <h2>Spiele</h2>
       <div className="sub">
@@ -109,9 +114,11 @@ export function GamesTable({ teamId, history, editable, focus, showOpponent = fa
         team={teamId}
         focus={focus}
         showFiltered
+        inline={inlineTimeline}
         onSelect={(mode) =>
           setSelected(new Set(mode === "none" ? [] : history.filter((r) => mode === "all" || r.selected).map((r) => r.match_id)))}
       />
     </section>
+    </>
   );
 }

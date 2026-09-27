@@ -83,7 +83,7 @@ export function ScoutReportPage() {
         </div>
         {restart.error && <ErrorBox error={restart.error} />}
       </section>
-      <ReportBody data={data} refreshing={report.isFetching} hideLabelFilter focus={data.roster.map((r) => r.puuid)}
+      <ReportBody data={data} refreshing={report.isFetching} hideLabelFilter focus={data.roster.map((r) => r.puuid)} inlineTimeline
         noTimelineHint="Für diese Spiele sind keine Timeline-Daten verfügbar." />
     </>
   );

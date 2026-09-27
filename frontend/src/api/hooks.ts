@@ -25,6 +25,7 @@ export const useAnalysis = (ids: string[], focus: string[], team?: number) =>
     queryKey: ["analysis", ids, focus, team],
     queryFn: () => api<Analysis>("/analysis", { query: { m: ids, focus, team } }),
     enabled: ids.length > 0,
+    placeholderData: keepPreviousData,
   });
 
 export const useTeams = () => useQuery({ queryKey: ["teams"], queryFn: () => api<Team[]>("/teams") });

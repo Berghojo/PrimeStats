@@ -8,9 +8,11 @@ interface Props {
   focus?: string[];
   team?: number;
   showFiltered?: boolean;
+  /** Zeitverlauf wird direkt auf der Seite angezeigt – kein Wechsel zur Analyse-Seite */
+  inline?: boolean;
 }
 
-export function SelectionBar({ selected, onSelect, focus, team, showFiltered }: Props) {
+export function SelectionBar({ selected, onSelect, focus, team, showFiltered, inline }: Props) {
   const navigate = useNavigate();
   const analyse = () => navigate(`/analysis${buildQuery({ m: [...selected], focus, team })}`);
   return (
@@ -19,9 +21,13 @@ export function SelectionBar({ selected, onSelect, focus, team, showFiltered }: 
       <button type="button" className="btn small" onClick={() => onSelect("all")}>Alle</button>
       <button type="button" className="btn small" onClick={() => onSelect("none")}>Keine</button>
       <span className="muted"><b>{selected.size}</b> ausgewählt</span>
-      <button type="button" className="btn primary push" disabled={selected.size === 0} onClick={analyse}>
-        Zeitverlauf analysieren →
-      </button>
+      {inline ? (
+        <span className="muted small push">Zeitverlauf oben aktualisiert sich mit der Auswahl.</span>
+      ) : (
+        <button type="button" className="btn primary push" disabled={selected.size === 0} onClick={analyse}>
+          Zeitverlauf analysieren →
+        </button>
+      )}
     </div>
   );
 }
