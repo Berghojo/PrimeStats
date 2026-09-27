@@ -79,3 +79,13 @@ def test_link_code_brute_force_is_limited(client, demo_source):
     body = {"code": "AAAA-AAAA", "puuid": polaris["puuid"], "game_name": "x", "tag_line": "EUW"}
     codes = [client.post("/api/uploader/link", json=body).status_code for _ in range(11)]
     assert codes[:10] == [400] * 10 and codes[10] == 429
+
+
+def test_register_with_email_address(client):
+    me = register(client, "berghoff.joshua@gmail.com")
+    assert me["user"]["username"] == "berghoff.joshua@gmail.com"
+    client.post("/api/auth/logout")
+    resp = client.post("/api/auth/login", json={"username": " Berghoff.Joshua@Gmail.com ", "password": "geheim123"})
+    assert resp.status_code == 200
+    assert client.post("/api/auth/register", json={"username": "a b@c.de", "password": "geheim123"}).status_code == 422
+    assert client.post("/api/auth/register", json={"username": "x" * 65, "password": "geheim123"}).status_code == 422

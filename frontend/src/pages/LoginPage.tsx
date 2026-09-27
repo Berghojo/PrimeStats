@@ -39,9 +39,9 @@ export function LoginPage() {
         </div>
         {(localError || action.error) && <ErrorBox error={localError || action.error} />}
         <form className="stack" onSubmit={submit}>
-          <label className="field">Benutzername
-            <input className="input" autoComplete="username" required minLength={3} maxLength={32}
-              pattern="[A-Za-z0-9_.\-]{3,32}" title="3–32 Zeichen: Buchstaben, Ziffern, _ . -"
+          <label className="field">Benutzername oder E-Mail
+            <input className="input" autoComplete="username" required minLength={3} maxLength={64}
+              pattern="\s*[A-Za-z0-9_.+@\-]{3,64}\s*" title="3–64 Zeichen: Buchstaben, Ziffern und _ . - + @ (z.B. deine E-Mail-Adresse)"
               value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
           </label>
           <label className="field">Passwort

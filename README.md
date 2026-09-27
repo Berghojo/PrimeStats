@@ -65,7 +65,7 @@ abrufbar; „Neu scouten“ aktualisiert sie.
 
 ## Konten und Riot-Verknüpfung
 
-Auf der Website legt man ein **Konto** an (Benutzername + Passwort). Ein Riot-Account wird **über den
+Auf der Website legt man ein **Konto** an (Benutzername oder E-Mail-Adresse + Passwort). Ein Riot-Account wird **über den
 Uploader** mit dem Konto verknüpft – nur wer im League Client mit dem Account eingeloggt ist, kann ihn
 verknüpfen:
 

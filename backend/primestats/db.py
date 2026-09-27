@@ -111,9 +111,9 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(String(32))
+    username: Mapped[str] = mapped_column(String(64))
     #: lower-case Benutzername für eindeutige Anmeldung
-    username_key: Mapped[str] = mapped_column(String(32), unique=True)
+    username_key: Mapped[str] = mapped_column(String(64), unique=True)
     password_hash: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

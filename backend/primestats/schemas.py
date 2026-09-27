@@ -403,16 +403,28 @@ class TeamReportOut(BaseModel):
 
 
 # ------------------------------------------------------------ Konten
-_USERNAME = r"^[A-Za-z0-9_.\-]{3,32}$"
+#: Benutzername oder E-Mail-Adresse (wird nur als Anmeldename genutzt, nicht verifiziert)
+_USERNAME = r"^[A-Za-z0-9_.+@\-]{3,64}$"
 
 
 class RegisterIn(BaseModel):
-    username: str = Field(pattern=_USERNAME, description="3–32 Zeichen: Buchstaben, Ziffern, _ . -")
+    username: str = Field(pattern=_USERNAME,
+                          description="3–64 Zeichen: Buchstaben, Ziffern, _ . - + @ (z.B. E-Mail-Adresse)")
+
+    @field_validator("username", mode="before")
+    @classmethod
+    def _strip_username(cls, value):
+        return value.strip() if isinstance(value, str) else value
     password: str = Field(min_length=8, max_length=200)
 
 
 class LoginIn(BaseModel):
-    username: str = Field(max_length=32)
+    username: str = Field(max_length=64)
+
+    @field_validator("username", mode="before")
+    @classmethod
+    def _strip_login(cls, value):
+        return value.strip() if isinstance(value, str) else value
     password: str = Field(max_length=200)
 
 
