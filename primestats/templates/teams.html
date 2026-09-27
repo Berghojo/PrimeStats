@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Teams{% endblock %}
+{% block content %}
+<section class="row between">
+  <div>
+    <h1>Teams</h1>
+    <div class="muted">Aggregierte Statistiken aus gemeinsamen Custom Games (Prime League &amp; Scrims).</div>
+  </div>
+  <a class="btn primary" href="{{ url_for('main.team_new') }}">+ Team anlegen</a>
+</section>
+{% if teams %}
+  <div class="grid three">{% for team in teams %}{% include "_team_card.html" %}{% endfor %}</div>
+{% else %}
+  <div class="card empty">Noch keine Teams angelegt.</div>
+{% endif %}
+{% endblock %}

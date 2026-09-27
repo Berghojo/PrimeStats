@@ -1,43 +1,15 @@
-from flask import Flask, render_template, request, session
-from collections import namedtuple
-import requests
-from utils import *
-from collect_games import *
-from dotenv import load_dotenv
+"""Startpunkt: ``python main_page.py`` (oder ``flask --app main_page run``)."""
+
 import os
-import secrets
-from flask_session import Session
 
+from dotenv import load_dotenv
 
-app = Flask(__name__)
+load_dotenv()
 
-@app.route("/")
-def start():
-    return render_template("index.html")
+from primestats import create_app  # noqa: E402  (nach load_dotenv, damit .env greift)
 
-
-@app.route("/search")
-def search():
-    q = request.args.get("q")
-    assert type(q) is str and len(q) > 0 and len(q) < 20
-    if "#" in q:
-        games, game_stats = get_by_name(q)
-
-
-    games = list(games.values())
-    return render_template("games.html", games=games)
-
-
-@app.route("/data")
-def data_aggregator():
-    gameIds = json.loads(request.args.get("gameIds"))
-    stats, player_data = get_game_stats(gameIds)
-    stats = dataframe_to_google_chart(stats)
-    return render_template("stats.html", stats=stats, players=player_data.to_dict(orient='records'))
+app = create_app()
 
 if __name__ == "__main__":
-    load_dotenv()
-
-    app.secret_key = os.getenv("SECRET_KEY")
-    app.jinja_env.filters['zip'] = zip
-    app.run(debug=True)
+    app.run(host=os.getenv("HOST", "127.0.0.1"), port=int(os.getenv("PORT", "5000")),
+            debug=os.getenv("FLASK_DEBUG", "0") == "1")

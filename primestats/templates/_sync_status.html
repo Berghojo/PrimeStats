@@ -1,0 +1,21 @@
+<div id="sync" class="sync-box"
+     {% if job and job.status == 'running' %}hx-get="{{ url_for('main.team_sync_status', team_id=team.id) }}" hx-trigger="every 1s" hx-swap="outerHTML"{% endif %}>
+  {% if job and job.status == 'running' %}
+    <div class="spinner"></div>
+    <div>
+      <div>{{ job.message }}</div>
+      <div class="progress"><span style="width: {{ job.percent }}%"></span></div>
+    </div>
+  {% else %}
+    <button class="btn primary" hx-post="{{ url_for('main.team_sync', team_id=team.id) }}" hx-target="#sync" hx-swap="outerHTML">
+      ⟳ Custom Games synchronisieren
+    </button>
+    {% if job and job.status == 'error' %}
+      <span class="neg">{{ job.message }} {{ job.error }}</span>
+    {% elif job and job.status == 'done' %}
+      <span class="pos">{{ job.message }}</span>
+    {% elif team.last_synced %}
+      <span class="muted small">Neue Spiele werden über die Spiellisten aller Mitglieder gesucht.</span>
+    {% endif %}
+  {% endif %}
+</div>
