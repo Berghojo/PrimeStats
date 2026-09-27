@@ -112,7 +112,7 @@ Schnittstelle (LCU-API). Der Uploader liest sie dort aus:
 1. `PrimeStats-Uploader.exe` herunterladen (GitHub → Releases bzw. Actions-Artefakt „PrimeStats-Uploader“),
    League Client starten und einloggen, Uploader starten.
 2. Beim ersten Start mit einem Riot-Account: Code von der Website eingeben (siehe oben).
-3. Das Tool liest die Match-History (standardmäßig die letzten 200 Spiele), fragt den Server, welche
+3. Das Tool liest die Match-History, fragt den Server, welche
    Custom Games schon bekannt sind, und lädt nur neue Spiele samt Timeline hoch. Der Server nimmt nur
    Spiele an, in denen einer der verknüpften Riot-Accounts mitgespielt hat, und ordnet sie automatisch
    allen passenden Teams zu (Label „Scrim“).
@@ -120,6 +120,12 @@ Schnittstelle (LCU-API). Der Uploader liest sie dort aus:
 Die Server-Adresse ist fest in die EXE eingebaut: Die GitHub-Action `uploader.yml` setzt dafür die
 Repository-Variable `PRIMESTATS_SERVER_URL` ein (Settings → Secrets and variables → Actions → Variables).
 Bei einem Tag `uploader-v*` hängt sie die EXE an ein Release.
+
+**Wichtig:** Der League Client gibt nur die **letzten ~20 Spiele** heraus (ältere Seiten der History liefert er
+nicht). Deshalb gibt es den Watch-Modus: `PrimeStats-Uploader.exe --watch` läuft im Hintergrund, prüft jede
+Minute die History und lädt neue Custom Games direkt nach Spielende hoch. `--autostart on` legt eine
+Verknüpfung im Windows-Autostart an (`--autostart off` entfernt sie). Nicht verknüpfte Riot-Accounts werden im
+Watch-Modus übersprungen – verknüpft wird mit einem normalen Start.
 
 Ein Teammitglied reicht, wenn es bei (fast) allen Scrims dabei ist – jedes Spiel enthält alle 10 Spieler.
 Doppelte Uploads werden erkannt; fehlende Timelines werden bei einem späteren Upload ergänzt. Die Rohdaten

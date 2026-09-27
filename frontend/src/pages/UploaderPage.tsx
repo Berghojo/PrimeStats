@@ -55,8 +55,9 @@ export function UploaderPage() {
             die es verpasst hat, kann jedes andere Mitglied zusätzlich hochladen; doppelte Spiele werden erkannt.
           </p>
           <p className="muted small">
-            Der Client hält nur eine begrenzte Match-History vor. Am besten nach jedem Scrim-Abend oder mindestens einmal pro
-            Woche hochladen, damit keine Spiele herausrutschen.
+            Der Client gibt nur die letzten ~20 Spiele heraus. Damit keine Scrims herausrutschen, das Tool am besten im
+            Hintergrund laufen lassen: <code>PrimeStats-Uploader.exe --watch</code> lädt neue Custom Games direkt nach
+            Spielende hoch, <code>--autostart on</code> startet das automatisch mit Windows.
           </p>
         </div>
       </section>

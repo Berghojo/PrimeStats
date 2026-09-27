@@ -9,6 +9,10 @@ Benutzung: League Client starten und einloggen, dann ``PrimeStats-Uploader.exe``
 Beim ersten Start mit einem Riot-Account fragt das Tool nach einem Verknüpfungscode, den man auf der
 PrimeStats-Website (Konto → „Riot-Account verknüpfen“) erzeugt. Damit wird der im Client eingeloggte
 Riot-Account dem PrimeStats-Konto zugeordnet; danach lädt das Tool ohne weitere Eingaben hoch.
+
+Der Client gibt nur die letzten ~20 Spiele heraus. Damit keine Scrims verloren gehen, kann das Tool mit
+``--watch`` im Hintergrund laufen und neue Custom Games direkt nach Spielende hochladen
+(``--autostart on`` startet es dafür automatisch mit Windows).
 """
 
 from __future__ import annotations
@@ -29,11 +33,14 @@ from pathlib import Path
 import requests
 import urllib3
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 #: Feste Server-Adresse – wird beim Bauen der EXE über PRIMESTATS_SERVER_URL eingesetzt
 DEFAULT_SERVER = "__PRIMESTATS_SERVER_URL__"
 CONFIG_NAME = "primestats-uploader.ini"
 HISTORY_PAGE = 20
+#: Abfrageintervall im Watch-Modus (Sekunden)
+WATCH_INTERVAL = 60
+AUTOSTART_NAME = "PrimeStats-Uploader.cmd"
 UPLOAD_BATCH = 5
 
 DEFAULT_LOCKFILES = [
@@ -190,22 +197,22 @@ class LeagueClient:
 
     def history(self, max_games: int) -> list[dict]:
         """Einträge der eigenen Match-History (neueste zuerst)."""
+        # Aktuelle Clients liefern nur die letzten ~20 Spiele und ignorieren ältere Seiten;
+        # sobald eine Seite nichts Neues bringt, ist Schluss.
+        seen: set = set()
         games: list[dict] = []
         start = 0
         while start < max_games:
             page = self.get("/lol-match-history/v1/products/lol/current-summoner/matches",
                             begIndex=start, endIndex=start + HISTORY_PAGE)
             batch = ((page or {}).get("games") or {}).get("games") or []
-            if not batch:
+            new = [g for g in batch if g.get("gameId") not in seen]
+            if not new:
                 break
-            games.extend(batch)
+            seen.update(g.get("gameId") for g in new)
+            games.extend(new)
             start += HISTORY_PAGE
-        seen, unique = set(), []
-        for g in games:
-            if g.get("gameId") not in seen:
-                seen.add(g.get("gameId"))
-                unique.append(g)
-        return unique[:max_games]
+        return games[:max_games]
 
     def game(self, game_id: int) -> dict | None:
         return self.get(f"/lol-match-history/v1/games/{game_id}")
@@ -278,12 +285,12 @@ class Summary:
 
 
 def run(client: LeagueClient, server: Server | None, max_games: int, out: Path | None = None,
-        log=print) -> Summary:
+        log=print, history: list[dict] | None = None) -> Summary:
     summary = Summary(assigned={})
-    me = client.current_summoner()
-    log(f"Eingeloggt als {me.get('gameName') or me.get('displayName')}#{me.get('tagLine', '')}")
-
-    history = client.history(max_games)
+    if history is None:
+        me = client.current_summoner()
+        log(f"Eingeloggt als {me.get('gameName') or me.get('displayName')}#{me.get('tagLine', '')}")
+        history = client.history(max_games)
     customs = [g for g in history if is_custom(g)]
     summary.customs = len(customs)
     log(f"{len(history)} Spiele in der Match-History, davon {len(customs)} Custom Games.")
@@ -360,6 +367,121 @@ def ensure_linked(server: Server, cfg: Config, path: Path, me: dict, code: str |
     raise UploaderError("Verknüpfung fehlgeschlagen.")
 
 
+def print_summary(s: Summary, started: float, log=print) -> None:
+    log(f"Fertig in {time.time() - started:.0f}s: {s.uploaded} neue Spiele hochgeladen"
+        f"{f', {s.timelines} Timelines ergänzt' if s.timelines else ''}"
+        f"{f', {s.errors} Fehler' if s.errors else ''}.")
+    for team, n in (s.assigned or {}).items():
+        log(f"  → {n} Spiel(e) dem Team {team} zugeordnet")
+
+
+# ------------------------------------------------------------------ Watch-Modus
+class Watcher:
+    """Läuft im Hintergrund, wartet auf den Client und lädt neue Custom Games nach jedem Spiel hoch.
+
+    Nicht verknüpfte Riot-Accounts werden übersprungen (verknüpfen: Tool einmal normal starten).
+    """
+
+    def __init__(self, cfg: Config, server_factory=None, connect=None, log=print):
+        self.cfg = cfg
+        self.server_factory = server_factory or (lambda: Server(cfg.server))
+        self.connect = connect or (lambda: LeagueClient(find_credentials(cfg.league_path)))
+        self.log = log
+        self.client: LeagueClient | None = None
+        self.server: Server | None = None
+        self.puuid: str | None = None
+        self.linked = False
+        self.handled: set[str] = set()
+        self._waiting = False
+
+    def tick(self) -> Summary | None:
+        try:
+            return self._tick()
+        except (UploaderError, requests.RequestException) as exc:
+            if self.client is not None:
+                self.log(f"Verbindung unterbrochen: {exc}")
+            self.client = None  # beim nächsten Durchlauf neu verbinden
+            return None
+
+    def _tick(self) -> Summary | None:
+        if self.client is None:
+            try:
+                self.client = self.connect()
+                self.client.current_summoner()
+            except (UploaderError, requests.RequestException):
+                self.client = None
+                if not self._waiting:
+                    self.log("Warte auf den League Client …")
+                    self._waiting = True
+                return None
+            self._waiting = False
+        me = self.client.current_summoner()
+        if me.get("puuid") != self.puuid:
+            self._switch_account(me)
+        if not self.linked:
+            return None
+        history = self.client.history(self.cfg.max_games)
+        new = [g for g in history if is_custom(g) and match_id(g) not in self.handled]
+        if not new:
+            return None
+        started = time.time()
+        summary = run(self.client, self.server, self.cfg.max_games, log=self.log, history=history)
+        self.handled.update(match_id(g) for g in history if is_custom(g))
+        if summary.uploaded or summary.timelines or summary.errors:
+            print_summary(summary, started, self.log)
+        return summary
+
+    def _switch_account(self, me: dict) -> None:
+        self.puuid, self.linked, self.handled = me.get("puuid"), False, set()
+        riot_id = f"{me.get('gameName', '')}#{me.get('tagLine', '')}"
+        key = (self.cfg.keys or {}).get(self.puuid)
+        server = self.server_factory()
+        status = server.status(self.puuid, key) if key else {"linked": False}
+        if not status["linked"]:
+            self.log(f"{riot_id} ist nicht mit PrimeStats verknüpft – wird übersprungen. "
+                     "Zum Verknüpfen das Tool einmal ohne --watch starten.")
+            return
+        server.authenticate(self.puuid, key)
+        self.server, self.linked = server, True
+        self.log(f"{riot_id} erkannt – lade neue Custom Games für PrimeStats-Konto {status['username']} hoch.")
+
+    def run_forever(self, interval: int = WATCH_INTERVAL, sleep=time.sleep) -> None:
+        self.log(f"Watch-Modus: prüfe alle {interval}s auf neue Custom Games (Beenden mit Strg+C).")
+        while True:
+            self.tick()
+            sleep(interval)
+
+
+def _timestamped(message: str = "") -> None:
+    print(f"[{time.strftime('%H:%M:%S')}] {message}" if message else "", flush=True)
+
+
+# -------------------------------------------------------------------- Autostart
+def startup_dir() -> Path:
+    appdata = os.getenv("APPDATA")
+    if platform.system() != "Windows" or not appdata:
+        raise UploaderError("Autostart gibt es nur unter Windows.")
+    return Path(appdata) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+
+
+def autostart_command() -> str:
+    if getattr(sys, "frozen", False):
+        target = f'"{sys.executable}"'
+    else:
+        target = f'"{sys.executable}" "{Path(__file__).resolve()}"'
+    return f'@echo off\r\nstart "PrimeStats-Uploader" /min {target} --watch\r\n'
+
+
+def set_autostart(enabled: bool, directory: Path | None = None) -> Path:
+    path = (directory or startup_dir()) / AUTOSTART_NAME
+    if enabled:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(autostart_command(), encoding="utf-8", newline="")
+    elif path.exists():
+        path.unlink()
+    return path
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Lädt Custom Games aus dem League Client zu PrimeStats hoch.")
     parser.add_argument("--code", help="Verknüpfungscode von der Website (nur beim ersten Mal nötig)")
@@ -368,6 +490,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, help="Spiele zusätzlich als JSON-Datei speichern")
     parser.add_argument("--offline", action="store_true", help="Nichts hochladen (nur mit --out sinnvoll)")
     parser.add_argument("--no-pause", action="store_true", help="Am Ende nicht auf Enter warten")
+    parser.add_argument("--watch", action="store_true",
+                        help="Im Hintergrund laufen und neue Custom Games nach jedem Spiel hochladen")
+    parser.add_argument("--interval", type=int, default=WATCH_INTERVAL, help=argparse.SUPPRESS)
+    parser.add_argument("--autostart", choices=["on", "off"],
+                        help="Watch-Modus beim Windows-Start automatisch starten (on) oder nicht mehr (off)")
     parser.add_argument("--version", action="version", version=f"PrimeStats-Uploader {VERSION}")
     args = parser.parse_args(argv)
 
@@ -381,24 +508,36 @@ def main(argv: list[str] | None = None) -> int:
 
     code = 0
     try:
-        if not args.offline and not cfg.server:
-            raise UploaderError("Keine Server-Adresse eingebaut – bitte mit --server starten.")
-        client = LeagueClient(find_credentials(cfg.league_path))
-        me = client.current_summoner()
-        server = None
-        if not args.offline:
-            server = Server(cfg.server)
-            account = ensure_linked(server, cfg, path, me, args.code)
-            print(f"Lade hoch für PrimeStats-Konto {account}.")
-        started = time.time()
-        s = run(client, server, cfg.max_games, args.out)
-        print()
-        if server:
-            print(f"Fertig in {time.time() - started:.0f}s: {s.uploaded} neue Spiele hochgeladen"
-                  f"{f', {s.timelines} Timelines ergänzt' if s.timelines else ''}"
-                  f"{f', {s.errors} Fehler' if s.errors else ''}.")
-            for team, n in (s.assigned or {}).items():
-                print(f"  → {n} Spiel(e) dem Team {team} zugeordnet")
+        if args.autostart:
+            if args.server:
+                cfg.save(path)  # der Autostart liest die Server-Adresse aus der Konfiguration
+            target = set_autostart(args.autostart == "on")
+            print(f"Autostart {'eingerichtet' if args.autostart == 'on' else 'entfernt'}: {target}")
+            args.no_pause = True
+        elif args.watch:
+            if not cfg.server:
+                raise UploaderError("Keine Server-Adresse eingebaut – bitte mit --server starten.")
+            if args.code:  # Verknüpfen und dann direkt weiter beobachten
+                me = LeagueClient(find_credentials(cfg.league_path)).current_summoner()
+                ensure_linked(Server(cfg.server), cfg, path, me, args.code)
+            Watcher(cfg, log=_timestamped).run_forever(max(10, args.interval))
+        else:
+            if not args.offline and not cfg.server:
+                raise UploaderError("Keine Server-Adresse eingebaut – bitte mit --server starten.")
+            client = LeagueClient(find_credentials(cfg.league_path))
+            me = client.current_summoner()
+            server = None
+            if not args.offline:
+                server = Server(cfg.server)
+                account = ensure_linked(server, cfg, path, me, args.code)
+                print(f"Lade hoch für PrimeStats-Konto {account}.")
+            started = time.time()
+            s = run(client, server, cfg.max_games, args.out)
+            print()
+            if server:
+                print_summary(s, started)
+                print("\nTipp: Der Client zeigt nur die letzten ~20 Spiele. Mit --watch (oder --autostart on) "
+                      "lädt das Tool Scrims automatisch direkt nach Spielende hoch.")
     except UploaderError as exc:
         print(f"\nFehler: {exc}")
         code = 1

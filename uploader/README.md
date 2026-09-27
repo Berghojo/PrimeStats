@@ -7,10 +7,14 @@ Beim ersten Start mit einem Riot-Account fragt das Tool nach einem Verknüpfungs
 PrimeStats-Website unter **Konto → „Riot-Account verknüpfen“**. Danach lädt das Tool bei jedem Start ohne
 Rückfrage hoch.
 
+Der Client gibt nur die **letzten ~20 Spiele** heraus. Damit keine Scrims verloren gehen, am besten den
+Watch-Modus nutzen (`--watch`, per `--autostart on` automatisch beim Windows-Start).
+
 ```text
 PrimeStats-Uploader.exe                    # normaler Start
 PrimeStats-Uploader.exe --code K7QX-M2PA   # Code direkt übergeben
-PrimeStats-Uploader.exe --max-games 400    # tiefer in der History suchen
+PrimeStats-Uploader.exe --watch            # im Hintergrund laufen, nach jedem Spiel hochladen
+PrimeStats-Uploader.exe --autostart on     # Watch-Modus mit Windows starten (off = entfernen)
 PrimeStats-Uploader.exe --out scrims.json  # zusätzlich als Datei speichern
 PrimeStats-Uploader.exe --offline --out scrims.json   # nur exportieren, nichts hochladen
 ```

@@ -25,7 +25,7 @@ class FakeResponse:
 class FakeLcuSession:
     """Bildet die LCU-Endpunkte für einen eingeloggten Spieler nach."""
 
-    def __init__(self, demo_source, riot_id, with_timelines=True):
+    def __init__(self, demo_source, riot_id, with_timelines=True, page_cap=None):
         self.headers = {}
         self.verify = True
         self.account = demo_source.account(riot_id)
@@ -34,16 +34,23 @@ class FakeLcuSession:
                       for mid in ids}
         self.order = list(self.games)
         self.with_timelines = with_timelines
+        #: wie echte Clients: nur die neuesten Spiele, ältere Seiten liefern wieder dieselben
+        self.page_cap = page_cap
+        self.online = True
         self.calls = []
 
     def get(self, url, params=None, timeout=None):
         path = url.split("127.0.0.1:1234", 1)[1]
         self.calls.append(path)
+        if not self.online:
+            raise up.requests.ConnectionError("Client geschlossen")
         if path == "/lol-summoner/v1/current-summoner":
             return FakeResponse(200, {"gameName": self.account["gameName"], "tagLine": self.account["tagLine"],
                                       "puuid": self.account["puuid"]})
         if path.endswith("/current-summoner/matches"):
             begin, end = params["begIndex"], params["endIndex"]
+            if self.page_cap:
+                begin, end = 0, self.page_cap
             # Listeneinträge enthalten im Client nur den eigenen Teilnehmer
             page = []
             for gid in self.order[begin:end]:
@@ -167,3 +174,61 @@ def test_config_roundtrip(tmp_path):
 def test_baked_server_url(monkeypatch):
     monkeypatch.setattr(up, "DEFAULT_SERVER", "https://primestats.example.de")
     assert up.Config.load(Path("/nicht/vorhanden.ini")).server == "https://primestats.example.de"
+
+
+def test_history_stops_when_client_repeats_pages(demo_source):
+    lcu, session = _client_for(demo_source, page_cap=3)
+    assert len(lcu.history(200)) == 3
+    assert sum("/matches" in c for c in session.calls) == 2  # zweite Seite brachte nichts Neues
+
+
+def _watcher(web, demo_source, tmp_path, lcu):
+    server, cfg, _, _ = _linked_tool(web, lcu, tmp_path)
+    logs = []
+    watcher = up.Watcher(cfg, server_factory=lambda: up.Server("http://testserver", session=other_client(web)),
+                         connect=lambda: lcu, log=logs.append)
+    return watcher, logs
+
+
+def test_watch_uploads_new_games_after_each_match(offline_client, demo_source, tmp_path):
+    lcu, session = _client_for(demo_source)
+    newest, *older = session.order
+    session.order = older
+    watcher, logs = _watcher(offline_client, demo_source, tmp_path, lcu)
+
+    first = watcher.tick()
+    assert first.uploaded == len(older) and first.errors == 0
+    assert any("erkannt" in line for line in logs)
+
+    session.calls.clear()
+    assert watcher.tick() is None  # nichts Neues -> kein Server-Aufruf, keine Details geladen
+    assert not any("/games/" in c for c in session.calls)
+
+    session.order = [newest, *older]  # Spiel beendet
+    assert watcher.tick().uploaded == 1
+    assert offline_client.app.state.service.store.get_match(f"EUW1_{newest}") is not None
+
+
+def test_watch_waits_for_client_and_skips_unlinked_accounts(offline_client, demo_source, tmp_path):
+    lcu, session = _client_for(demo_source)
+    watcher, logs = _watcher(offline_client, demo_source, tmp_path, lcu)
+    session.online = False
+    assert watcher.tick() is None and watcher.tick() is None
+    assert logs.count("Warte auf den League Client …") == 1
+
+    session.online = True
+    assert watcher.tick().uploaded > 0
+
+    # anderer, nicht verknüpfter Riot-Account im Client
+    other, _ = _client_for(demo_source, "NLE Waldgeist#EUW")
+    watcher.client = other
+    assert watcher.tick() is None
+    assert "nicht mit PrimeStats verknüpft" in logs[-1]
+
+
+def test_autostart_file(tmp_path):
+    path = up.set_autostart(True, tmp_path)
+    content = path.read_text(encoding="utf-8")
+    assert path.name == up.AUTOSTART_NAME and "--watch" in content and "/min" in content
+    up.set_autostart(False, tmp_path)
+    assert not path.exists()
