@@ -14,6 +14,7 @@ import { ChampionTable } from "./ChampionTable";
 import { FightCard } from "./Fights";
 import { JungleCard } from "./Jungle";
 import { type ReportKind, PANELS, defaultPanels } from "./panels";
+import { HidePanelButton, PanelRail, panelLabel, type usePanels } from "../ViewCustomizer";
 import { ChampionPools, DraftCards } from "./Pools";
 import { InfoTip } from "../InfoTip";
 
@@ -62,10 +63,12 @@ interface Props {
   hideLabelFilter?: boolean;
   noTimelineHint?: string;
   focus?: string[];
+  /** anpassbare Ansicht: Ausblenden per Knopf im Panel, Leiste rechts mit allen Panels */
+  view?: ReturnType<typeof usePanels>;
 }
 
 export function ReportBody({
-  data, refreshing, kind = "team", panels, teamId, editable = false, hideLabelFilter, noTimelineHint, focus,
+  data, refreshing, kind = "team", panels, teamId, editable = false, hideLabelFilter, noTimelineHint, focus, view,
 }: Props) {
   const [filters, setFilters, resetFilters] = useUrlFilters();
   const [tab, setTab] = useTab<"overview" | "games">("overview");
@@ -76,8 +79,20 @@ export function ReportBody({
   // Spiele der Übersicht: passen zu den Filtern und sind im Spiele-Tab nicht abgewählt
   const statGames = history.filter((g) => g.selected && !excluded.has(g.match_id)).map((g) => g.match_id);
   const shownGames = history.filter((g) => g.selected).length;
-  const visible = (panels ?? defaultPanels(kind)).filter((k) => k !== "games");
+  const visible = (view?.panels ?? panels ?? defaultPanels(kind)).filter((k) => k !== "games");
   const empty = ov.games === 0;
+
+  // Panel mit Ausblenden-Knopf (beim Überfahren) und Sprungziel für die Leiste
+  const slot = (key: string) => {
+    const content = render(key);
+    if (!content) return null;
+    return (
+      <div className="panel-slot" id={`panel-${key}`} key={key}>
+        {view && <HidePanelButton label={panelLabel(kind, key)} onHide={() => view.setPanels(visible.filter((k) => k !== key))} />}
+        {content}
+      </div>
+    );
+  };
 
   const render = (key: string) => {
     if (empty && key !== "games") return null;
@@ -173,6 +188,7 @@ export function ReportBody({
             inlineTimeline excluded={excluded} onExcludedChange={setExcluded} />
         </div>
       ) : (
+      <div className={view ? "report-layout" : undefined}>
       <div className={refreshing ? "stack refreshing" : "stack"}>
         {excluded.size > 0 && (
           <div className="flash small">
@@ -184,10 +200,12 @@ export function ReportBody({
         {empty && <Empty>Keine Spiele für diese Filter.</Empty>}
         {rows.map((row) =>
           row.length === 2 && !empty
-            ? <section className="grid two" key={row.join("+")}>{render(row[0])}{render(row[1])}</section>
-            : <div className="panel" key={row[0]}>{render(row[0])}</div>,
+            ? <section className="grid two" key={row.join("+")}>{slot(row[0])}{slot(row[1])}</section>
+            : <div className="panel" key={row[0]}>{slot(row[0])}</div>,
         )}
-        {!visible.length && <Empty>Alle Panels sind ausgeblendet – über „Ansicht anpassen“ wieder einblenden.</Empty>}
+        {!visible.length && <Empty>Alle Panels sind ausgeblendet – rechts in der Leiste wieder einblenden.</Empty>}
+      </div>
+      {view && <PanelRail kind={kind} {...view} />}
       </div>
       )}
     </>

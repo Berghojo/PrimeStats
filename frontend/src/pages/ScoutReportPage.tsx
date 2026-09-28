@@ -8,7 +8,7 @@ import { useScoutReport, useScoutStatus, useStartScout } from "../api/hooks";
 import { ReportBody, useUrlFilters } from "../components/team/ReportBody";
 import { InfoTip } from "../components/InfoTip";
 import { ErrorBox, Loading, Spinner } from "../components/ui";
-import { usePanels, ViewCustomizer } from "../components/ViewCustomizer";
+import { usePanels } from "../components/ViewCustomizer";
 import { AddToGroup } from "../components/AddToGroup";
 import { ago } from "../lib/format";
 import { useGameData } from "../lib/meta";
@@ -157,10 +157,9 @@ export function ScoutReportPage() {
         {restart.error && <ErrorBox error={restart.error} />}
         <PlayerSelect roster={data.roster} selected={selected.filter((p) => data.roster.some((r) => r.puuid === p))}
           match={matchParam ?? data.match} onChange={setSelection} />
-        <ViewCustomizer kind="scout" {...view} />
       </section>
       <ReportBody data={data} refreshing={report.isFetching} hideLabelFilter focus={data.roster.map((r) => r.puuid)} kind="scout"
-        panels={view.panels}
+        view={view}
         noTimelineHint="Für diese Spiele sind keine Timeline-Daten verfügbar." />
     </>
   );

@@ -10,7 +10,7 @@ export interface PanelDef {
 
 export const PANELS: PanelDef[] = [
   { key: "overview", label: "Kennzahlen" },
-  { key: "gold", label: "Golddifferenz im Spielverlauf", half: true },
+  { key: "gold", label: "Golddifferenz", half: true },
   { key: "objectives", label: "Objectives", half: true },
   { key: "players", label: "Spieler" },
   { key: "champions", label: "Champion-Picks" },
